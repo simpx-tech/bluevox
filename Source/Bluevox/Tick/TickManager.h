@@ -37,14 +37,14 @@ class BLUEVOX_API UTickManager : public UObject, public FTickableGameObject
 	bool bRunningGameTick = false;
 
 	UPROPERTY()
-	TArray<UClass*> TickableClasses;
+	TArray<const UClass*> TickableClasses;
 	
-	TMap<UClass*, TArray<TScriptInterface<IGameTickable>>> TickablesByClass;
+	TMap<const UClass*, TArray<TScriptInterface<IGameTickable>>> TickablesByClass;
 
 	TQueue<TFunction<void()>, EQueueMode::Mpsc> ScheduledFns;
 
 	UFUNCTION()
-	void RemoveTickableByIndexes(const UClass* Class, const TArray<int32>& Indexes);
+	void RemoveTickableByIndexes(TArray<int32>& Indexes);
 	
 	virtual void Tick(float DeltaTime) override;
 

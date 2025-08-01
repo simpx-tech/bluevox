@@ -6,6 +6,7 @@
 #include "VirtualMapTaskManager.h"
 #include "Bluevox/Chunks/ChunkHelper.h"
 #include "Bluevox/Chunks/Position/ChunkPosition.h"
+#include "Bluevox/Chunks/Position/RegionPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/MainController.h"
 
@@ -20,6 +21,9 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 		const auto CurrentChunk = VirtualChunks.Find(LivePosition);
 		if (CurrentChunk)
 		{
+			const auto RegionPos = FRegionPosition::FromChunkPosition(LivePosition);
+			ChunksByRegion.FindOrAdd(RegionPos)--;
+			
 			CurrentChunk->LiveForPlayersAmount--;
 
 			// Downgrade live -> visual
@@ -44,6 +48,9 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 		const auto CurrentChunk = VirtualChunks.Find(FarPosition);
 		if (CurrentChunk)
 		{
+			const auto RegionPos = FRegionPosition::FromChunkPosition(FarPosition);
+			ChunksByRegion.FindOrAdd(RegionPos)--;
+			
 			if (CurrentChunk->LiveForPlayersAmount <= 0)
 			{
 				// Downgrade visual -> remote visual
@@ -78,24 +85,23 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 	
 	for (auto& LivePosition : LiveChunks)
 	{
+		const auto CurrentChunk = VirtualChunks.Find(LivePosition);
+
+		if (CurrentChunk)
 		{
-			FScopeLock Lock(&VirtualChunksLock);
+			CurrentChunk->LiveForPlayersAmount++;
+			CurrentChunk->State = EChunkState::Live;
+		} else
+		{
+			FVirtualChunk NewChunk;
+			NewChunk.State = EChunkState::Live;
+			NewChunk.LiveForPlayersAmount = 1;
+			VirtualChunks.Add(LivePosition, NewChunk);
+		
+			ToLoad.Add(LivePosition);
 
-			const auto CurrentChunk = VirtualChunks.Find(LivePosition);
-
-			if (CurrentChunk)
-			{
-				CurrentChunk->LiveForPlayersAmount++;
-				CurrentChunk->State = EChunkState::Live;
-			} else
-			{
-				FVirtualChunk NewChunk;
-				NewChunk.State = EChunkState::Live;
-				NewChunk.LiveForPlayersAmount = 1;
-				VirtualChunks.Add(LivePosition, NewChunk);
-			
-				ToLoad.Add(LivePosition);
-			}
+			const auto RegionPos = FRegionPosition::FromChunkPosition(LivePosition);
+			ChunksByRegion.FindOrAdd(RegionPos)++;
 		}
 
 		ToRender.Add(LivePosition);
@@ -108,8 +114,6 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 
 	for (auto& FarPosition : FarChunks)
 	{
-		FScopeLock Lock(&VirtualChunksLock);
-		
 		// Already loaded
 		if (VirtualChunks.Contains(FarPosition))
 		{
@@ -137,6 +141,9 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 			}
 
 			ToUnload.Add(FarPosition);
+
+			const auto RegionPos = FRegionPosition::FromChunkPosition(FarPosition);
+			ChunksByRegion.FindOrAdd(RegionPos)++;
 		}
 	}
 	

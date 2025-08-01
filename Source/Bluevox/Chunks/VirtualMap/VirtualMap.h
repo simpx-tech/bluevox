@@ -6,6 +6,7 @@
 #include "VirtualChunk.h"
 #include "Bluevox/Chunks/Position/ChunkPosition.h"
 #include "Bluevox/Chunks/Position/GlobalPosition.h"
+#include "Bluevox/Chunks/Position/RegionPosition.h"
 #include "UObject/Object.h"
 #include "VirtualMap.generated.h"
 
@@ -27,11 +28,9 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 
 	UPROPERTY()
 	TMap<FChunkPosition, FVirtualChunk> VirtualChunks;
-
-	FCriticalSection VirtualChunksLock;
 	
 	UPROPERTY()
-	TMap<FIntVector2, int32> ChunksByRegion;
+	TMap<FRegionPosition, int32> ChunksByRegion;
 
 	UPROPERTY()
 	UVirtualMapTaskManager* TaskManager;
@@ -58,7 +57,4 @@ public:
 	virtual void Tick(float DeltaTime) override;
 
 	virtual TStatId GetStatId() const override;
-
-	// DEV add tick function, check for player positions
-	// DEV on remove, check if region should be removed too
 };

@@ -5,8 +5,11 @@
 
 #include "Bluevox/Game/GameRules.h"
 
-void UTickManager::RemoveTickableByIndexes(const UClass* Class, const TArray<int32>& Indexes)
+void UTickManager::RemoveTickableByIndexes(TArray<int32>& Indexes)
 {
+	const auto Class = TickableClasses.IsValidIndex(CurrentTickableClassIndex) ? TickableClasses[CurrentTickableClassIndex] : nullptr;
+	CurrentTickableIndex -= FMath::Max(Indexes.Num(), 0);
+	
 	if (!TickablesByClass.Contains(Class))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[RemoveTickableByIndexes] Tickable class %s not found in TickablesByClass map."), *Class->GetName());
@@ -17,6 +20,15 @@ void UTickManager::RemoveTickableByIndexes(const UClass* Class, const TArray<int
 	{
 		TickablesByClass[Class].RemoveAt(Index);
 	}
+
+	if (TickablesByClass[Class].Num() == 0)
+	{
+		TickablesByClass.Remove(Class);
+		TickableClasses.Remove(Class);
+		CurrentTickableClassIndex = TickableClasses.Num() > 0 ? CurrentTickableClassIndex - 1 : -1;
+	}
+
+	Indexes.Reset();
 }
 
 void UTickManager::Tick(float DeltaTime)
@@ -31,11 +43,11 @@ void UTickManager::Tick(float DeltaTime)
 	
 	while (!ScheduledFns.IsEmpty() && CurrentBudget > 0)
 	{
-		TFunction<void()> HeavyFn;
-		if (ScheduledFns.Dequeue(HeavyFn))
+		TFunction<void()> Func;
+		if (ScheduledFns.Dequeue(Func))
 		{
 			const auto StartTime = FPlatformTime::Cycles();
-			HeavyFn();
+			Func();
 			const auto EndTime = FPlatformTime::Cycles();
 			CurrentBudget -= EndTime - StartTime;
 		}
@@ -65,30 +77,37 @@ void UTickManager::GameTick()
 	TArray<int32> ToRemoveIdx;
 	
 	ON_SCOPE_EXIT {
-		CurrentTickableIndex -= ToRemoveIdx.Num();
-		RemoveTickableByIndexes(CurrentTickableClass, ToRemoveIdx);
+		RemoveTickableByIndexes(ToRemoveIdx);
 	};
 	
-	bRunningGameTick = true;
 	const auto DeltaTime = GetWorld()->GetDeltaSeconds();
-	for (auto& Pair : TickablesByClass)
+	for (int i = CurrentTickableClassIndex; i < TickableClasses.Num() && i != -1; i++)
 	{
-		CurrentTickableClass = Pair.Key;
-		const auto Len = Pair.Value.Num();
-		
-		for (int i = 0; i < Len; ++i)
+		const auto CurrentTickableClass = TickableClasses[i];
+		const auto CurrentTickableList = TickablesByClass.FindRef(CurrentTickableClass);
+		const auto Len = CurrentTickableList.Num();
+
+		for (int j = CurrentTickableIndex; j < Len; ++j)
 		{
-			const auto& TickableInterface = Pair.Value[i];
+			const auto StartTime = FPlatformTime::Cycles();
+			const auto& TickableInterface = CurrentTickableList[j];
 			if (TickableInterface)
 			{
 				TickableInterface->GameTick(DeltaTime);
 			} else
 			{
-				ToRemoveIdx.Add(i);
+				ToRemoveIdx.Add(j);
+			}
+			const auto EndTime = FPlatformTime::Cycles();
+			CurrentBudget -= EndTime - StartTime;
+
+			if (CurrentBudget <= 0)
+			{
+				return;
 			}
 		}
 
-		RemoveTickableByIndexes(CurrentTickableClass, ToRemoveIdx);
+		RemoveTickableByIndexes(ToRemoveIdx);
 	}
 
 	bRunningGameTick = false;
@@ -118,7 +137,7 @@ void UTickManager::RegisterUObjectTickable(const TScriptInterface<IGameTickable>
 	}
 
 	const UObject* Obj = TickableObject.GetObject();
-	UClass*  ClassKey = Obj->GetClass();
+	const UClass* ClassKey = Obj->GetClass();
 	TArray<TScriptInterface<IGameTickable>>& Bucket = TickablesByClass.FindOrAdd(ClassKey);
 	Bucket.AddUnique(TickableObject);
 }
