@@ -1,0 +1,49 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "GameManager.h"
+
+#include "MainCharacter.h"
+#include "MainController.h"
+#include "Bluevox/Chunks/ChunkRegistry.h"
+#include "Bluevox/Chunks/VirtualMap/VirtualMap.h"
+#include "Bluevox/Tick/TickManager.h"
+#include "Kismet/GameplayStatics.h"
+
+
+// Sets default values
+AGameManager::AGameManager()
+{
+	// Set this actor to call Tick() every frame.  You can turn this off to improve performance if you don't need it.
+	PrimaryActorTick.bCanEverTick = false;
+}
+
+// Called when the game starts or when spawned
+void AGameManager::BeginPlay()
+{
+	Super::BeginPlay();
+
+	bServer = GetNetMode() == NM_ListenServer || GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_Standalone;
+	bClient = GetNetMode() == NM_Client || GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer;
+	bClientOnly = GetNetMode() == NM_Client;
+	bDedicatedServer = GetNetMode() == NM_DedicatedServer;
+	bStandalone = GetNetMode() == NM_Standalone;
+
+	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"));
+	VirtualMap->Init(this);
+	
+	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"));
+
+	TickManager = NewObject<UTickManager>(this, TEXT("TaskManager"));
+	TickManager->Init();
+	
+	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
+	LocalController = Cast<AMainController>(Controller);
+
+	const auto PlayerState = UGameplayStatics::GetPlayerState(GetWorld(), 0);
+	LocalPlayerState = PlayerState;
+
+	const auto Character = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
+	LocalCharacter = Cast<AMainCharacter>(Character);
+}
+
