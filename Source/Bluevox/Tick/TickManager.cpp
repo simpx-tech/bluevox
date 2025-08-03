@@ -124,9 +124,10 @@ void UTickManager::RecalculateBudget()
 	CalculatedTickBudget = static_cast<uint64>(BudgetSeconds / SecondsPerCycle);
 }
 
-void UTickManager::Init()
+UTickManager* UTickManager::Init()
 {
 	RecalculateBudget();
+	return this;
 }
 
 void UTickManager::RegisterUObjectTickable(const TScriptInterface<IGameTickable>& TickableObject)
@@ -166,40 +167,3 @@ void UTickManager::ScheduleFn(TFunction<void()>&& Func)
 	ScheduledFns.Enqueue(MoveTemp(Func));
 }
 
-template <typename AsyncFunc, typename ThenFunc, typename ValidateFunc = decltype([](auto&&){ return true; })>
-void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn,
-	ValidateFunc&& StillValidFn)
-{
-	PendingTasks++;
-	
-	auto Fut = Async(EAsyncExecution::ThreadPool, AsyncFn);
-	using FutureType = decltype(Fut);
-	using ReturnType = typename FutureType::ElementType;
-
-	Fut.Then([ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn)](TFuture<ReturnType>&& Future)
-	{
-		if constexpr (std::is_same_v<ReturnType, void>)
-		{
-			ScheduleFn(
-				[ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn), this]
-				{
-					if (StillValidFn())
-						ThenFn();
-					PendingTasks--;
-				}
-			);
-		}
-		else
-		{
-			auto Result = Future.Get();
-			ScheduleFn(
-				[ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn), Result = MoveTemp(Result), this]
-				{
-					if (StillValidFn(Result))
-						ThenFn(Result);
-					PendingTasks--;
-				}
-			);
-		}
-	});
-}

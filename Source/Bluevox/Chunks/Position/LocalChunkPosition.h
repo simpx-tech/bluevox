@@ -32,3 +32,8 @@ struct FLocalChunkPosition
 		return FString::Printf(TEXT("LocalChunkPosition(X: %d, Y: %d)"), X, Y);
 	}
 };
+
+FORCEINLINE uint32 GetTypeHash(const FLocalChunkPosition& Pos)
+{
+	return HashCombine(GetTypeHash(Pos.X), GetTypeHash(Pos.Y));
+}

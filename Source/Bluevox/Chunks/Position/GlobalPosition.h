@@ -30,3 +30,8 @@ struct FGlobalPosition
 	UPROPERTY()
 	int Z = 0;
 };
+
+FORCEINLINE uint32 GetTypeHash(const FGlobalPosition& Pos)
+{
+	return HashCombine(GetTypeHash(Pos.X), GetTypeHash(Pos.Y), GetTypeHash(Pos.Z));
+}

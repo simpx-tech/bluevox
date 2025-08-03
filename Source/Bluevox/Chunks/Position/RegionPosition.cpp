@@ -5,7 +5,7 @@ FRegionPosition FRegionPosition::FromChunkPosition(const FChunkPosition& ChunkPo
 {
 	FRegionPosition RegionPosition;
 	RegionPosition.X = ChunkPosition.X / GameRules::Chunk::Size;
-	RegionPosition.Y = ChunkPosition.Y / 16;
+	RegionPosition.Y = ChunkPosition.Y / GameRules::Chunk::Size;
 	
 	return RegionPosition;
 }

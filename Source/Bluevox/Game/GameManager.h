@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "GameManager.generated.h"
 
+class UWorldSave;
 class UTickManager;
 class UChunkRegistry;
 class AMainCharacter;
@@ -58,4 +59,7 @@ public:
 
 	UPROPERTY(BlueprintReadWrite, Category = "Game")
 	AMainCharacter* LocalCharacter = nullptr;
+
+	UPROPERTY()
+	UWorldSave* WorldSave = nullptr;
 };

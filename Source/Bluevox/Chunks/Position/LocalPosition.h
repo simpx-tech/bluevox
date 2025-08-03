@@ -22,3 +22,8 @@ struct FLocalPosition
 	UPROPERTY()
 	uint8 Z = 0;
 };
+
+FORCEINLINE uint32 GetTypeHash(const FLocalPosition& Pos)
+{
+	return HashCombine(GetTypeHash(Pos.X), GetTypeHash(Pos.Y), GetTypeHash(Pos.Z));
+}

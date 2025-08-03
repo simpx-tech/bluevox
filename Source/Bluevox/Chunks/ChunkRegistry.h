@@ -4,12 +4,14 @@
 
 #include "CoreMinimal.h"
 #include "Position/RegionPosition.h"
+#include "Position/ChunkPosition.h"
 #include "UObject/Object.h"
 #include "ChunkRegistry.generated.h"
 
+class UWorldSave;
+class AGameManager;
 struct FRegionFile;
 class UChunkData;
-struct FChunkPosition;
 class AChunk;
 class URegion;
 
@@ -28,14 +30,19 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	FCriticalSection RegionsLock;
 
 	UPROPERTY()
-	TMap<const FChunkPosition, UChunkData*> ChunksData;
+	TMap<FChunkPosition, UChunkData*> ChunksData;
 
 	FCriticalSection ChunksDataLock;
 
 	UPROPERTY()
-	TMap<const FChunkPosition, AChunk*> ChunkActors;
+	TMap<FChunkPosition, AChunk*> ChunkActors;
+
+	UPROPERTY()
+	UWorldSave* WorldSave;
 	
 public:
+	UChunkRegistry* Init(const AGameManager* InGameManager);
+	
 	TSharedPtr<FRegionFile> LoadRegionFile(const FRegionPosition& Position);
 	
 	UFUNCTION()

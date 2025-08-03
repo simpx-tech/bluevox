@@ -63,15 +63,67 @@ class BLUEVOX_API UTickManager : public UObject, public FTickableGameObject
 public:
 	void RecalculateBudget();
 	
-	void Init();
+	UTickManager* Init();
 	
 	void RegisterUObjectTickable(const TScriptInterface<IGameTickable>& TickableObject);
 
 	void UnregisterUObjectTickable(const TScriptInterface<IGameTickable>& TickableObject);
 
 	template <typename AsyncFunc, typename ThenFunc, typename ValidateFunc = decltype([](auto&&){ return true; })>
-void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn,
-	ValidateFunc&& StillValidFn = [](auto&&) { return true; });
+	void RunAsyncThen(
+		AsyncFunc&& AsyncFn,
+		ThenFunc&& ThenFn,
+		ValidateFunc&& StillValidFn = [](auto&&) { return true; }
+	);
 
 	void ScheduleFn(TFunction<void()>&& Func);
 };
+
+template <typename AsyncFunc, typename ThenFunc, typename ValidateFunc>
+void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn, ValidateFunc&& StillValidFn)
+{
+	// bump our counter immediately
+	PendingTasks++;
+
+	// figure out what AsyncFn() returns
+	using ReturnType = std::invoke_result_t<AsyncFunc>;
+
+	// fire off the background task
+	auto Fut = Async(EAsyncExecution::ThreadPool, Forward<AsyncFunc>(AsyncFn));
+
+	Fut.Then([Instance = this,
+			  ThenFn      = MoveTemp(ThenFn),
+			  StillValidFn = MoveTemp(StillValidFn)](TFuture<ReturnType>&& Future) mutable
+	{
+		if constexpr (std::is_void_v<ReturnType>)
+		{
+			Instance->ScheduleFn(
+				[Instance,
+				 ThenFn      = MoveTemp(ThenFn),
+				 StillValidFn = MoveTemp(StillValidFn)]() mutable
+				{
+					if (StillValidFn())
+					{
+						ThenFn();
+					}
+					Instance->PendingTasks--;
+				});
+		}
+		else
+		{
+			ReturnType Result = Future.Get();
+			Instance->ScheduleFn(
+				[Instance,
+				 ThenFn      = MoveTemp(ThenFn),
+				 StillValidFn = MoveTemp(StillValidFn),
+				 Result      = MoveTemp(Result)]() mutable
+				{
+					if (StillValidFn(Result))
+					{
+						ThenFn(Result);
+					}
+					Instance->PendingTasks--;
+				});
+		}
+	});
+}

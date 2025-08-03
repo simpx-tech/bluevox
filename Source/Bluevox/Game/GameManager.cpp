@@ -5,7 +5,9 @@
 
 #include "MainCharacter.h"
 #include "MainController.h"
+#include "WorldSave.h"
 #include "Bluevox/Chunks/ChunkRegistry.h"
+#include "Bluevox/Chunks/Generator/ChunkGenerator.h"
 #include "Bluevox/Chunks/VirtualMap/VirtualMap.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "Kismet/GameplayStatics.h"
@@ -29,13 +31,11 @@ void AGameManager::BeginPlay()
 	bDedicatedServer = GetNetMode() == NM_DedicatedServer;
 	bStandalone = GetNetMode() == NM_Standalone;
 
-	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"));
-	VirtualMap->Init(this);
+	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
 	
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"));
 
-	TickManager = NewObject<UTickManager>(this, TEXT("TaskManager"));
-	TickManager->Init();
+	TickManager = NewObject<UTickManager>(this, TEXT("TaskManager"))->Init();
 	
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	LocalController = Cast<AMainController>(Controller);
@@ -45,5 +45,8 @@ void AGameManager::BeginPlay()
 
 	const auto Character = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
 	LocalCharacter = Cast<AMainCharacter>(Character);
+
+	// DEV temp
+	WorldSave = UWorldSave::CreateOrLoadWorldSave("TestWorld", UChunkGenerator::StaticClass());
 }
 

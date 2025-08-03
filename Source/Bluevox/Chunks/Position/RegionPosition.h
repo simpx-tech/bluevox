@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "Bluevox/Game/GameRules.h"
 #include "RegionPosition.generated.h"
 
 struct FChunkPosition;
@@ -22,4 +21,15 @@ struct FRegionPosition
 
 	UPROPERTY()
 	int32 Y = 0;
+
+	bool operator==(FRegionPosition const& Other) const
+	{
+		return X == Other.X
+			&& Y == Other.Y;
+	}
 };
+
+FORCEINLINE uint32 GetTypeHash(const FRegionPosition& Pos)
+{
+	return HashCombine(GetTypeHash(Pos.X), GetTypeHash(Pos.Y));
+}

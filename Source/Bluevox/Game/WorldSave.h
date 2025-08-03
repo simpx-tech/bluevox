@@ -3,10 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Bluevox/Chunks/RegionFile.h"
 #include "UObject/Object.h"
 #include "WorldSave.generated.h"
 
+struct FRegionFile;
 struct FRegionPosition;
 class URegion;
 class UChunkGenerator;
@@ -30,6 +30,8 @@ public:
 	}
 	
 	static UWorldSave* LoadWorldSave(const FString& InWorldName);
+
+	static UWorldSave* CreateOrLoadWorldSave(const FString& InWorldName, const TSubclassOf<UChunkGenerator>& ChunkGeneratorClass);
 
 	static FString GetWorldsDir()
 	{
@@ -61,7 +63,7 @@ public:
 		return GetSaveDir(WorldName) / "world.dat";
 	}
 
-	FRegionFile GetRegionFromDisk(const FRegionPosition& RegionPosition) const;
+	TSharedPtr<FRegionFile> GetRegionFromDisk(const FRegionPosition& RegionPosition) const;
 
 	// DEV load player
 

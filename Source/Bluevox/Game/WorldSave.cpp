@@ -3,6 +3,8 @@
 
 #include "WorldSave.h"
 
+#include "Bluevox/Chunks/RegionFile.h"
+
 void UWorldSave::CreateSaveFolder(const FString& InWorldName)
 {
 	if (!IFileManager::Get().MakeDirectory(*GetRegionsDir(InWorldName), true))
@@ -51,7 +53,24 @@ UWorldSave* UWorldSave::LoadWorldSave(const FString& InWorldName)
 	return WorldSave;
 }
 
-FRegionFile UWorldSave::GetRegionFromDisk(const FRegionPosition& RegionPosition) const
+UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
+	const TSubclassOf<UChunkGenerator>& ChunkGeneratorClass)
+{
+	if (HasWorldSave(InWorldName))
+	{
+		return LoadWorldSave(InWorldName);
+	}
+
+	const auto WorldSave = NewObject<UWorldSave>();
+	WorldSave->WorldName = InWorldName;
+	WorldSave->SaveVersion = 1; // Initial version
+	WorldSave->ChunkGeneratorClass = ChunkGeneratorClass;
+	WorldSave->Save();
+	
+	return WorldSave;
+}
+
+TSharedPtr<FRegionFile> UWorldSave::GetRegionFromDisk(const FRegionPosition& RegionPosition) const
 {
 	return FRegionFile::NewFromDisk(WorldName, RegionPosition);
 }

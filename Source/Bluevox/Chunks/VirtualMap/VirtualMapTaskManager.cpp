@@ -46,7 +46,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 				}
 				// DEV check if we can send this to any player (PendingNetSend)
 				// DEV also schedule spawn actor and save to ChunkRegistry
-			}, [this, ChunkPosition]
+			}, [this, ChunkPosition] (UChunkData* ChunkData)
 			{
 				return ProcessingLoad.FindRef(ChunkPosition) == true;
 			});

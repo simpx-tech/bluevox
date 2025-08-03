@@ -4,8 +4,15 @@
 #include "ChunkRegistry.h"
 
 #include "RegionFile.h"
+#include "Bluevox/Game/GameManager.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
+
+UChunkRegistry* UChunkRegistry::Init(const AGameManager* InGameManager)
+{
+	WorldSave = InGameManager->WorldSave;
+	return this;
+}
 
 TSharedPtr<FRegionFile> UChunkRegistry::LoadRegionFile(const FRegionPosition& Position)
 {
@@ -17,7 +24,7 @@ TSharedPtr<FRegionFile> UChunkRegistry::LoadRegionFile(const FRegionPosition& Po
 		}
 	}
 
-	const auto RegionFile = FRegionFile::NewFromDisk(Position);
+	const auto RegionFile = WorldSave->GetRegionFromDisk(Position);
 	{
 		FScopeLock Lock(&RegionsLock);
 		Regions.Add(Position, RegionFile);
@@ -75,5 +82,10 @@ UChunkData* UChunkRegistry::LoadChunkData(const FChunkPosition& Position)
 
 AChunk* UChunkRegistry::GetChunkActor(const FChunkPosition& Position) const
 {
-	return ChunkActors.Find(Position);
+	if (ChunkActors.Contains(Position))
+	{
+		return ChunkActors[Position];
+	}
+
+	return nullptr;
 }

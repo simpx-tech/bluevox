@@ -37,3 +37,8 @@ struct FChunkPosition
 		return FString::Printf(TEXT("ChunkPosition(X: %d, Y: %d)"), X, Y);
 	}
 };
+
+FORCEINLINE uint32 GetTypeHash(const FChunkPosition& Pos)
+{
+	return HashCombine(GetTypeHash(Pos.X), GetTypeHash(Pos.Y));
+}

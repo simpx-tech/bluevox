@@ -6,6 +6,8 @@
 USTRUCT(BlueprintType)
 struct FSectionHeader
 {
+	GENERATED_BODY()
+	
 	UPROPERTY()
 	uint32 Offset = 0;
 
@@ -19,6 +21,8 @@ struct FSectionHeader
 USTRUCT(BlueprintType)
 struct FSegmentedHeaderBase
 {
+	GENERATED_BODY()
+	
 	FSegmentedHeaderBase() {}
 
 	FSegmentedHeaderBase(const uint32 InSegmentSize, const uint32 InSectionsCount)
@@ -35,7 +39,7 @@ struct FSegmentedHeaderBase
 };
 
 USTRUCT(BlueprintType)
-struct FSegmentedHeader : FSegmentedHeaderBase
+struct FSegmentedHeader : public FSegmentedHeaderBase
 {
 	GENERATED_BODY()
 
@@ -73,9 +77,9 @@ struct FSegmentedHeader : FSegmentedHeaderBase
 			return false;
 		}
 
-		const uint64 BytesForArray = static_cast<uint64>(Flat.SectionsCount) *
+		const int32 BytesForArray = static_cast<uint64>(Flat.SectionsCount) *
 									 sizeof(FSectionHeader);
-		if (Handle->Size() < sizeof(Flat) + BytesForArray)
+		if (Handle->Size() < static_cast<int32>(sizeof(Flat)) + BytesForArray)
 		{
 			// Truncated file
 			return false;

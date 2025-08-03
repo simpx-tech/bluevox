@@ -2,13 +2,9 @@
 
 #include "CoreMinimal.h"
 #include "SegmentedHeader.h"
-#include "SegmentedFile.generated.h"
 
-USTRUCT(BlueprintType)
 struct FSegmentedFile
 {
-	GENERATED_BODY()
-
 	FSegmentedFile()
 	{
 	}
@@ -22,14 +18,9 @@ struct FSegmentedFile
 		}
 	}
 
-	FCriticalSection FileLock;
-
-	TUniquePtr<IFileHandle> FileHandle;
-
-	FSegmentedHeader Header;
-
-	bool WriteSegment(const uint32 Index, const TArray<uint8>& Data)
+	bool WriteSegment(const int32 Index, const TArray<uint8>& Data)
 	{
+		FWriteScopeLock WriteLock(FileLock);
 		if (!Header.SectionsHeaders.IsValidIndex(Index))
 		{
 			checkf(false, TEXT("Invalid section index: %d"), Index);
@@ -38,7 +29,7 @@ struct FSegmentedFile
 
 		// Resize if necessary
 		const auto TotalSize = Data.Num();
-		if (TotalSize > Header.SectionsHeaders[Index].SegmentsUsed * Header.SegmentSize)
+		if (TotalSize > static_cast<int32>(Header.SectionsHeaders[Index].SegmentsUsed * Header.SegmentSize))
 		{
 			const auto SegmentsNeeded = FMath::CeilToInt(static_cast<float>(TotalSize) / Header.SegmentSize);
 			const auto SegmentsAdded = SegmentsNeeded - Header.SectionsHeaders[Index].SegmentsUsed;
@@ -49,7 +40,6 @@ struct FSegmentedFile
 			// If there are other segments after this one, we need to shift them
 			if (Index + 1 < Header.SectionsHeaders.Num())
 			{
-				const auto ResizedHeader = Header.SectionsHeaders[Index];
 				const auto NextHeader = Header.SectionsHeaders[Index + 1];
 					
 				for (int32 i = Index + 1; i < Header.SectionsHeaders.Num(); ++i)
@@ -95,8 +85,9 @@ struct FSegmentedFile
 		return true;
 	}
 
-	bool ReadSegment(const uint32 Index, TArray<uint8>& OutData)
+	bool ReadSegment(const int32 Index, TArray<uint8>& OutData)
 	{
+		FReadScopeLock ReadLock(FileLock);
 		if (!Header.SectionsHeaders.IsValidIndex(Index))
 		{
 			checkf(false, TEXT("Invalid section index: %d"), Index);
@@ -160,4 +151,10 @@ struct FSegmentedFile
 
 		return SegmentedFile;
 	}
+private:
+	FRWLock FileLock;
+
+	TUniquePtr<IFileHandle> FileHandle;
+
+	FSegmentedHeader Header;
 };
