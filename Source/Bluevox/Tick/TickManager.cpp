@@ -170,6 +170,8 @@ template <typename AsyncFunc, typename ThenFunc, typename ValidateFunc = decltyp
 void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn,
 	ValidateFunc&& StillValidFn)
 {
+	PendingTasks++;
+	
 	auto Fut = Async(EAsyncExecution::ThreadPool, AsyncFn);
 	using FutureType = decltype(Fut);
 	using ReturnType = typename FutureType::ElementType;
@@ -179,10 +181,11 @@ void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn,
 		if constexpr (std::is_same_v<ReturnType, void>)
 		{
 			ScheduleFn(
-				[ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn)]
+				[ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn), this]
 				{
 					if (StillValidFn())
 						ThenFn();
+					PendingTasks--;
 				}
 			);
 		}
@@ -190,10 +193,11 @@ void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn,
 		{
 			auto Result = Future.Get();
 			ScheduleFn(
-				[ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn), Result = MoveTemp(Result)]
+				[ThenFn = MoveTemp(ThenFn), StillValidFn = MoveTemp(StillValidFn), Result = MoveTemp(Result), this]
 				{
 					if (StillValidFn(Result))
 						ThenFn(Result);
+					PendingTasks--;
 				}
 			);
 		}

@@ -44,13 +44,10 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 
 	UPROPERTY()
 	UTickManager* TickManager = nullptr;
-
-	FThreadSafeCounter PendingTasks = 0;
 public:
 	UVirtualMapTaskManager* Init(const AGameManager* GameManager);
 
 	// TODO handle world begin destroy, wait for all tasks to finish
-	// TODO because of this, nothing should depend on main thread, so we should use locks here (?)
 	
 	UFUNCTION()
 	void ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad);

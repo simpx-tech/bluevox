@@ -21,7 +21,6 @@ struct FPendingReceive : public FPacketHeader
 	UPROPERTY()
 	TArray<uint8> Data;
 
-	// DEV request resend logic
 	UPROPERTY()
 	double LastPacketTime = 0;
 

@@ -30,11 +30,22 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 		{
 			TickManager->RunAsyncThen([this, ChunkPosition]
 			{
-				const auto ChunkData = ChunkRegistry->GetChunkDataFromDisk(ChunkPosition);
-				return ChunkData;
-			}, []
+				return ChunkRegistry->LoadChunkData(ChunkPosition);
+			}, [ChunkPosition, this] (UChunkData* ChunkData)
 			{
-				
+				if (PendingNetSend.Contains(ChunkPosition))
+				{
+					for (const auto& Player : PendingNetSend[ChunkPosition])
+					{
+						if (VirtualMap->VirtualChunks.Contains(ChunkPosition))
+						{
+							const auto Chunk = ChunkRegistry->GetChunkData(ChunkPosition);
+							Player->PlayerNetwork->SendToClient(NewObject<UChunkDataNetworkPacket>()->Init(Chunk));
+						}
+					}
+				}
+				// DEV check if we can send this to any player (PendingNetSend)
+				// DEV also schedule spawn actor and save to ChunkRegistry
 			}, [this, ChunkPosition]
 			{
 				return ProcessingLoad.FindRef(ChunkPosition) == true;
@@ -52,6 +63,7 @@ void UVirtualMapTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksTo
 {
 	for (const auto& ChunkPosition : ChunksToRender)
 	{
+		// Only add the ones that are not being unloaded
 		if (!ProcessingUnload.Contains(ChunkPosition))
 		{
 			PendingRender.Add(ChunkPosition);
@@ -110,5 +122,5 @@ TStatId UVirtualMapTaskManager::GetStatId() const
 
 void UVirtualMapTaskManager::Tick(float DeltaTime)
 {
-	// DEV 
+	// DEV check if we can process the render tasks (?)
 }

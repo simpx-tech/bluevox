@@ -3,10 +3,12 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "RegionFile.h"
+#include "Position/RegionPosition.h"
 #include "UObject/Object.h"
 #include "ChunkRegistry.generated.h"
 
+struct FRegionFile;
+class UChunkData;
 struct FChunkPosition;
 class AChunk;
 class URegion;
@@ -19,29 +21,35 @@ class BLUEVOX_API UChunkRegistry : public UObject
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
-	TMap<FIntVector2, FRegionFile> Regions;
+	friend class UVirtualMapTaskManager;
+	
+	TMap<FRegionPosition, TSharedPtr<FRegionFile>> Regions;
+
+	FCriticalSection RegionsLock;
 
 	UPROPERTY()
-	TMap<FIntVector2, UChunkData*> ChunkData;
+	TMap<const FChunkPosition, UChunkData*> ChunksData;
+
+	FCriticalSection ChunksDataLock;
 
 	UPROPERTY()
-	TMap<FIntVector2, AChunk*> Chunks;
+	TMap<const FChunkPosition, AChunk*> ChunkActors;
 	
 public:
-	// DEV keep regions files and chunks get logic
-	UFUNCTION()
-	UChunkData* GetChunkData(const FChunkPosition& Position) const;
-
-	UFUNCTION()
-	UChunkData* GetChunkDataFromDisk(const FChunkPosition& Position);
+	TSharedPtr<FRegionFile> LoadRegionFile(const FRegionPosition& Position);
 	
 	UFUNCTION()
-	bool HasChunkData(const FChunkPosition& Position) const;
+	UChunkData* GetChunkData(const FChunkPosition& Position);
+
+	UFUNCTION()
+	UChunkData* FetchChunkDataFromDisk(const FChunkPosition& Position);
+	
+	UFUNCTION()
+	bool HasChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
 	UChunkData* LoadChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
-	AChunk* GetChunk(const FChunkPosition& Position) const;
+	AChunk* GetChunkActor(const FChunkPosition& Position) const;
 };

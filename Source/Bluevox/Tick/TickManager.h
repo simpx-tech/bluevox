@@ -37,6 +37,9 @@ class BLUEVOX_API UTickManager : public UObject, public FTickableGameObject
 	bool bRunningGameTick = false;
 
 	UPROPERTY()
+	int32 PendingTasks = 0;
+
+	UPROPERTY()
 	TArray<const UClass*> TickableClasses;
 	
 	TMap<const UClass*, TArray<TScriptInterface<IGameTickable>>> TickablesByClass;
@@ -54,6 +57,8 @@ class BLUEVOX_API UTickManager : public UObject, public FTickableGameObject
 	void PrepareForGameTick();
 	
 	void GameTick();
+
+	// TODO handle BeginDestroy -> wait for all tasks to finish
 	
 public:
 	void RecalculateBudget();

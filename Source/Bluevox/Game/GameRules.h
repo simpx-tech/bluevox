@@ -110,8 +110,9 @@ namespace GameRules::Tick
 		TEXT("game.ticks.budget_ns"), TickBudget,
 		TEXT("Maximum time (in nanoseconds) before spreading tasks across frames"), ECVF_Default);
 }
-
 #endif
+
+// Non constants variables
 
 namespace GameRules::Distances
 {
