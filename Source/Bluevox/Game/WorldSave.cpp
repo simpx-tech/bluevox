@@ -3,7 +3,9 @@
 
 #include "WorldSave.h"
 
-#include "Bluevox/Chunks/RegionFile.h"
+#include "MainController.h"
+#include "Bluevox/Chunk/RegionFile.h"
+#include "GameFramework/PlayerState.h"
 
 void UWorldSave::CreateSaveFolder(const FString& InWorldName)
 {
@@ -54,7 +56,7 @@ UWorldSave* UWorldSave::LoadWorldSave(const FString& InWorldName)
 }
 
 UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
-	const TSubclassOf<UChunkGenerator>& ChunkGeneratorClass)
+	const TSubclassOf<UWorldGenerator>& ChunkGeneratorClass)
 {
 	if (HasWorldSave(InWorldName))
 	{
@@ -63,7 +65,7 @@ UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
 
 	const auto WorldSave = NewObject<UWorldSave>();
 	WorldSave->WorldName = InWorldName;
-	WorldSave->SaveVersion = 1; // Initial version
+	WorldSave->SaveVersion = 1;
 	WorldSave->ChunkGeneratorClass = ChunkGeneratorClass;
 	WorldSave->Save();
 	
@@ -73,6 +75,54 @@ UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
 TSharedPtr<FRegionFile> UWorldSave::GetRegionFromDisk(const FRegionPosition& RegionPosition) const
 {
 	return FRegionFile::NewFromDisk(WorldName, RegionPosition);
+}
+
+bool UWorldSave::SavePlayer(AMainController* PlayerController) const
+{
+	if (!PlayerController)
+	{
+		checkf(false, TEXT("PlayerController is null"));
+		return false;
+	}
+	
+	const auto PlayerState = PlayerController->GetPlayerState<APlayerState>();
+
+	const auto FilePath = GetPlayersDir(WorldName) / FString::Printf(TEXT("%s.dat"), *PlayerState->GetPlayerName());
+
+	TArray<uint8> ByteArray;
+	FMemoryWriter MemoryWriter(ByteArray, true);
+	PlayerController->Serialize(MemoryWriter);
+
+	if (!FFileHelper::SaveArrayToFile(MoveTemp(ByteArray), *FilePath))
+	{
+		checkf(false, TEXT("Failed to save player data for %s"), *PlayerState->GetPlayerName());
+		return false;
+	}
+
+	return true;
+}
+
+bool UWorldSave::LoadPlayer(AMainController* PlayerController) const
+{
+	if (!PlayerController)
+	{
+		checkf(false, TEXT("PlayerController is null"));
+		return false;
+	}
+
+	const auto PlayerState = PlayerController->GetPlayerState<APlayerState>();
+	const auto FilePath = GetPlayersDir(WorldName) / FString::Printf(TEXT("%s.dat"), *PlayerState->GetPlayerName());
+
+	TArray<uint8> ByteArray;
+	if (!FFileHelper::LoadFileToArray(ByteArray, *FilePath))
+	{
+		checkf(false, TEXT("Failed to load player data for %s"), *PlayerState->GetPlayerName());
+		return false;
+	}
+
+	FMemoryReader MemoryReader(ByteArray, true);
+	PlayerController->Serialize(MemoryReader);
+	return true;
 }
 
 void UWorldSave::Save()

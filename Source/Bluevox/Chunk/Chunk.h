@@ -6,6 +6,13 @@
 #include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
+struct FRenderChunkPayload;
+
+namespace UE::Geometry
+{
+	class FDynamicMesh3;
+}
+
 class UChunkData;
 class UDynamicMeshComponent;
 
@@ -29,11 +36,14 @@ protected:
 	bool bRendered = false;
 
 	UPROPERTY()
-	UChunkData* Data;
-
-	UPROPERTY()
 	uint32 RenderedAtDirtyChanges = 0;
 
-	UFUNCTION()
-	void Render(EChunkState State);
+public:
+	UPROPERTY()
+	UChunkData* Data;
+	
+	// DEV pass neighbor chunks copy (?) -> at least their border columns
+	void BeginRender(FRenderChunkPayload&& Payload, UE::Geometry::FDynamicMesh3& OutMesh);
+
+	void CommitRender(UE::Geometry::FDynamicMesh3&& Mesh);
 };

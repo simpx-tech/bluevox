@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Chunk/Position/GlobalPosition.h"
 #include "GameFramework/PlayerController.h"
 #include "MainController.generated.h"
 
@@ -27,12 +28,16 @@ class BLUEVOX_API AMainController : public APlayerController
 	void Sv_SetClientReady(bool bReady);
 
 	UFUNCTION(BlueprintCallable, Category = "Game")
-	void HandleOnClientReadyChanged();
+	void HandleOnClientReadyChanged() const;
 
 	UPROPERTY(Replicated)
 	int32 FarDistance = 12;
 	
 public:
+	// DEV remember to update this before saving
+	UPROPERTY()
+	FGlobalPosition SavedGlobalPosition;
+	
 	UFUNCTION()
 	int32 GetFarDistance() const;
 	
@@ -78,4 +83,6 @@ public:
 	void SetClientReady(bool bReady);
 
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+
+	virtual void Serialize(FArchive& Ar) override;
 };

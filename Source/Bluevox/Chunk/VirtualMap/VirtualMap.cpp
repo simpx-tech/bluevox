@@ -4,9 +4,9 @@
 #include "VirtualMap.h"
 
 #include "VirtualMapTaskManager.h"
-#include "Bluevox/Chunks/ChunkHelper.h"
-#include "Bluevox/Chunks/Position/ChunkPosition.h"
-#include "Bluevox/Chunks/Position/RegionPosition.h"
+#include "Bluevox/Chunk/ChunkHelper.h"
+#include "Bluevox/Chunk/Position/ChunkPosition.h"
+#include "Bluevox/Chunk/Position/RegionPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/MainController.h"
 
@@ -194,7 +194,7 @@ UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
 
 void UVirtualMap::RegisterPlayer(const AMainController* Player)
 {
-	const auto GlobalPosition = FChunkPosition::FromActorLocation(Player->GetPawn()->GetActorLocation());
+	const auto GlobalPosition = FChunkPosition::FromGlobalPosition(Player->SavedGlobalPosition);
 	ChunkPositionByPlayer.Add(Player, GlobalPosition);
 
 	TSet<FChunkPosition> FarChunks;
@@ -207,13 +207,19 @@ void UVirtualMap::RegisterPlayer(const AMainController* Player)
 void UVirtualMap::UnregisterPlayer(const AMainController* Player)
 {
 	ChunkPositionByPlayer.Remove(Player);
-	const auto GlobalPosition = FChunkPosition::FromActorLocation(Player->GetPawn()->GetActorLocation());
+	const auto GlobalPosition = FChunkPosition::FromGlobalPosition(Player->SavedGlobalPosition);
 
 	TSet<FChunkPosition> LiveChunks;
 	TSet<FChunkPosition> FarChunks;
 	UChunkHelper::GetChunksAroundLiveAndFar(GlobalPosition, Player->GetFarDistance(), GameRules::Distances::LiveDistance, FarChunks, LiveChunks);
 
 	RemovePlayerFromChunks(Player, LiveChunks, FarChunks);
+}
+ 
+void UVirtualMap::UpdateFarDistanceForPlayer(const AMainController* Player,
+	const int32 OldFarDistance, const int32 NewFarDistance)
+{
+	// DEV
 }
 
 void UVirtualMap::Tick(float DeltaTime)

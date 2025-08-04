@@ -12,6 +12,11 @@ struct FPiece
 	{
 	}
 
+	FPiece(const uint16 InPaletteId, const uint16 InSize)
+		: PaletteId(InPaletteId), Size(InSize)
+	{
+	}
+
 	UPROPERTY()
 	uint16 PaletteId = 0;
 

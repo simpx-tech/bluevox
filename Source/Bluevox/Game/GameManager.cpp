@@ -6,9 +6,9 @@
 #include "MainCharacter.h"
 #include "MainController.h"
 #include "WorldSave.h"
-#include "Bluevox/Chunks/ChunkRegistry.h"
-#include "Bluevox/Chunks/Generator/ChunkGenerator.h"
-#include "Bluevox/Chunks/VirtualMap/VirtualMap.h"
+#include "Bluevox/Chunk/ChunkRegistry.h"
+#include "Bluevox/Chunk/Generator/WorldGenerator.h"
+#include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -46,7 +46,7 @@ void AGameManager::BeginPlay()
 	const auto Character = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
 	LocalCharacter = Cast<AMainCharacter>(Character);
 
-	// DEV temp
-	WorldSave = UWorldSave::CreateOrLoadWorldSave("TestWorld", UChunkGenerator::StaticClass());
+	// TODO temp
+	WorldSave = UWorldSave::CreateOrLoadWorldSave("TestWorld", UWorldGenerator::StaticClass());
 }
 

@@ -21,6 +21,14 @@ struct FChunkPosition
 		return ChunkPosition;
 	}
 
+	static FChunkPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition)
+	{
+		FChunkPosition ChunkPosition;
+		ChunkPosition.X = GlobalPosition.X / GameRules::Chunk::Size;
+		ChunkPosition.Y = GlobalPosition.Y / GameRules::Chunk::Size;
+		return ChunkPosition;
+	}
+
 	UPROPERTY()
 	int32 X = 0;
 

@@ -41,7 +41,7 @@ void AMainCharacter::BeginPlay()
 
 	GetCharacterMovement()->SetMovementMode(MOVE_None);
 
-	// DEV temp
+	// TODO temp
 	if (GameManager->bServer)
 	{
 		GameManager->LocalController->SetServerReady(true);	

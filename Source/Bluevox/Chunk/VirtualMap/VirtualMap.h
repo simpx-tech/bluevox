@@ -4,9 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "VirtualChunk.h"
-#include "Bluevox/Chunks/Position/ChunkPosition.h"
-#include "Bluevox/Chunks/Position/GlobalPosition.h"
-#include "Bluevox/Chunks/Position/RegionPosition.h"
+#include "Bluevox/Chunk/Position/ChunkPosition.h"
+#include "Bluevox/Chunk/Position/GlobalPosition.h"
+#include "Bluevox/Chunk/Position/RegionPosition.h"
 #include "UObject/Object.h"
 #include "VirtualMap.generated.h"
 
@@ -53,6 +53,8 @@ public:
 	void RegisterPlayer(const AMainController* Player);
 
 	void UnregisterPlayer(const AMainController* Player);
+
+	void UpdateFarDistanceForPlayer(const AMainController* Player, const int32 OldFarDistance, const int32 NewFarDistance);
 
 	virtual void Tick(float DeltaTime) override;
 

@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Game/GameRules.h"
 #include "GlobalPosition.generated.h"
 
 USTRUCT(BlueprintType)
@@ -12,6 +13,11 @@ struct FGlobalPosition
 	{
 	}
 
+	FGlobalPosition(const int InX, const int InY, const int InZ)
+		: X(InX), Y(InY), Z(InZ)
+	{
+	}
+	
 	static FGlobalPosition FromActorLocation(const FVector& Location)
 	{
 		FGlobalPosition GlobalPosition;
@@ -29,6 +35,14 @@ struct FGlobalPosition
 
 	UPROPERTY()
 	int Z = 0;
+
+	friend FArchive& operator<<(FArchive& Ar, FGlobalPosition& Pos)
+	{
+		Ar << Pos.X;
+		Ar << Pos.Y;
+		Ar << Pos.Z;
+		return Ar;
+	}
 };
 
 FORCEINLINE uint32 GetTypeHash(const FGlobalPosition& Pos)

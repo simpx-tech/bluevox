@@ -43,19 +43,25 @@ class BLUEVOX_API UChunkRegistry : public UObject
 public:
 	UChunkRegistry* Init(const AGameManager* InGameManager);
 	
-	TSharedPtr<FRegionFile> LoadRegionFile(const FRegionPosition& Position);
+	TSharedPtr<FRegionFile> Th_LoadRegionFile(const FRegionPosition& Position);
+
+	TSharedPtr<FRegionFile> Th_GetRegionFile(const FRegionPosition& Position);
+
+	AChunk* SpawnChunk(FChunkPosition Position);
+
+	void RemoveChunk(const FChunkPosition& Position);
 	
 	UFUNCTION()
-	UChunkData* GetChunkData(const FChunkPosition& Position);
+	UChunkData* Th_GetChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
-	UChunkData* FetchChunkDataFromDisk(const FChunkPosition& Position);
+	UChunkData* Th_FetchChunkDataFromDisk(const FChunkPosition& Position);
 	
 	UFUNCTION()
-	bool HasChunkData(const FChunkPosition& Position);
+	bool Th_HasChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
-	UChunkData* LoadChunkData(const FChunkPosition& Position);
+	UChunkData* Th_LoadChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
 	AChunk* GetChunkActor(const FChunkPosition& Position) const;

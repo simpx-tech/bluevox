@@ -4,15 +4,16 @@
 
 #include "CoreMinimal.h"
 #include "UObject/Object.h"
-#include "ChunkGenerator.generated.h"
+#include "WorldGenerator.generated.h"
 
 struct FLocalChunkPosition;
 class UChunkData;
+
 /**
  * 
  */
 UCLASS()
-class BLUEVOX_API UChunkGenerator : public UObject
+class BLUEVOX_API UWorldGenerator : public UObject
 {
 	GENERATED_BODY()
 

@@ -13,6 +13,7 @@ AChunk::AChunk()
 	PrimaryActorTick.bCanEverTick = false;
 
 	MeshComponent = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("MeshComponent"));
+	RootComponent = MeshComponent;
 }
 
 // Called when the game starts or when spawned
@@ -21,10 +22,14 @@ void AChunk::BeginPlay()
 	Super::BeginPlay();
 }
 
-void AChunk::Render(EChunkState State)
+void AChunk::BeginRender(FRenderChunkPayload&& Payload, FDynamicMesh3& OutMesh)
 {
 	// DEV check if state changed, do something
 	// DEV also check if data is dirty and/or if the chunk is rendered
 }
 
+void AChunk::CommitRender(FDynamicMesh3&& Mesh)
+{
+	// DEV
+}
 

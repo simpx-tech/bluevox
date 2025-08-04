@@ -18,7 +18,7 @@ struct FSegmentedFile
 		}
 	}
 
-	bool WriteSegment(const int32 Index, const TArray<uint8>& Data)
+	bool Th_WriteSegment(const int32 Index, const TArray<uint8>& Data)
 	{
 		FWriteScopeLock WriteLock(FileLock);
 		if (!Header.SectionsHeaders.IsValidIndex(Index))
@@ -85,7 +85,7 @@ struct FSegmentedFile
 		return true;
 	}
 
-	bool ReadSegment(const int32 Index, TArray<uint8>& OutData)
+	bool Th_ReadSegment(const int32 Index, TArray<uint8>& OutData)
 	{
 		FReadScopeLock ReadLock(FileLock);
 		if (!Header.SectionsHeaders.IsValidIndex(Index))
@@ -96,9 +96,8 @@ struct FSegmentedFile
 		
 		const auto TotalSize = Header.SectionsHeaders[Index].SegmentsUsed * Header.SegmentSize;
 
-		FileHandle->Seek(Header.SectionsHeaders[Index].Offset);
 		OutData.SetNumUninitialized(TotalSize);
-		if (!FileHandle->Read(OutData.GetData(), TotalSize))
+		if (!FileHandle->ReadAt(OutData.GetData(), TotalSize, Header.SectionsHeaders[Index].Offset))
 		{
 			return false;
 		}

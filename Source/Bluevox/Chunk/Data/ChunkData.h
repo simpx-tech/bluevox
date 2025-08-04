@@ -15,10 +15,9 @@ class BLUEVOX_API UChunkData : public UObject
 {
 	GENERATED_BODY()
 
+public:
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
-
-public:
 	
 	UPROPERTY()
 	bool bDirty = false;

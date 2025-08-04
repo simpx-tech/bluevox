@@ -6,10 +6,11 @@
 #include "UObject/Object.h"
 #include "WorldSave.generated.h"
 
+class AMainController;
 struct FRegionFile;
 struct FRegionPosition;
 class URegion;
-class UChunkGenerator;
+class UWorldGenerator;
 
 /**
  * 
@@ -31,7 +32,7 @@ public:
 	
 	static UWorldSave* LoadWorldSave(const FString& InWorldName);
 
-	static UWorldSave* CreateOrLoadWorldSave(const FString& InWorldName, const TSubclassOf<UChunkGenerator>& ChunkGeneratorClass);
+	static UWorldSave* CreateOrLoadWorldSave(const FString& InWorldName, const TSubclassOf<UWorldGenerator>& ChunkGeneratorClass);
 
 	static FString GetWorldsDir()
 	{
@@ -65,7 +66,9 @@ public:
 
 	TSharedPtr<FRegionFile> GetRegionFromDisk(const FRegionPosition& RegionPosition) const;
 
-	// DEV load player
+	bool SavePlayer(AMainController* PlayerController) const;
+
+	bool LoadPlayer(AMainController* PlayerController) const;
 
 	// DEV load network
 
@@ -76,7 +79,7 @@ public:
 	int32 SaveVersion = 1;
 
 	UPROPERTY()
-	TSubclassOf<UChunkGenerator> ChunkGeneratorClass;
+	TSubclassOf<UWorldGenerator> ChunkGeneratorClass;
 	
 	void Save();
 };

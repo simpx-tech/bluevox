@@ -7,6 +7,20 @@
 #include "UObject/Object.h"
 #include "TickManager.generated.h"
 
+namespace TickManagerFunc
+{
+	struct FNo_Validate
+	{
+		template<class... Ts>
+		constexpr bool operator()(Ts&&...) const noexcept { return true; }
+	};
+
+	struct FNo_Finally
+	{
+		constexpr void operator()() const noexcept {}
+	};
+}
+
 /**
  * 
  */
@@ -55,7 +69,8 @@ class BLUEVOX_API UTickManager : public UObject, public FTickableGameObject
 
 	UFUNCTION()
 	void PrepareForGameTick();
-	
+
+	UFUNCTION()
 	void GameTick();
 
 	// TODO handle BeginDestroy -> wait for all tasks to finish
@@ -69,61 +84,67 @@ public:
 
 	void UnregisterUObjectTickable(const TScriptInterface<IGameTickable>& TickableObject);
 
-	template <typename AsyncFunc, typename ThenFunc, typename ValidateFunc = decltype([](auto&&){ return true; })>
-	void RunAsyncThen(
-		AsyncFunc&& AsyncFn,
-		ThenFunc&& ThenFn,
-		ValidateFunc&& StillValidFn = [](auto&&) { return true; }
-	);
+	template<
+	typename  AsyncFunc,
+	typename  ThenFunc,
+	typename  ValidateFunc = TickManagerFunc::FNo_Validate,
+	typename  FinallyFunc  = TickManagerFunc::FNo_Finally>
+	void RunAsyncThen( AsyncFunc&&   AsyncFn,
+				   ThenFunc&&    ThenFn,
+				   ValidateFunc&& ValidateFn = {},
+				   FinallyFunc&&  FinallyFn  = {} );
 
 	void ScheduleFn(TFunction<void()>&& Func);
 };
 
-template <typename AsyncFunc, typename ThenFunc, typename ValidateFunc>
-void UTickManager::RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn, ValidateFunc&& StillValidFn)
+template<class A, class T, class V, class F>
+void UTickManager::RunAsyncThen(A&& AsyncFn, T&& ThenFn,
+								V&& ValidateFn, F&& FinallyFn)
 {
-	// bump our counter immediately
 	PendingTasks++;
 
-	// figure out what AsyncFn() returns
-	using ReturnType = std::invoke_result_t<AsyncFunc>;
+	using R = std::invoke_result_t<A>;
+	auto Fut = Async(EAsyncExecution::ThreadPool,
+					 std::forward<A>(AsyncFn));
 
-	// fire off the background task
-	auto Fut = Async(EAsyncExecution::ThreadPool, Forward<AsyncFunc>(AsyncFn));
-
-	Fut.Then([Instance = this,
-			  ThenFn      = MoveTemp(ThenFn),
-			  StillValidFn = MoveTemp(StillValidFn)](TFuture<ReturnType>&& Future) mutable
+	Fut.Then([this,
+			  thenFn      = std::forward<T>(ThenFn),
+			  validateFn  = std::forward<V>(ValidateFn),
+			  finallyFn   = std::forward<F>(FinallyFn)]
+			 (TFuture<R>&& Future) mutable
 	{
-		if constexpr (std::is_void_v<ReturnType>)
+		auto Call_Finally = [&]
 		{
-			Instance->ScheduleFn(
-				[Instance,
-				 ThenFn      = MoveTemp(ThenFn),
-				 StillValidFn = MoveTemp(StillValidFn)]() mutable
+			if constexpr (!std::is_same_v<std::decay_t<F>, TickManagerFunc::FNo_Finally>)
+				finallyFn();
+		};
+
+		if constexpr (std::is_void_v<R>)
+		{
+			ScheduleFn([=]() mutable
+			{
+				if constexpr (!std::is_same_v<std::decay_t<V>, TickManagerFunc::FNo_Validate>)
 				{
-					if (StillValidFn())
-					{
-						ThenFn();
-					}
-					Instance->PendingTasks--;
-				});
+					if (!validateFn()) { Call_Finally(); --PendingTasks; return; }
+				}
+				thenFn();
+				Call_Finally();
+				--PendingTasks;
+			});
 		}
 		else
 		{
-			ReturnType Result = Future.Get();
-			Instance->ScheduleFn(
-				[Instance,
-				 ThenFn      = MoveTemp(ThenFn),
-				 StillValidFn = MoveTemp(StillValidFn),
-				 Result      = MoveTemp(Result)]() mutable
+			R Result = Future.Get();
+			ScheduleFn([=, res = std::move(Result)]() mutable
+			{
+				if constexpr (!std::is_same_v<std::decay_t<V>, TickManagerFunc::FNo_Validate>)
 				{
-					if (StillValidFn(Result))
-					{
-						ThenFn(Result);
-					}
-					Instance->PendingTasks--;
-				});
+					if (!validateFn(res)) { Call_Finally(); --PendingTasks; return; }
+				}
+				thenFn(std::move(res));
+				Call_Finally();
+				--PendingTasks;
+			});
 		}
 	});
 }

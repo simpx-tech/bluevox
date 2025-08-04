@@ -3,11 +3,11 @@
 
 #include "ChunkDataNetworkPacket.h"
 
-#include "Bluevox/Chunks/Data/ChunkData.h"
+#include "Bluevox/Chunk/Data/ChunkData.h"
 
 void UChunkDataNetworkPacket::OnReceive(AGameManager* GameManager)
 {
-	// DEV
+	// DEV save to ChunkRegistry + Start spawn chunk process (?)
 }
 
 void UChunkDataNetworkPacket::Serialize(FArchive& Ar)

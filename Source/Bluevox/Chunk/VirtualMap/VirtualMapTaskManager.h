@@ -7,6 +7,7 @@
 #include "UObject/Object.h"
 #include "VirtualMapTaskManager.generated.h"
 
+class UWorldSave;
 class UTickManager;
 class AGameManager;
 class UChunkRegistry;
@@ -28,9 +29,11 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	UPROPERTY()
 	TSet<FChunkPosition> PendingRender;
 
-	UPROPERTY()
-	TMap<FChunkPosition, bool> ProcessingRender;
+	TMap<FChunkPosition, int32> ProcessingRender;
 
+	UPROPERTY()
+	int32 LastRenderIndex = 0;
+	
 	UPROPERTY()
 	TMap<FChunkPosition, bool> ProcessingUnload;
 	
@@ -38,6 +41,9 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	
 	UPROPERTY()
 	UVirtualMap* VirtualMap = nullptr;
+
+	UPROPERTY()
+	UWorldSave* WorldSave = nullptr;
 
 	UPROPERTY()
 	UChunkRegistry* ChunkRegistry = nullptr;

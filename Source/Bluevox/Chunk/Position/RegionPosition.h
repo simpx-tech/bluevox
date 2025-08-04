@@ -27,6 +27,11 @@ struct FRegionPosition
 		return X == Other.X
 			&& Y == Other.Y;
 	}
+
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("RegionPosition(%d, %d)"), X, Y);
+	}
 };
 
 FORCEINLINE uint32 GetTypeHash(const FRegionPosition& Pos)

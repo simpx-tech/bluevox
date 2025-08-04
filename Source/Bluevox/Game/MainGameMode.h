@@ -6,6 +6,8 @@
 #include "GameFramework/GameModeBase.h"
 #include "MainGameMode.generated.h"
 
+class AGameManager;
+
 /**
  * 
  */
@@ -15,4 +17,11 @@ class BLUEVOX_API AMainGameMode : public AGameModeBase
 	GENERATED_BODY()
 
 	AMainGameMode();
+
+	UPROPERTY(EditAnywhere);
+	AGameManager* GameManager = nullptr;
+
+	virtual void BeginPlay() override;
+
+	virtual void Logout(AController* Exiting) override;
 };
