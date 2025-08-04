@@ -3,18 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Bluevox/Shape/Shape.h"
-#include "LayerShape.generated.h"
+#include "Bluevox/Material/ShapeMaterial.h"
+#include "VoidMaterial.generated.h"
 
 /**
  * 
  */
 UCLASS()
-class BLUEVOX_API ULayerShape : public UShape
+class BLUEVOX_API UVoidMaterial : public UShapeMaterial
 {
 	GENERATED_BODY()
 
+public:
 	virtual FName GetNameId() const override;
-
-	virtual void InitializeAllowedMaterials(UMaterialRegistry* Registry) override;
 };

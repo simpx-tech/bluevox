@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Bluevox/Chunks/Position/ChunkPosition.h"
+#include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "UObject/Object.h"
 #include "VirtualMapTaskManager.generated.h"
 

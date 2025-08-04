@@ -3,6 +3,12 @@
 
 #include "WorldGenerator.h"
 
+UWorldGenerator* UWorldGenerator::Init(AGameManager* InGameManager)
+{
+	GameManager = InGameManager;
+	return this;
+}
+
 void UWorldGenerator::GenerateChunk(const FLocalChunkPosition& Position,
                                     UChunkData* OutChunkData) const
 {

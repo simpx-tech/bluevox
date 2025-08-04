@@ -21,8 +21,16 @@ class BLUEVOX_API UShapeRegistry : public UObject
 	UPROPERTY()
 	TMap<FName, int32> ShapeByName;
 
-	void RegisterShape(const FName& ShapeName, const TSubclassOf<UObject>& ShapeClass);
+	int32 RegisterShape(const FName& ShapeName, const TSubclassOf<UObject>& ShapeClass);
 	
 public:
 	void RegisterAll();
+
+	uint8 GetShapeIdByName(const FName& ShapeName) const;
+
+	const UShape* GetShapeById(const int32 ShapeId) const;
+
+	const UShape* GetShapeByName(const FName& ShapeName) const;
+
+	virtual void Serialize(FArchive& Ar) override;
 };

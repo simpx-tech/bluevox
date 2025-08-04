@@ -9,6 +9,8 @@
 #include "Bluevox/Chunk/ChunkRegistry.h"
 #include "Bluevox/Chunk/Generator/WorldGenerator.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
+#include "Bluevox/Shape/ShapeRegistry.h"
+#include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -35,6 +37,12 @@ void AGameManager::BeginPlay()
 	
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"));
 
+	ShapeRegistry = NewObject<UShapeRegistry>(this, TEXT("ShapeRegistry"));
+	ShapeRegistry->RegisterAll();
+
+	MaterialRegistry = NewObject<UMaterialRegistry>(this, TEXT("ShapeMaterialRegistry"));
+	MaterialRegistry->RegisterAll();
+	
 	TickManager = NewObject<UTickManager>(this, TEXT("TaskManager"))->Init();
 	
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);

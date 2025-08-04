@@ -1,7 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "MaterialRegistry.h"
+#include "ShapeMaterialRegistry.h"
 
 void UMaterialRegistry::RegisterMaterial(const FName& MaterialName, UMaterialInterface* Material)
 {
@@ -10,5 +10,10 @@ void UMaterialRegistry::RegisterMaterial(const FName& MaterialName, UMaterialInt
 
 void UMaterialRegistry::RegisterAll()
 {
-	// DEV
+	// DEV when looping for all, should register only the "leaf" classes, including the overriden in editor
+}
+
+void UMaterialRegistry::Serialize(FArchive& Ar)
+{
+	Ar << Materials;
 }

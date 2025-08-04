@@ -3,6 +3,9 @@
 
 #include "Shape.h"
 
+#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
+
 FName UShape::GetNameId() const
 {
 	UE_LOG(LogTemp, Fatal, TEXT("UShape::GetNameId not implemented for %s"), *GetName());
@@ -14,3 +17,6 @@ void UShape::Render(UE::Geometry::FDynamicMesh3& Mesh, const EFace Face,
 {
 }
 
+void UShape::InitializeAllowedMaterials(UMaterialRegistry* Registry)
+{
+}

@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "GameManager.generated.h"
 
+class UMaterialRegistry;
+class UShapeRegistry;
 class UWorldSave;
 class UTickManager;
 class UChunkRegistry;
@@ -27,39 +29,45 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bStandalone = false;
 	
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bServer = false;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bClient = false;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bDedicatedServer = false;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bClientOnly = false;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	UVirtualMap* VirtualMap = nullptr;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	UChunkRegistry* ChunkRegistry = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	UTickManager* TickManager = nullptr;
+
+	UPROPERTY(EditAnywhere)
+	UShapeRegistry* ShapeRegistry = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
+	UMaterialRegistry* MaterialRegistry = nullptr;
 	
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	APlayerState* LocalPlayerState = nullptr;
 
-	UPROPERTY(BlueprintReadWrite, Category = "Game")
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainCharacter* LocalCharacter = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	UWorldSave* WorldSave = nullptr;
 };

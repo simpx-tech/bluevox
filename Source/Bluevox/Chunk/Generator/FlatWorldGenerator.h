@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldGenerator.h"
+#include "Bluevox/Game/GameRules.h"
 #include "FlatWorldGenerator.generated.h"
 
 /**
@@ -19,10 +20,10 @@ public:
 	int32 GroundHeight = 64.0f;
 
 	UPROPERTY(EditAnywhere)
-	int32 ShapeId = 1;
+	FName ShapeName = GameRules::Constants::GShape_Layer;
 	
 	UPROPERTY(EditAnywhere)
-	int32 MaterialId = 1;
+	FName MaterialName = GameRules::Constants::GMaterial_Stone;
 	
 	virtual void GenerateChunk(const FLocalChunkPosition& Position, UChunkData* OutChunkData) const override;
 

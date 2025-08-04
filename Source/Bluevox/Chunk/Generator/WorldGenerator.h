@@ -6,6 +6,7 @@
 #include "UObject/Object.h"
 #include "WorldGenerator.generated.h"
 
+class AGameManager;
 struct FLocalChunkPosition;
 class UChunkData;
 
@@ -17,6 +18,12 @@ class BLUEVOX_API UWorldGenerator : public UObject
 {
 	GENERATED_BODY()
 
+protected:
+	UPROPERTY()
+	AGameManager* GameManager = nullptr;
+	
 public:
+	UWorldGenerator* Init(AGameManager* InGameManager);
+	
 	virtual void GenerateChunk(const FLocalChunkPosition& Position, UChunkData* OutChunkData) const;
 };
