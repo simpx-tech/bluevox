@@ -121,7 +121,7 @@ void UTickManager::RunAsyncThen(A&& AsyncFn, T&& ThenFn,
 
 		if constexpr (std::is_void_v<R>)
 		{
-			ScheduleFn([=]() mutable
+			ScheduleFn([=, this]() mutable
 			{
 				if constexpr (!std::is_same_v<std::decay_t<V>, TickManagerFunc::FNo_Validate>)
 				{
@@ -135,7 +135,7 @@ void UTickManager::RunAsyncThen(A&& AsyncFn, T&& ThenFn,
 		else
 		{
 			R Result = Future.Get();
-			ScheduleFn([=, res = std::move(Result)]() mutable
+			ScheduleFn([=, this, res = std::move(Result)]() mutable
 			{
 				if constexpr (!std::is_same_v<std::decay_t<V>, TickManagerFunc::FNo_Validate>)
 				{

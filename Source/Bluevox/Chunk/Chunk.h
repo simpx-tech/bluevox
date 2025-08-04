@@ -3,9 +3,11 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Position/ChunkPosition.h"
 #include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
+class AGameManager;
 struct FRenderChunkPayload;
 
 namespace UE::Geometry
@@ -33,17 +35,27 @@ protected:
 	UDynamicMeshComponent* MeshComponent = nullptr;
 
 	UPROPERTY()
-	bool bRendered = false;
+	int32 RenderedAtDirtyChanges = -1;
 
 	UPROPERTY()
-	uint32 RenderedAtDirtyChanges = 0;
+	AGameManager* GameManager = nullptr;
+
+	UPROPERTY()
+	FChunkPosition Position;
 
 public:
+	AChunk* Init(const FChunkPosition InPosition, AGameManager* InGameManager, UChunkData* InData)
+	{
+		Position = InPosition;
+		GameManager = InGameManager;
+		Data = InData;
+		return this;
+	}
+	
 	UPROPERTY()
 	UChunkData* Data;
 	
-	// DEV pass neighbor chunks copy (?) -> at least their border columns
-	void BeginRender(FRenderChunkPayload&& Payload, UE::Geometry::FDynamicMesh3& OutMesh);
+	void Th_BeginRender(EChunkState State, UE::Geometry::FDynamicMesh3& OutMesh);
 
-	void CommitRender(UE::Geometry::FDynamicMesh3&& Mesh);
+	void CommitRender(UE::Geometry::FDynamicMesh3&& Mesh) const;
 };

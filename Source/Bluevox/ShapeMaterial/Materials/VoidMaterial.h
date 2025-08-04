@@ -3,7 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
-#include "Bluevox/Material/ShapeMaterial.h"
+#include "Bluevox/ShapeMaterial/ShapeMaterial.h"
 #include "VoidMaterial.generated.h"
 
 /**

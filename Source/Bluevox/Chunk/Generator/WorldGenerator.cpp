@@ -9,7 +9,7 @@ UWorldGenerator* UWorldGenerator::Init(AGameManager* InGameManager)
 	return this;
 }
 
-void UWorldGenerator::GenerateChunk(const FLocalChunkPosition& Position,
+void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                     UChunkData* OutChunkData) const
 {
 }

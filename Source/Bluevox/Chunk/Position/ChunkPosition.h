@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "GlobalPosition.h"
 #include "Bluevox/Game/GameRules.h"
 #include "ChunkPosition.generated.h"
 
@@ -10,6 +11,11 @@ struct FChunkPosition
 	GENERATED_BODY()
 
 	FChunkPosition()
+	{
+	}
+
+	FChunkPosition(const int32 InX, const int32 InY)
+		: X(InX), Y(InY)
 	{
 	}
 
@@ -38,6 +44,18 @@ struct FChunkPosition
 	bool operator==(const FChunkPosition& Other) const
 	{
 		return X == Other.X && Y == Other.Y;
+	}
+
+	FChunkPosition operator+(const FChunkPosition& Other) const
+	{
+		return FChunkPosition(X + Other.X, Y + Other.Y);
+	}
+
+	FChunkPosition& operator+=(const FChunkPosition& Other)
+	{
+		X += Other.X;
+		Y += Other.Y;
+		return *this;
 	}
 
 	FString ToString() const

@@ -5,6 +5,7 @@
 
 #include "MainController.h"
 #include "Bluevox/Chunk/RegionFile.h"
+#include "Bluevox/Chunk/Generator/WorldGenerator.h"
 #include "GameFramework/PlayerState.h"
 
 void UWorldSave::CreateSaveFolder(const FString& InWorldName)
@@ -30,7 +31,7 @@ void UWorldSave::Serialize(FArchive& Ar)
 	UObject::Serialize(Ar);
 	Ar << WorldName;
 	Ar << SaveVersion;
-	Ar << ChunkGeneratorClass;
+	// DEV save chunk generator
 }
 
 UWorldSave* UWorldSave::LoadWorldSave(const FString& InWorldName)
@@ -56,7 +57,7 @@ UWorldSave* UWorldSave::LoadWorldSave(const FString& InWorldName)
 }
 
 UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
-	const TSubclassOf<UWorldGenerator>& ChunkGeneratorClass)
+	const TSubclassOf<UWorldGenerator>& WorldGeneratorClass)
 {
 	if (HasWorldSave(InWorldName))
 	{
@@ -66,7 +67,7 @@ UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
 	const auto WorldSave = NewObject<UWorldSave>();
 	WorldSave->WorldName = InWorldName;
 	WorldSave->SaveVersion = 1;
-	WorldSave->ChunkGeneratorClass = ChunkGeneratorClass;
+	WorldSave->WorldGenerator = NewObject<UWorldGenerator>(WorldSave, WorldGeneratorClass);
 	WorldSave->Save();
 	
 	return WorldSave;

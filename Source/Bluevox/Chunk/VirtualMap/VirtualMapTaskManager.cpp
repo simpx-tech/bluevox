@@ -45,10 +45,10 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 				{
 					if (VirtualMap->VirtualChunks.Contains(ChunkPosition))
 					{
-						const auto Chunk = ChunkRegistry->Th_GetChunkData(ChunkPosition);
 						for (const auto& Player : PendingNetSend[ChunkPosition])
 						{
-							Player->PlayerNetwork->SendToClient(NewObject<UChunkDataNetworkPacket>()->Init(Chunk));
+							Player->PlayerNetwork->SendToClient
+							(NewObject<UChunkDataNetworkPacket>()->Init(ChunkData));
 						}
 					}
 				}
@@ -187,17 +187,12 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 			const auto State = VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
 
 			const auto RenderId = LastRenderIndex++;
-			FRenderChunkPayload Payload;
-			Payload.Columns = Chunk->Data->Columns;
-			Payload.bDirty = Chunk->Data->bDirty;
-			Payload.State = State;
-			// DEV Neighbors Payload.EastColumns = 
 			
 			TickManager->RunAsyncThen(
-				[Chunk, Payload = MoveTemp(Payload)] mutable
+				[Chunk, State]
 				{
 					UE::Geometry::FDynamicMesh3 Mesh;
-					Chunk->BeginRender(MoveTemp(Payload), Mesh);
+					Chunk->Th_BeginRender(State, Mesh);
 					return MoveTemp(Mesh);
 				},
 				[Chunk](UE::Geometry::FDynamicMesh3&& Mesh)

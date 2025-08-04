@@ -25,7 +25,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	FName MaterialName = GameRules::Constants::GMaterial_Stone;
 	
-	virtual void GenerateChunk(const FLocalChunkPosition& Position, UChunkData* OutChunkData) const override;
+	virtual void GenerateChunk(const FChunkPosition& Position, UChunkData* OutChunkData) const override;
 
 	virtual void Serialize(FArchive& Ar) override;
 };

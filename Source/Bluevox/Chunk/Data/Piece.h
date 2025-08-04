@@ -33,32 +33,27 @@ struct FPiece
 	UPROPERTY()
 	uint16 PackedSizeAndType = 0;
 
-	UFUNCTION()
 	FORCEINLINE uint16_t GetSize() const
 	{
 		return PackedSizeAndType & Low14_Mask;
 	}
 
-	UFUNCTION()
 	FORCEINLINE EIdType GetType() const
 	{
 		return static_cast<EIdType>(PackedSizeAndType >> High2_Shift);
 	}
 
-	UFUNCTION()
 	FORCEINLINE void SetSizeType(const uint16_t NewSize, const EIdType NewType)
 	{
 		PackedSizeAndType = NewSize & Low14_Mask
 		 | static_cast<uint16_t>(NewType & 0x3) << High2_Shift;
 	}
 
-	UFUNCTION()
 	FORCEINLINE void SetSize(const uint16_t NewSize) noexcept {
 		PackedSizeAndType = PackedSizeAndType & High2_Shift
 			 | NewSize & Low14_Mask;
 	}
 
-	UFUNCTION()
 	FORCEINLINE void SetType(const EIdType NewType) noexcept {
 		PackedSizeAndType = PackedSizeAndType & Low14_Mask
 			 | static_cast<uint16_t>(NewType & 0x3) << High2_Shift & High2_Shift;

@@ -32,7 +32,7 @@ public:
 	
 	static UWorldSave* LoadWorldSave(const FString& InWorldName);
 
-	static UWorldSave* CreateOrLoadWorldSave(const FString& InWorldName, const TSubclassOf<UWorldGenerator>& ChunkGeneratorClass);
+	static UWorldSave* CreateOrLoadWorldSave(const FString& InWorldName, const TSubclassOf<UWorldGenerator>& WorldGeneratorClass);
 
 	static FString GetWorldsDir()
 	{
@@ -78,8 +78,9 @@ public:
 	UPROPERTY()
 	int32 SaveVersion = 1;
 
+	// DEV populate this on Serialize
 	UPROPERTY()
-	TSubclassOf<UWorldGenerator> ChunkGeneratorClass;
+	UWorldGenerator* WorldGenerator;
 	
 	void Save();
 };

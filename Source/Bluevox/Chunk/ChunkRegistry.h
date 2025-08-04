@@ -30,6 +30,9 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	FCriticalSection RegionsLock;
 
 	UPROPERTY()
+	AGameManager* GameManager;
+	
+	UPROPERTY()
 	TMap<FChunkPosition, UChunkData*> ChunksData;
 
 	FCriticalSection ChunksDataLock;
@@ -41,7 +44,7 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	UWorldSave* WorldSave;
 	
 public:
-	UChunkRegistry* Init(const AGameManager* InGameManager);
+	UChunkRegistry* Init(AGameManager* InGameManager);
 	
 	TSharedPtr<FRegionFile> Th_LoadRegionFile(const FRegionPosition& Position);
 
@@ -50,6 +53,10 @@ public:
 	AChunk* SpawnChunk(FChunkPosition Position);
 
 	void RemoveChunk(const FChunkPosition& Position);
+
+	void LockForRender(const FChunkPosition& Position);
+
+	void ReleaseForRender(const FChunkPosition& Position);
 	
 	UFUNCTION()
 	UChunkData* Th_GetChunkData(const FChunkPosition& Position);

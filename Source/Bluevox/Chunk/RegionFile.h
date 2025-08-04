@@ -16,7 +16,7 @@ struct FRegionFile : FSegmentedFile
 
 	void Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* ChunkData);
 
-	void Th_LoadChunk(const FLocalChunkPosition& Position, UChunkData* OutChunkDat);
+	UChunkData* Th_LoadChunk(const FLocalChunkPosition& Position);
 
 	static TSharedPtr<FRegionFile> NewFromDisk(const FString& WorldName, const FRegionPosition& RegionPosition);
 };

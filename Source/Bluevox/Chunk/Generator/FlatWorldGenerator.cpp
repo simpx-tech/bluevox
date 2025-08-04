@@ -9,7 +9,7 @@
 #include "Bluevox/Shape/ShapeRegistry.h"
 #include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
 
-void UFlatWorldGenerator::GenerateChunk(const FLocalChunkPosition& Position,
+void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                         UChunkData* OutChunkData) const
 {
 	OutChunkData->Columns.SetNumUninitialized(GameRules::Chunk::Size * GameRules::Chunk::Size);
@@ -25,7 +25,9 @@ void UFlatWorldGenerator::GenerateChunk(const FLocalChunkPosition& Position,
 			auto& Column = OutChunkData->Columns[Index];
 			
 			Column.Pieces.Add(FPiece{
-				static_cast<uint16_t>(MaterialId) << 8 | static_cast<uint16_t>(ShapeId),
+				static_cast<uint16>(
+					static_cast<uint16>(MaterialId) << 8 | static_cast<uint16>(ShapeId)
+					),
 				static_cast<unsigned short>(GroundHeight)
 			});
 			Column.Pieces.Add(FPiece{

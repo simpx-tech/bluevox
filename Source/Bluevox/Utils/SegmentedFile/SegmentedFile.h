@@ -93,6 +93,12 @@ struct FSegmentedFile
 			checkf(false, TEXT("Invalid section index: %d"), Index);
 			return false;
 		}
+
+		if (Header.SectionsHeaders[Index].SegmentsUsed == 0)
+		{
+			OutData.Empty();
+			return true;
+		}
 		
 		const auto TotalSize = Header.SectionsHeaders[Index].SegmentsUsed * Header.SegmentSize;
 

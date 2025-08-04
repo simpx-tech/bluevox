@@ -14,16 +14,15 @@ UCLASS()
 class BLUEVOX_API UChunkData : public UObject
 {
 	GENERATED_BODY()
-
+	
 public:
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
-	
-	UPROPERTY()
-	bool bDirty = false;
 
 	UPROPERTY()
-	uint32 DirtyChanges = 0;
+	int32 Changes = 0;
+
+	FRWLock Lock;
 	
 	virtual void Serialize(FArchive& Ar) override;
 

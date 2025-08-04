@@ -6,8 +6,8 @@
 #include "UObject/Object.h"
 #include "WorldGenerator.generated.h"
 
+struct FChunkPosition;
 class AGameManager;
-struct FLocalChunkPosition;
 class UChunkData;
 
 /**
@@ -25,5 +25,5 @@ protected:
 public:
 	UWorldGenerator* Init(AGameManager* InGameManager);
 	
-	virtual void GenerateChunk(const FLocalChunkPosition& Position, UChunkData* OutChunkData) const;
+	virtual void GenerateChunk(const FChunkPosition& Position, UChunkData* OutChunkData) const;
 };

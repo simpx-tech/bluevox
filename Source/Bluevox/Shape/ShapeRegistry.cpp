@@ -67,5 +67,4 @@ void UShapeRegistry::Serialize(FArchive& Ar)
 	UObject::Serialize(Ar);
 	// DEV should serialize their name id, then new object when loading
 	// DEV should also consider when their name id are not found/registered
-	Ar << RegisteredShapes;
 }
