@@ -18,4 +18,9 @@ public:
 	virtual FName GetNameId() const override;
 
 	virtual int32 GetMaterialCost() const override;
+
+	virtual bool IsOpaque(EFace Face) const override
+	{
+		return false;
+	}
 };

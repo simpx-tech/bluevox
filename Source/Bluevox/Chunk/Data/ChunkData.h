@@ -4,6 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "ChunkColumn.h"
+#include "Bluevox/Chunk/Position/LocalColumnPosition.h"
+#include "Bluevox/Game/GameRules.h"
 #include "UObject/Object.h"
 #include "ChunkData.generated.h"
 
@@ -25,6 +27,18 @@ public:
 	FRWLock Lock;
 	
 	virtual void Serialize(FArchive& Ar) override;
+
+	static int32 GetIndex(const FLocalColumnPosition ColumnPosition)
+	{
+		return ColumnPosition.X + ColumnPosition.Y * GameRules::Chunk::Size;
+	}
+	
+	FChunkColumn& GetColumn(const FLocalColumnPosition ColumnPosition)
+	{
+		return Columns[GetIndex(ColumnPosition)];
+	}
+	
+	// DEV if set to a border chunk, also schedule re-render on the neighbor chunks
 
 	// DEV get xyz
 	// DEV set xyz

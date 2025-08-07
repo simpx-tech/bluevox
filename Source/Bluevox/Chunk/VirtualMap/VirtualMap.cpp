@@ -112,8 +112,12 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 		}
 	}
 
+	const auto PlayerChunkPosition = FChunkPosition::FromActorLocation(Controller->GetPawn()->GetActorLocation());
+	const auto MaxDistance = Controller->GetFarDistance() - 1;
 	for (auto& FarPosition : FarChunks)
 	{
+		const auto Distance = UChunkHelper::GetDistance(PlayerChunkPosition, FarPosition);
+		
 		// Already loaded
 		if (VirtualChunks.Contains(FarPosition))
 		{
@@ -123,7 +127,14 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 				const auto CurrentChunk = VirtualChunks.Find(FarPosition);
 				// Enable rendered, doesn't change the collision state
 				CurrentChunk->State = CurrentChunk->State | EChunkState::Rendered;
-				ToRender.Add(FarPosition);
+
+				if (Distance <= MaxDistance)
+				{
+					ToRender.Add(FarPosition);
+				}
+			} else
+			{
+				ToSend.Add(FarPosition);
 			}
 		} else
 		{
@@ -134,14 +145,15 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 
 			if (IsLocalController)
 			{
-				ToRender.Add(FarPosition);
+				if (Distance <= MaxDistance)
+				{
+					ToRender.Add(FarPosition);
+				}
 			} else
 			{
 				ToSend.Add(FarPosition);
 			}
-
-			ToUnload.Add(FarPosition);
-
+			
 			const auto RegionPos = FRegionPosition::FromChunkPosition(FarPosition);
 			ChunksByRegion.FindOrAdd(RegionPos)++;
 		}
@@ -150,7 +162,6 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 	TaskManager->ScheduleLoad(ToLoad);
 	TaskManager->ScheduleRender(ToRender);
 	TaskManager->ScheduleNetSend(Controller, ToSend);
-	TaskManager->ScheduleUnload(ToUnload);
 }
 
 void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
@@ -188,6 +199,8 @@ UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
 	TaskManager = NewObject<UVirtualMapTaskManager>(this, TEXT("VirtualMapTaskManager"));
+	// DEV temp
+	TaskManager->AddToRoot();
 	TaskManager->Init(InGameManager);
 	return this;
 }

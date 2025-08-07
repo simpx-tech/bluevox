@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Chunk/Generator/FlatWorldGenerator.h"
 #include "UObject/Object.h"
 #include "WorldSave.generated.h"
 
@@ -30,9 +31,9 @@ public:
 		return FPaths::FileExists(GetFullSavePath(InWorldName));
 	}
 	
-	static UWorldSave* LoadWorldSave(const FString& InWorldName);
+	static UWorldSave* LoadWorldSave(AGameManager* InGameManager, const FString& InWorldName);
 
-	static UWorldSave* CreateOrLoadWorldSave(const FString& InWorldName, const TSubclassOf<UWorldGenerator>& WorldGeneratorClass);
+	static UWorldSave* CreateOrLoadWorldSave(AGameManager* InGameManager, const FString& InWorldName, const TSubclassOf<UWorldGenerator>& WorldGeneratorClass);
 
 	static FString GetWorldsDir()
 	{
@@ -78,7 +79,9 @@ public:
 	UPROPERTY()
 	int32 SaveVersion = 1;
 
-	// DEV populate this on Serialize
+	UPROPERTY()
+	TSubclassOf<UWorldGenerator> WorldGeneratorClass = UFlatWorldGenerator::StaticClass();
+	
 	UPROPERTY()
 	UWorldGenerator* WorldGenerator;
 	

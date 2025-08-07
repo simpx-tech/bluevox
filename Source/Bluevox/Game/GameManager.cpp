@@ -34,8 +34,10 @@ void AGameManager::BeginPlay()
 	bStandalone = GetNetMode() == NM_Standalone;
 
 	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
+	// DEV temp
+	VirtualMap->AddToRoot();
 	
-	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"));
+	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"))->Init(this);
 
 	ShapeRegistry = NewObject<UShapeRegistry>(this, TEXT("ShapeRegistry"));
 	ShapeRegistry->RegisterAll();
@@ -43,7 +45,7 @@ void AGameManager::BeginPlay()
 	MaterialRegistry = NewObject<UMaterialRegistry>(this, TEXT("ShapeMaterialRegistry"));
 	MaterialRegistry->RegisterAll();
 	
-	TickManager = NewObject<UTickManager>(this, TEXT("TaskManager"))->Init();
+	TickManager = NewObject<UTickManager>(this, TEXT("TickManager"))->Init();
 	
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	LocalController = Cast<AMainController>(Controller);
@@ -53,8 +55,8 @@ void AGameManager::BeginPlay()
 
 	const auto Character = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
 	LocalCharacter = Cast<AMainCharacter>(Character);
-
+	
 	// TODO temp
-	WorldSave = UWorldSave::CreateOrLoadWorldSave("TestWorld", UWorldGenerator::StaticClass());
+	WorldSave = UWorldSave::CreateOrLoadWorldSave(this, "TestWorld", UWorldGenerator::StaticClass());
 }
 

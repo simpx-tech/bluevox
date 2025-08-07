@@ -24,7 +24,8 @@ struct FPiece
 		SetSizeType(InSize, Shape);
 	}
 
-	static constexpr uint16_t Low14_Mask  = (1u << 14) - 1;
+	static constexpr uint16 Low14_Mask   = (1u << 14) - 1;
+	static constexpr uint16 High2_Mask   = ~Low14_Mask; 
 	static constexpr unsigned High2_Shift = 14;
 
 	UPROPERTY()
@@ -43,20 +44,21 @@ struct FPiece
 		return static_cast<EIdType>(PackedSizeAndType >> High2_Shift);
 	}
 
-	FORCEINLINE void SetSizeType(const uint16_t NewSize, const EIdType NewType)
+	FORCEINLINE void SetSizeType(const uint16 NewSize, const EIdType NewType)
 	{
-		PackedSizeAndType = NewSize & Low14_Mask
-		 | static_cast<uint16_t>(NewType & 0x3) << High2_Shift;
+		PackedSizeAndType = NewSize & Low14_Mask |
+							(static_cast<uint16>(NewType) & 0x3) << High2_Shift;
 	}
 
-	FORCEINLINE void SetSize(const uint16_t NewSize) noexcept {
-		PackedSizeAndType = PackedSizeAndType & High2_Shift
-			 | NewSize & Low14_Mask;
+	FORCEINLINE void SetSize(const uint16 NewSize) noexcept
+	{
+		PackedSizeAndType = PackedSizeAndType & High2_Mask | NewSize & Low14_Mask;
 	}
 
-	FORCEINLINE void SetType(const EIdType NewType) noexcept {
-		PackedSizeAndType = PackedSizeAndType & Low14_Mask
-			 | static_cast<uint16_t>(NewType & 0x3) << High2_Shift & High2_Shift;
+	FORCEINLINE void SetType(const EIdType NewType) noexcept
+	{
+		PackedSizeAndType = PackedSizeAndType & Low14_Mask |
+							(static_cast<uint16>(NewType) & 0x3) << High2_Shift;
 	}
 
 	friend FArchive& operator<<(FArchive& Ar, FPiece& Piece)

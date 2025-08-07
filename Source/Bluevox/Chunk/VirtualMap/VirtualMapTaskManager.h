@@ -40,18 +40,9 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	TMap<FChunkPosition, TArray<const AMainController*>> PendingNetSend;
 	
 	UPROPERTY()
-	UVirtualMap* VirtualMap = nullptr;
-
-	UPROPERTY()
-	UWorldSave* WorldSave = nullptr;
-
-	UPROPERTY()
-	UChunkRegistry* ChunkRegistry = nullptr;
-
-	UPROPERTY()
-	UTickManager* TickManager = nullptr;
+	AGameManager* GameManager = nullptr;
 public:
-	UVirtualMapTaskManager* Init(const AGameManager* GameManager);
+	UVirtualMapTaskManager* Init(AGameManager* InGameManager);
 
 	// TODO handle world begin destroy, wait for all tasks to finish
 	

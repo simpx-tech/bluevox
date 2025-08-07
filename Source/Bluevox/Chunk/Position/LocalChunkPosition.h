@@ -16,8 +16,13 @@ struct FLocalChunkPosition
 	static FLocalChunkPosition FromChunkPosition(const FChunkPosition& ChunkPosition)
 	{
 		FLocalChunkPosition LocalChunkPosition;
-		LocalChunkPosition.X = ChunkPosition.X % GameRules::Chunk::Size;
-		LocalChunkPosition.Y = ChunkPosition.Y % GameRules::Chunk::Size;
+
+		LocalChunkPosition.X = (ChunkPosition.X % GameRules::Region::Size + GameRules::Region::Size)
+			% GameRules::Region::Size;
+		
+		LocalChunkPosition.Y = (ChunkPosition.Y % GameRules::Region::Size + GameRules::Region::Size)
+			% GameRules::Region::Size;
+		
 		return LocalChunkPosition;
 	}
 

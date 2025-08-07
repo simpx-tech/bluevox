@@ -13,7 +13,7 @@ FName UShape::GetNameId() const
 }
 
 void UShape::Render(UE::Geometry::FDynamicMesh3& Mesh, const EFace Face,
-	const FLocalPosition& Position, int32 Size, int32 MaterialId)
+	const FLocalPosition& Position, int32 Size, int32 MaterialId) const
 {
 }
 

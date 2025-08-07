@@ -56,3 +56,8 @@ void UChunkHelper::GetChunksAround(const FChunkPosition& GlobalPosition, int32 D
 		}
 	}
 }
+
+int32 UChunkHelper::GetDistance(const FChunkPosition& A, const FChunkPosition& B)
+{
+	return FMath::Max(FMath::Abs(A.X - B.X), FMath::Abs(A.Y - B.Y));
+}

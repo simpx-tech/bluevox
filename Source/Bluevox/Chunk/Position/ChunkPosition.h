@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "ColumnPosition.h"
 #include "GlobalPosition.h"
 #include "Bluevox/Game/GameRules.h"
 #include "ChunkPosition.generated.h"
@@ -32,6 +33,22 @@ struct FChunkPosition
 		FChunkPosition ChunkPosition;
 		ChunkPosition.X = GlobalPosition.X / GameRules::Chunk::Size;
 		ChunkPosition.Y = GlobalPosition.Y / GameRules::Chunk::Size;
+		return ChunkPosition;
+	}
+
+	static FChunkPosition FromIntVector2(const FIntVector2& IntVector)
+	{
+		FChunkPosition ChunkPosition;
+		ChunkPosition.X = IntVector.X;
+		ChunkPosition.Y = IntVector.Y;
+		return ChunkPosition;
+	}
+
+	static FChunkPosition FromColumnPosition(const FColumnPosition& ColumnPosition)
+	{
+		FChunkPosition ChunkPosition;
+		ChunkPosition.X = ColumnPosition.X / GameRules::Chunk::Size;
+		ChunkPosition.Y = ColumnPosition.Y / GameRules::Chunk::Size;
 		return ChunkPosition;
 	}
 

@@ -8,6 +8,8 @@
 #include "UObject/Object.h"
 #include "ChunkRegistry.generated.h"
 
+struct FColumnPosition;
+struct FChunkColumn;
 class UWorldSave;
 class AGameManager;
 struct FRegionFile;
@@ -27,6 +29,9 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	
 	TMap<FRegionPosition, TSharedPtr<FRegionFile>> Regions;
 
+	TMap<FRegionPosition, int32> LoadedByRegion;
+
+	// TODO change for a read/write lock
 	FCriticalSection RegionsLock;
 
 	UPROPERTY()
@@ -35,13 +40,11 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	UPROPERTY()
 	TMap<FChunkPosition, UChunkData*> ChunksData;
 
+	// TODO change for a read/write lock
 	FCriticalSection ChunksDataLock;
 
 	UPROPERTY()
 	TMap<FChunkPosition, AChunk*> ChunkActors;
-
-	UPROPERTY()
-	UWorldSave* WorldSave;
 	
 public:
 	UChunkRegistry* Init(AGameManager* InGameManager);
@@ -52,7 +55,9 @@ public:
 
 	AChunk* SpawnChunk(FChunkPosition Position);
 
-	void RemoveChunk(const FChunkPosition& Position);
+	FChunkColumn& Th_GetColumn(const FColumnPosition& GlobalColPosition);
+
+	void UnregisterChunk(const FChunkPosition& Position);
 
 	void LockForRender(const FChunkPosition& Position);
 

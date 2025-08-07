@@ -49,7 +49,7 @@ void AMainController::BeginPlay()
 	if (GameManager->bServer)
 	{
 		GameManager->WorldSave->LoadPlayer(this);
-		GameManager->VirtualMap->RegisterPlayer(this);	
+		GameManager->VirtualMap->RegisterPlayer(this);
 	}
 }
 
@@ -75,6 +75,5 @@ void AMainController::GetLifetimeReplicatedProps(
 
 void AMainController::Serialize(FArchive& Ar)
 {
-	Super::Serialize(Ar);
 	Ar << SavedGlobalPosition;
 }

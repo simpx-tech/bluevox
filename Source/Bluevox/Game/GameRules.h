@@ -2,6 +2,8 @@
 
 namespace GameRules::Constants
 {
+	inline constexpr uint16 GShapeId_Void = 0;
+	
 	inline const FName GShape_Void(TEXT("core:shape:void"));
 	inline const FName GShape_Layer(TEXT("core:shape:layer"));
 	inline const FName GShape_Ramp_N(TEXT("core:shape:ramp_n"));

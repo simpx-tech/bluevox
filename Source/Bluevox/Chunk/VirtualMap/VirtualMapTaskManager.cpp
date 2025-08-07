@@ -3,13 +3,11 @@
 
 #include "VirtualMapTaskManager.h"
 
-#include "ParticleHelper.h"
 #include "VirtualMap.h"
 #include "Bluevox/Chunk/Chunk.h"
 #include "Bluevox/Chunk/ChunkRegistry.h"
 #include "Bluevox/Chunk/RegionFile.h"
 #include "Bluevox/Chunk/Data/ChunkData.h"
-#include "Bluevox/Chunk/Data/RenderChunkPayload.h"
 #include "Bluevox/Chunk/Position/LocalChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/MainController.h"
@@ -18,12 +16,9 @@
 #include "Bluevox/Tick/TickManager.h"
 #include "DynamicMesh/DynamicMesh3.h"
 
-UVirtualMapTaskManager* UVirtualMapTaskManager::Init(const AGameManager* GameManager)
+UVirtualMapTaskManager* UVirtualMapTaskManager::Init(AGameManager* InGameManager)
 {
-	VirtualMap = GameManager->VirtualMap;
-	ChunkRegistry = GameManager->ChunkRegistry;
-	TickManager = GameManager->TickManager;
-	WorldSave = GameManager->WorldSave;
+	GameManager = InGameManager;
 	return this;
 }
 
@@ -36,14 +31,20 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 			ProcessingLoad.Add(ChunkPosition, true);
 		} else
 		{
-			TickManager->RunAsyncThen([this, ChunkPosition]
+			// DEV create UObjects on main thread, then run async (?)
+			// DEV or create UObject pull on main thread, then run async
+			
+			GameManager->TickManager->RunAsyncThen([this, ChunkPosition]
 			{
-				return ChunkRegistry->Th_LoadChunkData(ChunkPosition);
+				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Async);
+				return GameManager->ChunkRegistry->Th_LoadChunkData(ChunkPosition);
 			}, [ChunkPosition, this] (UChunkData* ChunkData)
 			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Then);
+				
 				if (PendingNetSend.Contains(ChunkPosition))
 				{
-					if (VirtualMap->VirtualChunks.Contains(ChunkPosition))
+					if (GameManager->VirtualMap->VirtualChunks.Contains(ChunkPosition))
 					{
 						for (const auto& Player : PendingNetSend[ChunkPosition])
 						{
@@ -54,19 +55,32 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 				}
 
 				// Prevent spawn from stuttering game
-				TickManager->ScheduleFn(
+				GameManager->TickManager->ScheduleFn(
 					[ChunkPosition, this]
 					{
 						if (!ProcessingUnload.Contains(ChunkPosition))
 						{
-							ChunkRegistry->SpawnChunk(ChunkPosition);	
+							GameManager->ChunkRegistry->SpawnChunk(ChunkPosition);	
 						}
 					});
 			}, [this, ChunkPosition] (UChunkData* ChunkData)
 			{
+				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Validate);
 				return ProcessingLoad.FindRef(ChunkPosition) == true;
 			}, [this, ChunkPosition] {
-				ProcessingLoad.Remove(ChunkPosition);
+				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Finally);
+
+				UE_LOG(LogTemp, Log, TEXT("this valid: %d"), this->IsValidLowLevelFast());
+				
+				if (ProcessingLoad.Contains(ChunkPosition))
+				{
+					if (ProcessingLoad.FindRef(ChunkPosition) == false)
+					{
+						GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
+					}
+					
+					ProcessingLoad.Remove(ChunkPosition);
+				}
 			});
 		}
 		
@@ -96,9 +110,9 @@ void UVirtualMapTaskManager::ScheduleNetSend(const AMainController* ToPlayer,
 {
 	for (const auto& ChunkPosition : ChunksToSend)
 	{
-		if (VirtualMap->VirtualChunks.Contains(ChunkPosition))
+		if (GameManager->VirtualMap->VirtualChunks.Contains(ChunkPosition))
 		{
-			const auto Chunk = ChunkRegistry->Th_GetChunkData(ChunkPosition);
+			const auto Chunk = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition);
 			ToPlayer->PlayerNetwork->SendToClient(NewObject<UChunkDataNetworkPacket>()->Init(Chunk));
 		} else
 		{
@@ -141,15 +155,22 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 
 		const auto RegionPosition = FRegionPosition::FromChunkPosition(ChunkPosition);
 		const auto LocalChunkPosition = FLocalChunkPosition::FromChunkPosition(ChunkPosition);
-		const auto Region = ChunkRegistry->Th_GetRegionFile(RegionPosition);
-		TickManager->RunAsyncThen(
+		const auto Region = GameManager->ChunkRegistry->Th_GetRegionFile(RegionPosition);
+
+		if (!Region)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("Failed to unload chunk %s: region file not found."), *ChunkPosition.ToString());
+			continue;
+		}
+		
+		GameManager->TickManager->RunAsyncThen(
 			[this, LocalChunkPosition, ChunkPosition, Region]
 			{
-				Region->Th_SaveChunk(LocalChunkPosition, ChunkRegistry->Th_GetChunkData(ChunkPosition));
+				Region->Th_SaveChunk(LocalChunkPosition, GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition));
 			},
 			[ChunkPosition, this]
 			{
-				ChunkRegistry->RemoveChunk(ChunkPosition);
+				GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
 			},
 			[this, ChunkPosition]
 			{
@@ -175,7 +196,7 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 		for (const auto& ChunkPosition : PendingRender)
 		{
 			// Only start rendering when the chunk is loaded and spawned
-			const auto Chunk = ChunkRegistry->GetChunkActor(ChunkPosition);
+			const auto Chunk = GameManager->ChunkRegistry->GetChunkActor(ChunkPosition);
 			if (!Chunk)
 			{
 				continue;
@@ -184,11 +205,11 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 			ProcessingRender.Add(ChunkPosition, true);
 			ToRemove.Add(ChunkPosition);
 
-			const auto State = VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
+			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
 
 			const auto RenderId = LastRenderIndex++;
 			
-			TickManager->RunAsyncThen(
+			GameManager->TickManager->RunAsyncThen(
 				[Chunk, State]
 				{
 					UE::Geometry::FDynamicMesh3 Mesh;

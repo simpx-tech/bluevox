@@ -7,6 +7,7 @@
 #include "Bluevox/Chunk/RegionFile.h"
 #include "Bluevox/Chunk/Generator/WorldGenerator.h"
 #include "GameFramework/PlayerState.h"
+#include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
 void UWorldSave::CreateSaveFolder(const FString& InWorldName)
 {
@@ -28,13 +29,22 @@ void UWorldSave::CreateSaveFolder(const FString& InWorldName)
 
 void UWorldSave::Serialize(FArchive& Ar)
 {
-	UObject::Serialize(Ar);
 	Ar << WorldName;
 	Ar << SaveVersion;
-	// DEV save chunk generator
+
+	if (Ar.IsLoading())
+	{
+		Ar << WorldGeneratorClass;
+		WorldGenerator = NewObject<UWorldGenerator>(this, WorldGeneratorClass);
+		WorldGenerator->Serialize(Ar);
+	} else if (Ar.IsSaving())
+	{
+		Ar << WorldGeneratorClass;
+		WorldGenerator->Serialize(Ar);
+	}
 }
 
-UWorldSave* UWorldSave::LoadWorldSave(const FString& InWorldName)
+UWorldSave* UWorldSave::LoadWorldSave(AGameManager* InGameManager, const FString& InWorldName)
 {
 	if (!HasWorldSave(InWorldName))
 	{
@@ -51,23 +61,25 @@ UWorldSave* UWorldSave::LoadWorldSave(const FString& InWorldName)
 
 	const auto WorldSave = NewObject<UWorldSave>();
 	FMemoryReader MemoryReader(ByteArray, true);
-	WorldSave->Serialize(MemoryReader);
+	FObjectAndNameAsStringProxyArchive Ar(MemoryReader, true);
+	WorldSave->Serialize(Ar);
+	WorldSave->WorldGenerator->Init(InGameManager);
 
 	return WorldSave;
 }
 
-UWorldSave* UWorldSave::CreateOrLoadWorldSave(const FString& InWorldName,
+UWorldSave* UWorldSave::CreateOrLoadWorldSave(AGameManager* InGameManager, const FString& InWorldName,
 	const TSubclassOf<UWorldGenerator>& WorldGeneratorClass)
 {
 	if (HasWorldSave(InWorldName))
 	{
-		return LoadWorldSave(InWorldName);
+		return LoadWorldSave(InGameManager, InWorldName);
 	}
 
 	const auto WorldSave = NewObject<UWorldSave>();
 	WorldSave->WorldName = InWorldName;
 	WorldSave->SaveVersion = 1;
-	WorldSave->WorldGenerator = NewObject<UWorldGenerator>(WorldSave, WorldGeneratorClass);
+	WorldSave->WorldGenerator = NewObject<UWorldGenerator>(WorldSave, WorldGeneratorClass)->Init(InGameManager);
 	WorldSave->Save();
 	
 	return WorldSave;
@@ -114,6 +126,11 @@ bool UWorldSave::LoadPlayer(AMainController* PlayerController) const
 	const auto PlayerState = PlayerController->GetPlayerState<APlayerState>();
 	const auto FilePath = GetPlayersDir(WorldName) / FString::Printf(TEXT("%s.dat"), *PlayerState->GetPlayerName());
 
+	if (!FPaths::FileExists(FilePath))
+	{
+		SavePlayer(PlayerController);
+	}
+	
 	TArray<uint8> ByteArray;
 	if (!FFileHelper::LoadFileToArray(ByteArray, *FilePath))
 	{
@@ -130,10 +147,11 @@ void UWorldSave::Save()
 {
 	TArray<uint8> ByteArray;
 	FMemoryWriter MemoryWriter(ByteArray, true);
-
+	FObjectAndNameAsStringProxyArchive Ar(MemoryWriter, false);
+	
 	CreateSaveFolder(WorldName);
 	
-	Serialize(MemoryWriter);
+	Serialize(Ar);
 
 	if (!FFileHelper::SaveArrayToFile(MoveTemp(ByteArray), *GetFullSavePath(WorldName)))
 	{

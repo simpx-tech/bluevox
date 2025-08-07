@@ -7,6 +7,9 @@
 #include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
+struct FChunkColumn;
+class UShape;
+struct FPiece;
 class AGameManager;
 struct FRenderChunkPayload;
 
@@ -17,6 +20,15 @@ namespace UE::Geometry
 
 class UChunkData;
 class UDynamicMeshComponent;
+
+struct FRenderNeighbor {
+	const FChunkColumn* Column = nullptr;
+	const FPiece* Piece = nullptr;
+	const UShape* Shape = nullptr;
+	int32 Start = 0;
+	int32 Size = 0;
+	int32 Index = 0;
+};
 
 UCLASS()
 class BLUEVOX_API AChunk : public AActor
@@ -42,6 +54,8 @@ protected:
 
 	UPROPERTY()
 	FChunkPosition Position;
+
+	// DEV perform accumulated render
 
 public:
 	AChunk* Init(const FChunkPosition InPosition, AGameManager* InGameManager, UChunkData* InData)

@@ -1,11 +1,13 @@
 ﻿#include "RegionPosition.h"
 #include "ChunkPosition.h"
+#include "Bluevox/Utils/FloorDiv.h"
 
 FRegionPosition FRegionPosition::FromChunkPosition(const FChunkPosition& ChunkPosition)
 {
 	FRegionPosition RegionPosition;
-	RegionPosition.X = ChunkPosition.X / GameRules::Chunk::Size;
-	RegionPosition.Y = ChunkPosition.Y / GameRules::Chunk::Size;
+
+	RegionPosition.X = FloorDiv(ChunkPosition.X, GameRules::Region::Size);
+	RegionPosition.Y = FloorDiv(ChunkPosition.Y, GameRules::Region::Size);
 	
 	return RegionPosition;
 }

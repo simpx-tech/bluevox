@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Utils/Face.h"
 #include "Kismet/BlueprintFunctionLibrary.h"
 #include "ChunkHelper.generated.h"
 
@@ -20,4 +21,6 @@ public:
 	static void GetChunksAroundLiveAndFar(const FChunkPosition& GlobalPosition, int32 FarDistance, int32 LiveDistance, TSet<FChunkPosition>& OutFar, TSet<FChunkPosition>& OutLive);
 
 	static void GetChunksAround(const FChunkPosition& GlobalPosition, int32 Distance, TSet<FChunkPosition>& OutPositions);
+
+	static int32 GetDistance(const FChunkPosition& A, const FChunkPosition& B);
 };

@@ -13,6 +13,11 @@ struct FLocalPosition
 	{
 	}
 
+	FLocalPosition(const uint8 InX, const uint8 InY, const uint8 InZ)
+		: X(InX), Y(InY), Z(InZ)
+	{
+	}
+
 	UPROPERTY()
 	uint8 X = 0;
 
