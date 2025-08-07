@@ -199,8 +199,6 @@ UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
 	TaskManager = NewObject<UVirtualMapTaskManager>(this, TEXT("VirtualMapTaskManager"));
-	// DEV temp
-	TaskManager->AddToRoot();
 	TaskManager->Init(InGameManager);
 	return this;
 }

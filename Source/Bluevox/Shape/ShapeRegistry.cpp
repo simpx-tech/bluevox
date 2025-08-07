@@ -4,10 +4,12 @@
 #include "ShapeRegistry.h"
 
 #include "Shape.h"
+#include "Shapes/VoidShape.h"
 
 int32 UShapeRegistry::RegisterShape(const FName& ShapeName, const TSubclassOf<UObject>& ShapeClass)
 {
-	const UShape* Shape = Cast<UShape>(NewObject<UObject>(this, ShapeClass, ShapeName));
+	UShape* Shape = Cast<UShape>(NewObject<UObject>(this, ShapeClass, ShapeName));
+	Shape->InitializeData();
 	const auto Index = RegisteredShapes.Add(Shape);
 	ShapeByName.Add(ShapeName, Index);
 	return Index;
@@ -15,18 +17,22 @@ int32 UShapeRegistry::RegisterShape(const FName& ShapeName, const TSubclassOf<UO
 
 void UShapeRegistry::RegisterAll()
 {
-	TArray<UShape*> Shapes;
-	for (TObjectIterator<UShape> It; It; ++It)
-	{
-		if (It->IsA<UShape>() && It->GetClass() != UShape::StaticClass())
-		{
-			Shapes.Add(Cast<UShape>(*It));
-		}
-	}
+	// Always register the VoidShape first, so it has ID 0
+	const auto VoidShapeClass = UVoidShape::StaticClass();
+	RegisterShape(VoidShapeClass->GetDefaultObject<UShape>()->GetNameId(), VoidShapeClass);
+	
+	TArray<UClass*> ShapeClasses;
+	GetDerivedClasses(UShape::StaticClass(), ShapeClasses, true);
 
-	for (const auto Shape : Shapes)
+	for (UClass* ShapeClass : ShapeClasses)
 	{
-		RegisterShape(Shape->GetNameId(), Shape->GetClass());
+		if (ShapeClass->HasAnyClassFlags(CLASS_Abstract) || ShapeClass == VoidShapeClass)
+		{
+			continue;
+		}
+
+		const UShape* CDO = ShapeClass->GetDefaultObject<UShape>();
+		RegisterShape(CDO->GetNameId(), ShapeClass);
 	}
 }
 
@@ -48,6 +54,7 @@ const UShape* UShapeRegistry::GetShapeById(const int32 ShapeId) const
 		return RegisteredShapes[ShapeId];
 	}
 
+	UE_LOG(LogTemp, Warning, TEXT("Shape %d not found in registry"), ShapeId);
 	return nullptr;
 }
 
@@ -59,6 +66,7 @@ const UShape* UShapeRegistry::GetShapeByName(const FName& ShapeName) const
 		return RegisteredShapes[*Index];
 	}
 
+	UE_LOG(LogTemp, Warning, TEXT("Shape %s not found in registry"), *ShapeName.ToString());
 	return nullptr;
 }
 

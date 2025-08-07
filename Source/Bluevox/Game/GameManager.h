@@ -29,6 +29,18 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
+	UPROPERTY(EditAnywhere, Category = "Development")
+	bool bEraseAllSavesOnStart = false;
+
+	UPROPERTY(EditAnywhere, Category = "Development")
+	bool bOverrideWorldGenerator = false;
+
+	UPROPERTY(EditAnywhere, Category = "Development", meta = (EditCondition = "bOverrideWorldGenerator"))
+	TSubclassOf<class UWorldGenerator> WorldGeneratorClassOverride;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
+	UMaterial* ChunkMaterial = nullptr;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bStandalone = false;
 	
@@ -50,10 +62,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	UChunkRegistry* ChunkRegistry = nullptr;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Game")
 	UTickManager* TickManager = nullptr;
 
-	UPROPERTY(EditAnywhere)
+	UPROPERTY(EditAnywhere, Category = "Game")
 	UShapeRegistry* ShapeRegistry = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")

@@ -4,9 +4,9 @@
 
 #include "CoreMinimal.h"
 #include "Position/ChunkPosition.h"
-#include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
+struct FRenderGroup;
 struct FChunkColumn;
 class UShape;
 struct FPiece;
@@ -46,16 +46,13 @@ protected:
 	UPROPERTY(EditAnywhere)
 	UDynamicMeshComponent* MeshComponent = nullptr;
 
-	UPROPERTY()
-	int32 RenderedAtDirtyChanges = -1;
+	FThreadSafeCounter RenderedAtDirtyChanges = -1;
 
 	UPROPERTY()
 	AGameManager* GameManager = nullptr;
 
 	UPROPERTY()
 	FChunkPosition Position;
-
-	// DEV perform accumulated render
 
 public:
 	AChunk* Init(const FChunkPosition InPosition, AGameManager* InGameManager, UChunkData* InData)
@@ -69,7 +66,7 @@ public:
 	UPROPERTY()
 	UChunkData* Data;
 	
-	void Th_BeginRender(EChunkState State, UE::Geometry::FDynamicMesh3& OutMesh);
+	void Th_BeginRender(UE::Geometry::FDynamicMesh3& OutMesh);
 
 	void CommitRender(UE::Geometry::FDynamicMesh3&& Mesh) const;
 };

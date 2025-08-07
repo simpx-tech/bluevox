@@ -84,22 +84,14 @@ public:
 
 	void UnregisterUObjectTickable(const TScriptInterface<IGameTickable>& TickableObject);
 
-	template<
-	typename  AsyncFunc,
-	typename  ThenFunc,
-	typename  ValidateFunc = TickManagerFunc::FNo_Validate,
-	typename  FinallyFunc  = TickManagerFunc::FNo_Finally>
-	void RunAsyncThen( AsyncFunc&&   AsyncFn,
-				   ThenFunc&&    ThenFn,
-				   ValidateFunc&& ValidateFn = {},
-				   FinallyFunc&&  FinallyFn  = {} );
+	template<typename AsyncFunc, typename ThenFunc>
+	void RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn);
 
-	void ScheduleFn(TFunction<void()>&& Func);
+	void Th_ScheduleFn(TFunction<void()>&& Func);
 };
 
-template<class A, class T, class V, class F>
-void UTickManager::RunAsyncThen(A&& AsyncFn, T&& ThenFn,
-								V&& ValidateFn, F&& FinallyFn)
+template<class A, class T>
+void UTickManager::RunAsyncThen(A&& AsyncFn, T&& ThenFn)
 {
 	PendingTasks++;
 
@@ -107,42 +99,23 @@ void UTickManager::RunAsyncThen(A&& AsyncFn, T&& ThenFn,
 	auto Fut = Async(EAsyncExecution::ThreadPool,
 					 std::forward<A>(AsyncFn));
 
-	Fut.Then([this,
-			  thenFn      = std::forward<T>(ThenFn),
-			  validateFn  = std::forward<V>(ValidateFn),
-			  finallyFn   = std::forward<F>(FinallyFn)]
+	Fut.Then([this, thenFn = std::forward<T>(ThenFn)]
 			 (TFuture<R>&& Future) mutable
 	{
-		auto Call_Finally = [&]
-		{
-			if constexpr (!std::is_same_v<std::decay_t<F>, TickManagerFunc::FNo_Finally>)
-				finallyFn();
-		};
-
 		if constexpr (std::is_void_v<R>)
 		{
-			ScheduleFn([=, this]() mutable
+			Th_ScheduleFn([=, this]() mutable
 			{
-				if constexpr (!std::is_same_v<std::decay_t<V>, TickManagerFunc::FNo_Validate>)
-				{
-					if (!validateFn()) { Call_Finally(); --PendingTasks; return; }
-				}
 				thenFn();
-				Call_Finally();
 				--PendingTasks;
 			});
 		}
 		else
 		{
 			R Result = Future.Get();
-			ScheduleFn([=, this, res = std::move(Result)]() mutable
+			Th_ScheduleFn([=, this, res = std::move(Result)]() mutable
 			{
-				if constexpr (!std::is_same_v<std::decay_t<V>, TickManagerFunc::FNo_Validate>)
-				{
-					if (!validateFn(res)) { Call_Finally(); --PendingTasks; return; }
-				}
 				thenFn(std::move(res));
-				Call_Finally();
 				--PendingTasks;
 			});
 		}

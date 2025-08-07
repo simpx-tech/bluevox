@@ -4,29 +4,30 @@
 
 #include "CoreMinimal.h"
 #include "WorldGenerator.h"
-#include "Bluevox/Chunk/Data/ChunkColumn.h"
 #include "Bluevox/Game/GameRules.h"
-#include "FlatWorldGenerator.generated.h"
+#include "NoiseWorldGenerator.generated.h"
+
+class UFastNoiseWrapper;
 
 /**
  * 
  */
 UCLASS()
-class BLUEVOX_API UFlatWorldGenerator : public UWorldGenerator
+class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 {
 	GENERATED_BODY()
 
-public:
-	UPROPERTY(EditAnywhere)
-	int32 GroundHeight = 64.0f;
+	UNoiseWorldGenerator();
 
 	UPROPERTY(EditAnywhere)
 	FName ShapeName = GameRules::Constants::GShape_Layer;
 	
 	UPROPERTY(EditAnywhere)
 	FName MaterialName = GameRules::Constants::GMaterial_Stone;
-	
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 
-	virtual void Serialize(FArchive& Ar) override;
+	UPROPERTY()
+	UFastNoiseWrapper* Noise;
+
+public:
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 };

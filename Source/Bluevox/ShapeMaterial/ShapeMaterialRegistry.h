@@ -19,7 +19,7 @@ class BLUEVOX_API UMaterialRegistry : public UObject
 	UPROPERTY()
 	TMap<FName, int32> MaterialByName;
 
-	void RegisterMaterial(const FName& MaterialName, UMaterialInterface* Material);
+	void RegisterMaterial(const FName& MaterialName, UTexture2D* Material);
 	
 public:
 	void RegisterAll();
@@ -30,8 +30,9 @@ public:
 		{
 			return *Index;
 		}
-		
-		return INDEX_NONE;
+
+		UE_LOG(LogTemp, Warning, TEXT("Material %s not found in registry"), *MaterialName.ToString());
+		return 0;
 	}
 
 	virtual void Serialize(FArchive& Ar) override;

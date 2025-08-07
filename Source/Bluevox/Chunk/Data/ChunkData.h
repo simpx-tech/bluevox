@@ -10,7 +10,7 @@
 #include "ChunkData.generated.h"
 
 /**
- * 
+ *
  */
 UCLASS()
 class BLUEVOX_API UChunkData : public UObject
@@ -28,6 +28,11 @@ public:
 	
 	virtual void Serialize(FArchive& Ar) override;
 
+	static int32 GetIndex(const int32 X, const int32 Y)
+	{
+		return X + Y * GameRules::Chunk::Size;
+	}
+	
 	static int32 GetIndex(const FLocalColumnPosition ColumnPosition)
 	{
 		return ColumnPosition.X + ColumnPosition.Y * GameRules::Chunk::Size;

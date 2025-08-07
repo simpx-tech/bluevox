@@ -19,7 +19,6 @@ struct FLocalChunkPosition
 
 		LocalChunkPosition.X = (ChunkPosition.X % GameRules::Region::Size + GameRules::Region::Size)
 			% GameRules::Region::Size;
-		
 		LocalChunkPosition.Y = (ChunkPosition.Y % GameRules::Region::Size + GameRules::Region::Size)
 			% GameRules::Region::Size;
 		

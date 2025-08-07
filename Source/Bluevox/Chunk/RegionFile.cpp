@@ -27,7 +27,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 	}
 }
 
-UChunkData* FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position)
+bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns)
 {
 	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
 
@@ -35,26 +35,19 @@ UChunkData* FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position)
 	if (!Th_ReadSegment(Index, Data))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("Failed to read chunk data for position %s in region file."), *Position.ToString());
-		return nullptr;
+		return false;
 	}
 
 	if (Data.Num() == 0)
 	{
-		return nullptr;
+		return false;
 	}
 	
-	FBufferArchive ChunkArchive;
 	FArchiveLoadCompressedProxy Decompressor = FArchiveLoadCompressedProxy(Data, NAME_Zlib);
-	Decompressor << ChunkArchive;
+	Decompressor << OutColumns;
 	Decompressor.Flush();
 	
-	FMemoryReader MemoryReader(ChunkArchive, true);
-
-	const auto ChunkData = NewObject<UChunkData>();
-	ChunkData->ClearInternalFlags(EInternalObjectFlags::Async);
-	ChunkData->Serialize(MemoryReader);
-
-	return ChunkData;
+	return true;
 }
 
 TSharedPtr<FRegionFile> FRegionFile::NewFromDisk(const FString& WorldName,

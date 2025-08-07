@@ -6,6 +6,7 @@
 #include "VirtualMap.h"
 #include "Bluevox/Chunk/Chunk.h"
 #include "Bluevox/Chunk/ChunkRegistry.h"
+#include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/RegionFile.h"
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/Position/LocalChunkPosition.h"
@@ -26,61 +27,68 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 {
 	for (const auto& ChunkPosition : ChunksToLoad)
 	{
+		UE_LOG(LogChunk, Verbose, TEXT("Scheduling load for chunk %s"), *ChunkPosition.ToString());
 		if (ProcessingLoad.Contains(ChunkPosition))
 		{
 			ProcessingLoad.Add(ChunkPosition, true);
 		} else
 		{
-			// DEV create UObjects on main thread, then run async (?)
-			// DEV or create UObject pull on main thread, then run async
+			ProcessingLoad.Add(ChunkPosition, true);
 			
 			GameManager->TickManager->RunAsyncThen([this, ChunkPosition]
 			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Async);
-				return GameManager->ChunkRegistry->Th_LoadChunkData(ChunkPosition);
-			}, [ChunkPosition, this] (UChunkData* ChunkData)
-			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Then);
-				
-				if (PendingNetSend.Contains(ChunkPosition))
+				FLoadResult LoadResult;
+				LoadResult.bSuccess = GameManager->ChunkRegistry->Th_FetchChunkDataFromDisk(ChunkPosition, LoadResult.Columns);
+
+				if (!LoadResult.bSuccess)
 				{
-					if (GameManager->VirtualMap->VirtualChunks.Contains(ChunkPosition))
+					// TODO would re-generate chunk if fail to load from disk, is that a good idea?
+					GameManager->WorldSave->WorldGenerator->GenerateChunk(ChunkPosition, LoadResult.Columns);
+				}
+				
+				return MoveTemp(LoadResult);
+			}, [ChunkPosition, this] (FLoadResult&& Result)
+			{
+				UE_LOG(LogChunk, Verbose, TEXT("Processing load for chunk %s"), *ChunkPosition.ToString());
+
+				if (ProcessingLoad.FindRef(ChunkPosition) == true)
+				{
+					const auto ChunkData = NewObject<UChunkData>();
+					ChunkData->Columns = MoveTemp(Result.Columns);
+					GameManager->ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkData);
+
+					if (PendingNetSend.Contains(ChunkPosition))
 					{
-						for (const auto& Player : PendingNetSend[ChunkPosition])
+						UE_LOG(LogChunk, Verbose, TEXT("Chunk %s has PendingNetSend"), *ChunkPosition.ToString());
+						if (
+							ensureMsgf(GameManager->VirtualMap->VirtualChunks.Contains(ChunkPosition), TEXT("Chunk %s was not registered in VirtualMap when trying to send data to players."), *ChunkPosition.ToString())
+							)
 						{
-							Player->PlayerNetwork->SendToClient
-							(NewObject<UChunkDataNetworkPacket>()->Init(ChunkData));
+							for (const auto& Player : PendingNetSend[ChunkPosition])
+							{
+								Player->PlayerNetwork->SendToClient
+								(NewObject<UChunkDataNetworkPacket>()->Init(ChunkData));
+							}
 						}
 					}
-				}
 
-				// Prevent spawn from stuttering game
-				GameManager->TickManager->ScheduleFn(
-					[ChunkPosition, this]
-					{
-						if (!ProcessingUnload.Contains(ChunkPosition))
+					// Prevent spawn from stuttering game
+					GameManager->TickManager->Th_ScheduleFn(
+						[ChunkPosition, this]
 						{
-							GameManager->ChunkRegistry->SpawnChunk(ChunkPosition);	
-						}
-					});
-			}, [this, ChunkPosition] (UChunkData* ChunkData)
-			{
-				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Validate);
-				return ProcessingLoad.FindRef(ChunkPosition) == true;
-			}, [this, ChunkPosition] {
-				TRACE_CPUPROFILER_EVENT_SCOPE(UVirtualMapTaskManager::ScheduleLoad::Finally);
-
-				UE_LOG(LogTemp, Log, TEXT("this valid: %d"), this->IsValidLowLevelFast());
-				
-				if (ProcessingLoad.Contains(ChunkPosition))
-				{
-					if (ProcessingLoad.FindRef(ChunkPosition) == false)
-					{
-						GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
-					}
-					
-					ProcessingLoad.Remove(ChunkPosition);
+							if (!ProcessingUnload.Contains(ChunkPosition))
+							{
+								GameManager->ChunkRegistry->SpawnChunk(ChunkPosition);	
+							}
+						});
 				}
+
+				if (ProcessingLoad.FindRef(ChunkPosition) == false)
+				{
+					GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
+				}
+				
+				ProcessingLoad.Remove(ChunkPosition);
 			});
 		}
 		
@@ -119,7 +127,7 @@ void UVirtualMapTaskManager::ScheduleNetSend(const AMainController* ToPlayer,
 #if !UE_BUILD_SHIPPING
 			if (!ProcessingLoad.Contains(ChunkPosition))
 			{
-				UE_LOG(LogTemp, Warning, TEXT("Chunk %s was requested for a NetSend, but it was not scheduled for load. Player: %s"),
+				UE_LOG(LogChunk, Warning, TEXT("Chunk %s was requested for a NetSend, but it was not scheduled for load. Player: %s"),
 					*ChunkPosition.ToString(), *ToPlayer->GetName());
 			}
 #endif
@@ -138,6 +146,7 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 	{
 		if (ProcessingLoad.Contains(ChunkPosition))
 		{
+			UE_LOG(LogChunk, Verbose, TEXT("Cancelling load for chunk %s"), *ChunkPosition.ToString());
 			ProcessingLoad.Add(ChunkPosition, false);
 		}
 
@@ -159,24 +168,23 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 
 		if (!Region)
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Failed to unload chunk %s: region file not found."), *ChunkPosition.ToString());
+			UE_LOG(LogChunk, Warning, TEXT("Failed to unload chunk %s: region file not found."), *ChunkPosition.ToString());
 			continue;
 		}
-		
+
+		const auto ChunkData = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition);
 		GameManager->TickManager->RunAsyncThen(
-			[this, LocalChunkPosition, ChunkPosition, Region]
+			[this, LocalChunkPosition, ChunkData, Region]
 			{
-				Region->Th_SaveChunk(LocalChunkPosition, GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition));
+				Region->Th_SaveChunk(LocalChunkPosition, ChunkData);
 			},
 			[ChunkPosition, this]
 			{
-				GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
-			},
-			[this, ChunkPosition]
-			{
-				return ProcessingUnload.FindRef(ChunkPosition) == true;
-			},
-			[this, ChunkPosition] {
+				if (ProcessingUnload.FindRef(ChunkPosition) == true)
+				{
+					GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);	
+				}
+
 				ProcessingUnload.Remove(ChunkPosition);
 			}
 		);
@@ -201,31 +209,30 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 			{
 				continue;
 			}
-			
-			ProcessingRender.Add(ChunkPosition, true);
-			ToRemove.Add(ChunkPosition);
-
-			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
 
 			const auto RenderId = LastRenderIndex++;
 			
+			ProcessingRender.Add(ChunkPosition, RenderId);
+			ToRemove.Add(ChunkPosition);
+
+			// DEV
+			// const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
+
 			GameManager->TickManager->RunAsyncThen(
-				[Chunk, State]
+				[Chunk]
 				{
 					UE::Geometry::FDynamicMesh3 Mesh;
-					Chunk->Th_BeginRender(State, Mesh);
+					Chunk->Th_BeginRender(Mesh);
 					return MoveTemp(Mesh);
 				},
-				[Chunk](UE::Geometry::FDynamicMesh3&& Mesh)
+				[Chunk, this, ChunkPosition, RenderId](UE::Geometry::FDynamicMesh3&& Mesh)
 				{
-					Chunk->CommitRender(MoveTemp(Mesh));
-				},
-				[this, ChunkPosition, RenderId](const UE::Geometry::FDynamicMesh3& Mesh)
-				{
-					return ProcessingRender.FindRef(ChunkPosition) == RenderId;
-				},
-				[this, ChunkPosition]
-				{
+					if (ProcessingRender.FindRef(ChunkPosition) == RenderId)
+					{
+						Chunk->CommitRender(MoveTemp(Mesh));	
+					}
+
+					// TODO Do we remove? we need to check if there is another tasks running before deleting
 					ProcessingRender.Remove(ChunkPosition);
 				}
 			);

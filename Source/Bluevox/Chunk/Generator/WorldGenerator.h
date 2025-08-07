@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Chunk/Data/ChunkColumn.h"
 #include "UObject/Object.h"
 #include "WorldGenerator.generated.h"
 
@@ -25,5 +26,5 @@ protected:
 public:
 	UWorldGenerator* Init(AGameManager* InGameManager);
 	
-	virtual void GenerateChunk(const FChunkPosition& Position, UChunkData* OutChunkData) const;
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
 };

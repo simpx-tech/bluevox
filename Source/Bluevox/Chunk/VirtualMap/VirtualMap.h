@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "VirtualChunk.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
-#include "Bluevox/Chunk/Position/GlobalPosition.h"
 #include "Bluevox/Chunk/Position/RegionPosition.h"
 #include "UObject/Object.h"
 #include "VirtualMap.generated.h"

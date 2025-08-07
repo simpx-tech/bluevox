@@ -9,6 +9,7 @@ enum class EFace : uint8
 	West = 3 UMETA(DisplayName = "West"),
 	Top = 4 UMETA(DisplayName = "Top"),
 	Bottom = 5 UMETA(DisplayName = "Bottom"),
+	Anywhere = 6 UMETA(DisplayName = "Anywhere")
 };
 
 namespace FaceUtils

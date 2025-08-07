@@ -4,6 +4,7 @@
 #include "ChunkRegistry.h"
 
 #include "Chunk.h"
+#include "LogChunk.h"
 #include "RegionFile.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Data/ChunkData.h"
@@ -18,7 +19,7 @@ UChunkRegistry* UChunkRegistry::Init(AGameManager* InGameManager)
 
 TSharedPtr<FRegionFile> UChunkRegistry::Th_LoadRegionFile(const FRegionPosition& Position)
 {
-	FScopeLock Lock(&RegionsLock);
+	FWriteScopeLock Lock(RegionsLock);
 	if (Regions.Contains(Position))
 	{
 		return Regions[Position];
@@ -34,7 +35,7 @@ TSharedPtr<FRegionFile> UChunkRegistry::Th_LoadRegionFile(const FRegionPosition&
 TSharedPtr<FRegionFile> UChunkRegistry::Th_GetRegionFile(const FRegionPosition& Position)
 {
 	{
-		FScopeLock Lock(&RegionsLock);
+		FReadScopeLock Lock(RegionsLock);
 		if (Regions.Contains(Position))
 		{
 			return Regions[Position];
@@ -46,9 +47,11 @@ TSharedPtr<FRegionFile> UChunkRegistry::Th_GetRegionFile(const FRegionPosition& 
 
 AChunk* UChunkRegistry::SpawnChunk(const FChunkPosition Position)
 {
+	UE_LOG(LogChunk, Verbose, TEXT("Spawning chunk at position %s"), *Position.ToString());
+	
 	if (ChunkActors.Contains(Position))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Chunk actor already exists for position %s"), *Position.ToString());
+		UE_LOG(LogChunk, Warning, TEXT("Chunk actor already exists for position %s"), *Position.ToString());
 		return ChunkActors[Position];
 	}
 
@@ -70,7 +73,7 @@ AChunk* UChunkRegistry::SpawnChunk(const FChunkPosition Position)
 
 FChunkColumn& UChunkRegistry::Th_GetColumn(const FColumnPosition& GlobalColPosition)
 {
-	FScopeLock Lock(&ChunksDataLock);
+	FReadScopeLock Lock(ChunksDataLock);
 	const FChunkPosition ChunkPos = FChunkPosition::FromColumnPosition(GlobalColPosition);
 	const FLocalColumnPosition LocalColPosition = FLocalColumnPosition::FromColumnPosition(GlobalColPosition);
 
@@ -82,6 +85,8 @@ FChunkColumn& UChunkRegistry::Th_GetColumn(const FColumnPosition& GlobalColPosit
 
 void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
 {
+	UE_LOG(LogChunk, Verbose, TEXT("Unregistering chunk at position %s"), *Position.ToString());
+	
 	if (ChunkActors.Contains(Position))
 	{
 		const auto ChunkActor = ChunkActors[Position];
@@ -93,7 +98,7 @@ void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
 	}
 
 	{
-		FScopeLock Lock(&ChunksDataLock);
+		FWriteScopeLock Lock(ChunksDataLock);
 		if (ChunksData.Contains(Position))
 		{
 			ChunksData.Remove(Position);
@@ -102,7 +107,7 @@ void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
 
 	const auto RegionPosition = FRegionPosition::FromChunkPosition(Position);
 	{
-		FScopeLock Lock(&RegionsLock);
+		FWriteScopeLock Lock(RegionsLock);
 		LoadedByRegion.FindOrAdd(RegionPosition) -= 1;
 		if (LoadedByRegion[RegionPosition] <= 0)
 		{
@@ -115,45 +120,54 @@ void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
 void UChunkRegistry::LockForRender(const FChunkPosition& Position)
 {
 	Th_GetChunkData(Position)->Lock.ReadLock();
-	Th_GetChunkData(Position + FChunkPosition{0, 1})->Lock.WriteLock();
-	Th_GetChunkData(Position + FChunkPosition{0, -1})->Lock.WriteLock();
-	Th_GetChunkData(Position + FChunkPosition{1, 0})->Lock.WriteLock();
-	Th_GetChunkData(Position + FChunkPosition{-0, 0})->Lock.WriteLock();
+	Th_GetChunkData(Position + FChunkPosition{0, 1})->Lock.ReadLock();
+	Th_GetChunkData(Position + FChunkPosition{0, -1})->Lock.ReadLock();
+	Th_GetChunkData(Position + FChunkPosition{1, 0})->Lock.ReadLock();
+	Th_GetChunkData(Position + FChunkPosition{-0, 0})->Lock.ReadLock();
 }
 
 void UChunkRegistry::ReleaseForRender(const FChunkPosition& Position)
 {
 	Th_GetChunkData(Position)->Lock.ReadUnlock();
-	Th_GetChunkData(Position + FChunkPosition{0, 1})->Lock.WriteUnlock();
-	Th_GetChunkData(Position + FChunkPosition{0, -1})->Lock.WriteUnlock();
-	Th_GetChunkData(Position + FChunkPosition{1, 0})->Lock.WriteUnlock();
-	Th_GetChunkData(Position + FChunkPosition{-0, 0})->Lock.WriteUnlock();
+	Th_GetChunkData(Position + FChunkPosition{0, 1})->Lock.ReadUnlock();
+	Th_GetChunkData(Position + FChunkPosition{0, -1})->Lock.ReadUnlock();
+	Th_GetChunkData(Position + FChunkPosition{1, 0})->Lock.ReadUnlock();
+	Th_GetChunkData(Position + FChunkPosition{-0, 0})->Lock.ReadUnlock();
 }
 
 UChunkData* UChunkRegistry::Th_GetChunkData(const FChunkPosition& Position)
 {
-	FScopeLock Lock(&ChunksDataLock);
+	FReadScopeLock Lock(ChunksDataLock);
 	return ChunksData.FindRef(Position);
 }
 
-UChunkData* UChunkRegistry::Th_FetchChunkDataFromDisk(const FChunkPosition& Position)
+void UChunkRegistry::Th_RegisterChunk(const FChunkPosition& Position, UChunkData* Data)
 {
+	UE_LOG(LogChunk, Verbose, TEXT("Registering chunk data for position %s"), *Position.ToString());
+	FWriteScopeLock Lock(ChunksDataLock);
+	ChunksData.Add(Position, Data);
+}
+
+bool UChunkRegistry::Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns)
+{
+	UE_LOG(LogChunk, Verbose, TEXT("Fetching chunk data from disk for position %s"), *Position.ToString());
+	
 	const auto RegionPosition = FRegionPosition::FromChunkPosition(Position);
 	const auto RegionFile = Th_LoadRegionFile(RegionPosition);
 
-	return RegionFile->Th_LoadChunk(FLocalChunkPosition::FromChunkPosition(Position));
+	return RegionFile->Th_LoadChunk(FLocalChunkPosition::FromChunkPosition(Position), OutColumns);
 }
 
 bool UChunkRegistry::Th_HasChunkData(const FChunkPosition& Position)
 {
-	FScopeLock Lock(&ChunksDataLock);
+	FReadScopeLock Lock(ChunksDataLock);
 	return ChunksData.Contains(Position);
 }
 
-UChunkData* UChunkRegistry::Th_LoadChunkData(const FChunkPosition& Position)
+UChunkData* UChunkRegistry::Th_LoadChunkData(const FChunkPosition& Position, UChunkData* Fallback)
 {
 	{
-		FScopeLock Lock(&ChunksDataLock);
+		FReadScopeLock Lock(ChunksDataLock);
 		const auto ChunkData = Th_GetChunkData(Position);
 		if (ChunkData)
 		{
@@ -161,26 +175,26 @@ UChunkData* UChunkRegistry::Th_LoadChunkData(const FChunkPosition& Position)
 		}
 	}
 	
-	const auto NewChunkData = Th_FetchChunkDataFromDisk(Position);
-	if (NewChunkData)
-	{
-		{
-			FScopeLock Lock(&ChunksDataLock);
-			ChunksData.Add(Position, NewChunkData);
+	// const auto NewChunkData = Th_FetchChunkDataFromDisk(Position, Fallback);
+	// if (NewChunkData)
+	// {
+	// 	{
+	// 		FScopeLock Lock(&ChunksDataLock);
+	// 		ChunksData.Add(Position, NewChunkData);
+	//
+	// 		const auto RegionPosition = FRegionPosition::FromChunkPosition(Position);
+	// 		const auto OldValue = LoadedByRegion.FindOrAdd(RegionPosition);
+	// 		LoadedByRegion[RegionPosition] = OldValue + 1;
+	// 	}
+	// 	
+	// 	return NewChunkData;
+	// }
 
-			const auto RegionPosition = FRegionPosition::FromChunkPosition(Position);
-			const auto OldValue = LoadedByRegion.FindOrAdd(RegionPosition);
-			LoadedByRegion[RegionPosition] = OldValue + 1;
-		}
-		
-		return NewChunkData;
-	}
+	// const auto ChunkData = NewObject<UChunkData>(this, UChunkData::StaticClass());
+	// Fallback->ClearInternalFlags(EInternalObjectFlags::Async);
+	// GameManager->WorldSave->WorldGenerator->GenerateChunk(Position, TODO);
 
-	const auto ChunkData = NewObject<UChunkData>(this, UChunkData::StaticClass());
-	ChunkData->ClearInternalFlags(EInternalObjectFlags::Async);
-	GameManager->WorldSave->WorldGenerator->GenerateChunk(Position, ChunkData);
-
-	return ChunkData;
+	return Fallback;
 }
 
 AChunk* UChunkRegistry::GetChunkActor(const FChunkPosition& Position) const

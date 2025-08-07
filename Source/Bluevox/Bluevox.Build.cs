@@ -12,7 +12,8 @@ public class Bluevox : ModuleRules
 			"MeshDescription",
 			"GeometryCore",
 			"GeometryFramework",
-			"ProceduralMeshComponent" });
+			"ProceduralMeshComponent", "FastNoise",
+			"FastNoiseGenerator", });
 
 		PrivateDependencyModuleNames.AddRange(new string[] {  });
 

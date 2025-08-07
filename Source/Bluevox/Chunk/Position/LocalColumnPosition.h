@@ -2,6 +2,8 @@
 
 #include "CoreMinimal.h"
 #include "ColumnPosition.h"
+#include "Bluevox/Utils/PositiveMod.h"
+#include "Bluevox/Game/GameRules.h"
 #include "LocalColumnPosition.generated.h"
 
 USTRUCT(BlueprintType)
@@ -16,8 +18,8 @@ struct FLocalColumnPosition
 	static FLocalColumnPosition FromColumnPosition(const FColumnPosition& ColumnPosition)
 	{
 		FLocalColumnPosition LocalPosition;
-		LocalPosition.X = ColumnPosition.X;
-		LocalPosition.Y = ColumnPosition.Y;
+		LocalPosition.X = PositiveMod(ColumnPosition.X, GameRules::Chunk::Size);
+		LocalPosition.Y = PositiveMod(ColumnPosition.Y, GameRules::Chunk::Size);
 		return LocalPosition;
 	}
 	

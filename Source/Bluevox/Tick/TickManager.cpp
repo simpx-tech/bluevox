@@ -7,6 +7,11 @@
 
 void UTickManager::RemoveTickableByIndexes(TArray<int32>& Indexes)
 {
+	if (Indexes.Num() == 0)
+	{
+		return;
+	}
+	
 	const auto Class = TickableClasses.IsValidIndex(CurrentTickableClassIndex) ? TickableClasses[CurrentTickableClassIndex] : nullptr;
 	CurrentTickableIndex -= FMath::Max(Indexes.Num(), 0);
 	
@@ -162,7 +167,7 @@ void UTickManager::UnregisterUObjectTickable(const TScriptInterface<IGameTickabl
 	}
 }
 
-void UTickManager::ScheduleFn(TFunction<void()>&& Func)
+void UTickManager::Th_ScheduleFn(TFunction<void()>&& Func)
 {
 	ScheduledFns.Enqueue(MoveTemp(Func));
 }

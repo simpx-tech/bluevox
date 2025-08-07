@@ -44,10 +44,11 @@ struct FPiece
 		return static_cast<EIdType>(PackedSizeAndType >> High2_Shift);
 	}
 
+	static uint16 MakeSizeType(const uint16 NewSize, const EIdType NewType);
+
 	FORCEINLINE void SetSizeType(const uint16 NewSize, const EIdType NewType)
 	{
-		PackedSizeAndType = NewSize & Low14_Mask |
-							(static_cast<uint16>(NewType) & 0x3) << High2_Shift;
+		PackedSizeAndType = MakeSizeType(NewSize, NewType);
 	}
 
 	FORCEINLINE void SetSize(const uint16 NewSize) noexcept
@@ -68,3 +69,9 @@ struct FPiece
 		return Ar;
 	}
 };
+
+inline uint16 FPiece::MakeSizeType(const uint16 NewSize, const EIdType NewType)
+{
+	return NewSize & Low14_Mask |
+		(static_cast<uint16>(NewType) & 0x3) << High2_Shift;
+}

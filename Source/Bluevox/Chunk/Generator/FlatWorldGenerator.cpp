@@ -9,10 +9,9 @@
 #include "Bluevox/Shape/ShapeRegistry.h"
 #include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
 
-void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
-                                        UChunkData* OutChunkData) const
+void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const
 {
-	OutChunkData->Columns.SetNumUninitialized(GameRules::Chunk::Size * GameRules::Chunk::Size);
+	OutColumns.SetNum(GameRules::Chunk::Size * GameRules::Chunk::Size);
 
 	const auto ShapeId = GameManager->ShapeRegistry->GetShapeIdByName(ShapeName);
 	const auto MaterialId = GameManager->MaterialRegistry->GetMaterialByName(MaterialName);
@@ -22,7 +21,7 @@ void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 		for (int32 Y = 0; Y < GameRules::Chunk::Size; ++Y)
 		{
 			const int32 Index = X + Y * GameRules::Chunk::Size;
-			auto& Column = OutChunkData->Columns[Index];
+			auto& Column = OutColumns[Index];
 			
 			Column.Pieces.Add(FPiece{
 				static_cast<uint16>(
@@ -32,7 +31,7 @@ void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 			});
 			Column.Pieces.Add(FPiece{
 				0,
-				static_cast<unsigned short>(GameRules::Chunk::Size - GroundHeight)
+				static_cast<unsigned short>(GameRules::Chunk::Height - GroundHeight)
 			});
 		}
 	}

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Chunk/Data/ChunkColumn.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "UObject/Object.h"
 #include "VirtualMapTaskManager.generated.h"
@@ -14,6 +15,17 @@ class UChunkRegistry;
 class UChunkData;
 class UVirtualMap;
 class AMainController;
+
+struct FLoadResult
+{
+	FLoadResult()
+		: bSuccess(false)
+	{
+	}
+	
+	bool bSuccess = false;
+	TArray<FChunkColumn> Columns = {};
+};
 
 /**
  *
@@ -43,8 +55,6 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	AGameManager* GameManager = nullptr;
 public:
 	UVirtualMapTaskManager* Init(AGameManager* InGameManager);
-
-	// TODO handle world begin destroy, wait for all tasks to finish
 	
 	UFUNCTION()
 	void ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad);

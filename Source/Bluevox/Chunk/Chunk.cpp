@@ -4,6 +4,8 @@
 #include "Chunk.h"
 
 #include "ChunkRegistry.h"
+#include "LogChunk.h"
+#include "LogStat.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Shape/Shape.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
@@ -19,6 +21,14 @@ AChunk::AChunk()
 	PrimaryActorTick.bCanEverTick = false;
 
 	MeshComponent = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("MeshComponent"));
+
+	MeshComponent->SetGenerateOverlapEvents(false);
+	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	MeshComponent->bEnableComplexCollision = false;
+	MeshComponent->CollisionType = CTF_UseDefault;
+	MeshComponent->bDeferCollisionUpdates = true; 
+	
 	RootComponent = MeshComponent;
 }
 
@@ -27,25 +37,26 @@ void AChunk::BeginPlay()
 	Super::BeginPlay();
 }
 
-void AChunk::Th_BeginRender(const EChunkState State, FDynamicMesh3& OutMesh)
+void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 {
+	SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender)
+	UE_LOG(LogChunk, Verbose, TEXT("Th_BeginRender for chunk %s"), *Position.ToString());
+	
 	const auto Start = FPlatformTime::Cycles64();
 	
 	const auto ChunkRegistry = GameManager->ChunkRegistry;
 	const auto ShapeRegistry = GameManager->ShapeRegistry;
 	
 	ChunkRegistry->LockForRender(Position);
-
-	const bool HasCollision = EnumHasAnyFlags(State, EChunkState::Collision);
-	MeshComponent->SetCollisionEnabled(HasCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	
-	const auto Visible = EnumHasAnyFlags(State, EChunkState::Rendered);
-	MeshComponent->SetVisibility(Visible);
-	
-	if (RenderedAtDirtyChanges == Data->Changes)
+	if (RenderedAtDirtyChanges.GetValue() == Data->Changes)
 	{
 		return;
 	}
+
+	OutMesh.EnableAttributes();
+	OutMesh.Attributes()->SetNumUVLayers(2);
+	OutMesh.Attributes()->EnablePrimaryColors();
 
 	int32 ColumnIndex;
 	int32 PiecesCount;
@@ -61,6 +72,8 @@ void AChunk::Th_BeginRender(const EChunkState State, FDynamicMesh3& OutMesh)
 	{
 		for (int32 Y = 0; Y < GameRules::Chunk::Size; ++Y)
 		{
+			SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessColumn)
+			
 			ColumnIndex = X + Y * GameRules::Chunk::Size;
 			PiecesCount = Data->Columns[ColumnIndex].Pieces.Num();
 			CurPosition.X = X;
@@ -84,11 +97,13 @@ void AChunk::Th_BeginRender(const EChunkState State, FDynamicMesh3& OutMesh)
 		
 			for (int32 PieceIdx = 0; PieceIdx < PiecesCount; ++PieceIdx)
 			{
+				SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece)
+				
 				const auto& Piece = Data->Columns[ColumnIndex].Pieces[PieceIdx];
 				const auto PieceSize = Piece.GetSize();
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 
-				// Hot path, skip void
+				// Quick path, skip void
 				if (Piece.Id == GameRules::Constants::GShapeId_Void)
 				{
 					continue;
@@ -96,6 +111,8 @@ void AChunk::Th_BeginRender(const EChunkState State, FDynamicMesh3& OutMesh)
 
 				for (const EFace Face : FaceUtils::AllHorizontalFaces)
 				{
+					SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece_AllHorizontalFaces)
+					
 					if (!Shape->IsOpaque(Face))
 					{
 						continue;
@@ -179,17 +196,18 @@ void AChunk::Th_BeginRender(const EChunkState State, FDynamicMesh3& OutMesh)
 		}
 	}
 
-	RenderedAtDirtyChanges = Data->Changes;
+	RenderedAtDirtyChanges.Set(Data->Changes);
 
 	GameManager->ChunkRegistry->ReleaseForRender(Position);
 
 	const auto End = FPlatformTime::Cycles64();
-	UE_LOG(LogTemp, Log, TEXT("Chunk %s rendered in %f ms"), *Position.ToString(),
+	UE_LOG(LogChunk, Verbose, TEXT("Chunk %s rendered in %f ms"), *Position.ToString(),
 		FPlatformTime::ToMilliseconds64(End - Start));
 }
 
 void AChunk::CommitRender(FDynamicMesh3&& Mesh) const
 {
+	UE_LOG(LogChunk, Verbose, TEXT("Committing render for chunk %s"), *Position.ToString());
+	MeshComponent->SetMaterial(0, GameManager->ChunkMaterial);
 	MeshComponent->SetMesh(MoveTemp(Mesh));
 }
-

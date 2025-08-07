@@ -32,15 +32,18 @@ void UWorldSave::Serialize(FArchive& Ar)
 	Ar << WorldName;
 	Ar << SaveVersion;
 
-	if (Ar.IsLoading())
+	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
-		Ar << WorldGeneratorClass;
-		WorldGenerator = NewObject<UWorldGenerator>(this, WorldGeneratorClass);
-		WorldGenerator->Serialize(Ar);
-	} else if (Ar.IsSaving())
-	{
-		Ar << WorldGeneratorClass;
-		WorldGenerator->Serialize(Ar);
+		if (Ar.IsLoading())
+		{
+			Ar << WorldGeneratorClass;
+			WorldGenerator = NewObject<UWorldGenerator>(this, WorldGeneratorClass);
+			WorldGenerator->Serialize(Ar);
+		} else if (Ar.IsSaving())
+		{
+			Ar << WorldGeneratorClass;
+			WorldGenerator->Serialize(Ar);
+		}
 	}
 }
 

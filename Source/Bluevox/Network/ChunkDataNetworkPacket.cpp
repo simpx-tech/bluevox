@@ -13,7 +13,10 @@ void UChunkDataNetworkPacket::OnReceive(AGameManager* GameManager)
 void UChunkDataNetworkPacket::Serialize(FArchive& Ar)
 {
 	Super::Serialize(Ar);
-	ChunkData->Serialize(Ar);
+	if (!HasAnyFlags(RF_ClassDefaultObject))
+	{
+		ChunkData->Serialize(Ar);
+	}
 }
 
 UChunkDataNetworkPacket* UChunkDataNetworkPacket::Init(UChunkData* InData)

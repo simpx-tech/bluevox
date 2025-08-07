@@ -1,7 +1,6 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "ChunkPosition.h"
 #include "LocalPosition.generated.h"
 
 USTRUCT(BlueprintType)

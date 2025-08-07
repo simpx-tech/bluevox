@@ -34,8 +34,6 @@ void AGameManager::BeginPlay()
 	bStandalone = GetNetMode() == NM_Standalone;
 
 	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
-	// DEV temp
-	VirtualMap->AddToRoot();
 	
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"))->Init(this);
 
@@ -55,8 +53,18 @@ void AGameManager::BeginPlay()
 
 	const auto Character = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
 	LocalCharacter = Cast<AMainCharacter>(Character);
+
+	if (bEraseAllSavesOnStart)
+	{
+		IFileManager::Get().DeleteDirectory(*UWorldSave::GetWorldsDir(), false, true);
+	}
 	
 	// TODO temp
-	WorldSave = UWorldSave::CreateOrLoadWorldSave(this, "TestWorld", UWorldGenerator::StaticClass());
+	WorldSave = UWorldSave::CreateOrLoadWorldSave(this, "TestWorld", UFlatWorldGenerator::StaticClass());
+	
+	if (bOverrideWorldGenerator && WorldSave && WorldGeneratorClassOverride)
+	{
+		WorldSave->WorldGenerator = NewObject<UWorldGenerator>(WorldSave, WorldGeneratorClassOverride)->Init(this);
+	}
 }
 

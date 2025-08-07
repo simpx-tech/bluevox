@@ -31,8 +31,7 @@ class BLUEVOX_API UChunkRegistry : public UObject
 
 	TMap<FRegionPosition, int32> LoadedByRegion;
 
-	// TODO change for a read/write lock
-	FCriticalSection RegionsLock;
+	FRWLock RegionsLock;
 
 	UPROPERTY()
 	AGameManager* GameManager;
@@ -40,8 +39,7 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	UPROPERTY()
 	TMap<FChunkPosition, UChunkData*> ChunksData;
 
-	// TODO change for a read/write lock
-	FCriticalSection ChunksDataLock;
+	FRWLock ChunksDataLock;
 
 	UPROPERTY()
 	TMap<FChunkPosition, AChunk*> ChunkActors;
@@ -67,13 +65,16 @@ public:
 	UChunkData* Th_GetChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
-	UChunkData* Th_FetchChunkDataFromDisk(const FChunkPosition& Position);
+	void Th_RegisterChunk(const FChunkPosition& Position, UChunkData* Data);
+	
+	UFUNCTION()
+	bool Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns);
 	
 	UFUNCTION()
 	bool Th_HasChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
-	UChunkData* Th_LoadChunkData(const FChunkPosition& Position);
+	UChunkData* Th_LoadChunkData(const FChunkPosition& Position, UChunkData* Fallback);
 
 	UFUNCTION()
 	AChunk* GetChunkActor(const FChunkPosition& Position) const;

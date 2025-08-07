@@ -3,6 +3,7 @@
 #include "CoreMinimal.h"
 #include "Bluevox/Game/WorldSave.h"
 #include "Bluevox/Utils/SegmentedFile/SegmentedFile.h"
+#include "Data/ChunkColumn.h"
 
 struct FLocalChunkPosition;
 struct FLocalPosition;
@@ -16,7 +17,7 @@ struct FRegionFile : FSegmentedFile
 
 	void Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* ChunkData);
 
-	UChunkData* Th_LoadChunk(const FLocalChunkPosition& Position);
+	bool Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns);
 
 	static TSharedPtr<FRegionFile> NewFromDisk(const FString& WorldName, const FRegionPosition& RegionPosition);
 };
