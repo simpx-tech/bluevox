@@ -4,6 +4,7 @@
 #include "ColumnPosition.h"
 #include "GlobalPosition.h"
 #include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Utils/FloorDiv.h"
 #include "ChunkPosition.generated.h"
 
 USTRUCT(BlueprintType)
@@ -22,17 +23,20 @@ struct FChunkPosition
 
 	static FChunkPosition FromActorLocation(const FVector& Location)
 	{
+		const float ChunkWorldSize = GameRules::Chunk::Size
+							   * GameRules::Scaling::XYWorldSize;
+		
 		FChunkPosition ChunkPosition;
-		ChunkPosition.X = FMath::FloorToInt(Location.X / GameRules::Chunk::Size * GameRules::Scaling::XYWorldSize);
-		ChunkPosition.Y = FMath::FloorToInt(Location.Y / GameRules::Chunk::Size * GameRules::Scaling::XYWorldSize);
+		ChunkPosition.X = FMath::FloorToInt(Location.X / ChunkWorldSize);
+		ChunkPosition.Y = FMath::FloorToInt(Location.Y / ChunkWorldSize);
 		return ChunkPosition;
 	}
 
 	static FChunkPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition)
 	{
 		FChunkPosition ChunkPosition;
-		ChunkPosition.X = GlobalPosition.X / GameRules::Chunk::Size;
-		ChunkPosition.Y = GlobalPosition.Y / GameRules::Chunk::Size;
+		ChunkPosition.X = FloorDiv(GlobalPosition.X, GameRules::Chunk::Size);
+		ChunkPosition.Y = FloorDiv(GlobalPosition.Y, GameRules::Chunk::Size);
 		return ChunkPosition;
 	}
 
@@ -47,15 +51,15 @@ struct FChunkPosition
 	static FChunkPosition FromColumnPosition(const FColumnPosition& ColumnPosition)
 	{
 		FChunkPosition ChunkPosition;
-		ChunkPosition.X = ColumnPosition.X / GameRules::Chunk::Size;
-		ChunkPosition.Y = ColumnPosition.Y / GameRules::Chunk::Size;
+		ChunkPosition.X = FloorDiv(ColumnPosition.X, GameRules::Chunk::Size);
+		ChunkPosition.Y = FloorDiv(ColumnPosition.Y, GameRules::Chunk::Size);
 		return ChunkPosition;
 	}
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	int32 X = 0;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	int32 Y = 0;
 
 	bool operator==(const FChunkPosition& Other) const

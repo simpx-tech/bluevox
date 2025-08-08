@@ -12,7 +12,7 @@ struct FLocalPosition
 	{
 	}
 
-	FLocalPosition(const uint8 InX, const uint8 InY, const uint8 InZ)
+	FLocalPosition(const uint8 InX, const uint8 InY, const uint16 InZ)
 		: X(InX), Y(InY), Z(InZ)
 	{
 	}
@@ -24,7 +24,7 @@ struct FLocalPosition
 	uint8 Y = 0;
 
 	UPROPERTY()
-	uint8 Z = 0;
+	uint16 Z = 0;
 };
 
 FORCEINLINE uint32 GetTypeHash(const FLocalPosition& Pos)

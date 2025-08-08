@@ -13,6 +13,11 @@ struct FChunkColumn
 	{
 	}
 
+	explicit FChunkColumn(TArray<FPiece>&& InPieces)
+		: Pieces(MoveTemp(InPieces))
+	{
+	}
+
 	UPROPERTY()
 	TArray<FPiece> Pieces;
 

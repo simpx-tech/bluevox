@@ -51,7 +51,7 @@ protected:
 	UPROPERTY()
 	AGameManager* GameManager = nullptr;
 
-	UPROPERTY()
+	UPROPERTY(EditAnywhere)
 	FChunkPosition Position;
 
 public:

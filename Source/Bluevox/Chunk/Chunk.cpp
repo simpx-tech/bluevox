@@ -27,7 +27,8 @@ AChunk::AChunk()
 	MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
 	MeshComponent->bEnableComplexCollision = false;
 	MeshComponent->CollisionType = CTF_UseDefault;
-	MeshComponent->bDeferCollisionUpdates = true; 
+	MeshComponent->bDeferCollisionUpdates = true;
+	MeshComponent->bCastShadowAsTwoSided = true;
 	
 	RootComponent = MeshComponent;
 }
@@ -57,33 +58,34 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	OutMesh.EnableAttributes();
 	OutMesh.Attributes()->SetNumUVLayers(2);
 	OutMesh.Attributes()->EnablePrimaryColors();
-
-	int32 ColumnIndex;
-	int32 PiecesCount;
-	int32 CurZ;
-	int32 InternalZ;
-	int32 AccumulatedSize = 0;
-	int32 AccumulatedZ = -1;
-	FColumnPosition CurPosition;
+	
+	FColumnPosition GlobalPos;
 	
 	TStaticArray<FRenderNeighbor, 4> Neighbors;
+
+	const auto BaseChunkPosX = Position.X * GameRules::Chunk::Size;
+	const auto BaseChunkPosY = Position.Y * GameRules::Chunk::Size;
 	
-	for (int32 X = 0; X < GameRules::Chunk::Size; ++X)
+	for (int32 LocalX = 0; LocalX < GameRules::Chunk::Size; ++LocalX)
 	{
-		for (int32 Y = 0; Y < GameRules::Chunk::Size; ++Y)
+		for (int32 LocalY = 0; LocalY < GameRules::Chunk::Size; ++LocalY)
 		{
-			SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessColumn)
+			if (Position.X == 0 && Position.Y == 0 && LocalX == 0 && LocalY == 0)
+			{
+				UE_LOG(LogTemp, Warning, TEXT("breakpoint"));
+			}
 			
-			ColumnIndex = X + Y * GameRules::Chunk::Size;
-			PiecesCount = Data->Columns[ColumnIndex].Pieces.Num();
-			CurPosition.X = X;
-			CurPosition.Y = Y;
-			CurZ = 0;
-			InternalZ = 0;
+			SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessColumn)
+
+			const int32 ColumnIndex = UChunkData::GetIndex(LocalX, LocalY);
+			const int32 PiecesCount = Data->Columns[ColumnIndex].Pieces.Num();
+			GlobalPos.X = BaseChunkPosX + LocalX;
+			GlobalPos.Y = BaseChunkPosY + LocalY;
+			int32 CurZ = 0;
 
 			for (const auto Face : FaceUtils::AllHorizontalFaces)
 			{
-				const auto& Column = ChunkRegistry->Th_GetColumn(CurPosition +
+				const auto& Column = ChunkRegistry->Th_GetColumn(GlobalPos +
 					FaceUtils::GetHorizontalOffsetByFace(Face));
 				auto& Neighbor = Neighbors[static_cast<uint8>(Face)];
 				Neighbor.Column = &Column;
@@ -100,17 +102,34 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece)
 				
 				const auto& Piece = Data->Columns[ColumnIndex].Pieces[PieceIdx];
-				const auto PieceSize = Piece.GetSize();
+				const int32 PieceSize = Piece.GetSize();
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 
 				// Quick path, skip void
 				if (Piece.Id == GameRules::Constants::GShapeId_Void)
 				{
+					for (const EFace Face : FaceUtils::AllHorizontalFaces)
+					{
+						auto& Neighbor = Neighbors[static_cast<uint8>(Face)];
+						while (Neighbor.Index + 1 < Neighbor.Column->Pieces.Num() &&
+							CurZ + PieceSize >= Neighbor.Start + Neighbor.Size)
+						{
+							Neighbor.Start += Neighbor.Size;
+							Neighbor.Index += 1;
+							Neighbor.Size = Neighbor.Column->Pieces[Neighbor.Index].GetSize();
+							Neighbor.Piece = &Neighbor.Column->Pieces[Neighbor.Index];
+							Neighbor.Shape = ShapeRegistry->GetShapeById(Neighbor.Piece->Id);
+						}
+					}
+					CurZ += PieceSize;
 					continue;
 				}
 
 				for (const EFace Face : FaceUtils::AllHorizontalFaces)
 				{
+					int32 AccumulatedSize = 0;
+					int32 AccumulatedZ = -1;
+					int32 InternalZ = 0;
 					SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece_AllHorizontalFaces)
 					
 					if (!Shape->IsOpaque(Face))
@@ -120,6 +139,7 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 					
 					const auto OppositeFace = FaceUtils::GetOppositeFace(Face);
 
+					bool bContinue;
 					auto& Neighbor = Neighbors[static_cast<uint8>(Face)];
 					do
 					{
@@ -129,7 +149,7 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 						{
 							if (AccumulatedSize > 0)
 							{
-								Shape->Render(OutMesh, Face, FLocalPosition(CurPosition.X, CurPosition.Y, AccumulatedZ), AccumulatedSize, Piece.Id);
+								Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize, Piece.Id);
 								
 								AccumulatedSize = 0;
 								AccumulatedZ = -1;
@@ -138,35 +158,34 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 						{
 							if (AccumulatedZ == -1)
 							{
-								AccumulatedZ = InternalZ;
+								AccumulatedZ = CurZ + InternalZ;
 							}
 
-							const auto End = FMath::Min(CurZ + PieceSize, Neighbor.Start + Neighbor.Size);
-							AccumulatedSize += End - InternalZ;
+							const int32 End = FMath::Min(CurZ + PieceSize, Neighbor.Start + Neighbor.Size);
+							AccumulatedSize += End - CurZ - InternalZ;
 						}
 
-						Neighbor.Start += Neighbor.Size;
-						InternalZ += Neighbor.Size;
-						Neighbor.Index += 1;
-						// Advance neighbor if we have more neighbor pieces
-						if (Neighbor.Index < Neighbor.Column->Pieces.Num())
+						if (
+							CurZ + PieceSize >= Neighbor.Start + Neighbor.Size &&
+							Neighbor.Index + 1 < Neighbor.Column->Pieces.Num())
 						{
+							Neighbor.Start += Neighbor.Size;
+							InternalZ += Neighbor.Size;
+							Neighbor.Index += 1;
 							Neighbor.Size = Neighbor.Column->Pieces[Neighbor.Index].GetSize();
 							Neighbor.Piece = &Neighbor.Column->Pieces[Neighbor.Index];
 							Neighbor.Shape = ShapeRegistry->GetShapeById(Neighbor.Piece->Id);
-						}
-
-						if (AccumulatedSize > 0)
+							bContinue = true;
+						} else
 						{
-							Shape->Render(OutMesh, Face, FLocalPosition(CurPosition.X, CurPosition.Y, AccumulatedZ), AccumulatedSize, Piece.Id);
-
-							AccumulatedSize = 0;
-							AccumulatedZ = -1;
+							bContinue = false;
 						}
-					} while (
-						CurZ + PieceSize > Neighbor.Index + Neighbor.Size && 
-						Neighbor.Index < Neighbor.Column->Pieces.Num()
-					);
+					} while (bContinue);
+
+					if (AccumulatedSize > 0)
+					{
+						Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize, Piece.Id);
+					}
 				}
 
 				// Top
@@ -178,7 +197,7 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				}
 				if (bShouldRenderTop)
 				{
-					Shape->Render(OutMesh, EFace::Top, FLocalPosition(CurPosition.X, CurPosition.Y, CurZ), PieceSize, Piece.Id);
+					Shape->Render(OutMesh, EFace::Top, FLocalPosition(LocalX, LocalY, CurZ), PieceSize, Piece.Id);
 				}
 				
 				// Bottom, only render if we are not on the first piece
@@ -187,11 +206,11 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 					const auto NeighborShape = ShapeRegistry->GetShapeById(Data->Columns[ColumnIndex].Pieces[PieceIdx - 1].Id);
 					if (!NeighborShape->IsOpaque(EFace::Top))
 					{
-						Shape->Render(OutMesh, EFace::Bottom, FLocalPosition(CurPosition.X, CurPosition.Y, CurZ), PieceSize, Piece.Id);
+						Shape->Render(OutMesh, EFace::Bottom, FLocalPosition(LocalX, LocalY, CurZ), PieceSize, Piece.Id);
 					}
 				}
 				
-				CurZ += Piece.GetSize();
+				CurZ += PieceSize;
 			}
 		}
 	}
