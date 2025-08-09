@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Position/ChunkPosition.h"
+#include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
 struct FRenderGroup;
@@ -65,8 +66,10 @@ public:
 	
 	UPROPERTY()
 	UChunkData* Data;
+
+	void SetRenderState(EChunkState State) const;
 	
-	void Th_BeginRender(UE::Geometry::FDynamicMesh3& OutMesh);
+	bool Th_BeginRender(UE::Geometry::FDynamicMesh3& OutMesh);
 
 	void CommitRender(UE::Geometry::FDynamicMesh3&& Mesh) const;
 };

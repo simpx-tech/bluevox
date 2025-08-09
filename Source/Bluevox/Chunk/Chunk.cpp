@@ -5,7 +5,7 @@
 
 #include "ChunkRegistry.h"
 #include "LogChunk.h"
-#include "LogStat.h"
+#include "ChunkStats.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Shape/Shape.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
@@ -21,15 +21,10 @@ AChunk::AChunk()
 	PrimaryActorTick.bCanEverTick = false;
 
 	MeshComponent = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("MeshComponent"));
-
-	MeshComponent->SetGenerateOverlapEvents(false);
-	MeshComponent->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	MeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
-	MeshComponent->bEnableComplexCollision = false;
-	MeshComponent->CollisionType = CTF_UseDefault;
-	MeshComponent->bDeferCollisionUpdates = true;
+	MeshComponent->bEnableComplexCollision = true;
 	MeshComponent->bCastShadowAsTwoSided = true;
-	
+	MeshComponent->CollisionType = CTF_UseComplexAsSimple;
+
 	RootComponent = MeshComponent;
 }
 
@@ -38,7 +33,16 @@ void AChunk::BeginPlay()
 	Super::BeginPlay();
 }
 
-void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
+void AChunk::SetRenderState(const EChunkState State) const
+{
+	const bool HasCollision = EnumHasAnyFlags(State, EChunkState::Collision);
+	MeshComponent->SetCollisionEnabled(HasCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	
+	const auto Visible = EnumHasAnyFlags(State, EChunkState::Rendered);
+	MeshComponent->SetVisibility(Visible);
+}
+
+bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 {
 	SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender)
 	UE_LOG(LogChunk, Verbose, TEXT("Th_BeginRender for chunk %s"), *Position.ToString());
@@ -48,13 +52,13 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	const auto ChunkRegistry = GameManager->ChunkRegistry;
 	const auto ShapeRegistry = GameManager->ShapeRegistry;
 	
-	ChunkRegistry->LockForRender(Position);
-	
 	if (RenderedAtDirtyChanges.GetValue() == Data->Changes)
 	{
-		return;
+		return false;
 	}
 
+	ChunkRegistry->LockForRender(Position);
+	
 	OutMesh.EnableAttributes();
 	OutMesh.Attributes()->SetNumUVLayers(2);
 	OutMesh.Attributes()->EnablePrimaryColors();
@@ -217,11 +221,13 @@ void AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 
 	RenderedAtDirtyChanges.Set(Data->Changes);
 
-	GameManager->ChunkRegistry->ReleaseForRender(Position);
+	ChunkRegistry->ReleaseForRender(Position);
 
 	const auto End = FPlatformTime::Cycles64();
 	UE_LOG(LogChunk, Verbose, TEXT("Chunk %s rendered in %f ms"), *Position.ToString(),
 		FPlatformTime::ToMilliseconds64(End - Start));
+
+	return true;
 }
 
 void AChunk::CommitRender(FDynamicMesh3&& Mesh) const

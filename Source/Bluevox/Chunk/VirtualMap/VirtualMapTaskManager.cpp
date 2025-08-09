@@ -215,25 +215,27 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 			ProcessingRender.Add(ChunkPosition, RenderId);
 			ToRemove.Add(ChunkPosition);
 
-			// DEV
-			// const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
+			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
+			Chunk->SetRenderState(State);
 
 			GameManager->TickManager->RunAsyncThen(
 				[Chunk]
 				{
-					UE::Geometry::FDynamicMesh3 Mesh;
-					Chunk->Th_BeginRender(Mesh);
-					return MoveTemp(Mesh);
+					FRenderResult Result;
+					Result.bSuccess = Chunk->Th_BeginRender(Result.Mesh);
+					return MoveTemp(Result);
 				},
-				[Chunk, this, ChunkPosition, RenderId](UE::Geometry::FDynamicMesh3&& Mesh)
+				[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
 				{
 					if (ProcessingRender.FindRef(ChunkPosition) == RenderId)
 					{
-						Chunk->CommitRender(MoveTemp(Mesh));	
-					}
+						if (Result.bSuccess) {
+							Chunk->CommitRender(MoveTemp(Result.Mesh));
+						}
 
-					// TODO Do we remove? we need to check if there is another tasks running before deleting
-					ProcessingRender.Remove(ChunkPosition);
+						// Only remove if is the last one
+						ProcessingRender.Remove(ChunkPosition);
+					}
 				}
 			);
 		}

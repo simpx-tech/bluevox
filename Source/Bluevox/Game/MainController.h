@@ -85,4 +85,6 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void Serialize(FArchive& Ar) override;
+
+	void SerializeForWorldSave(FArchive& Ar);
 };

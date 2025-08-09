@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Bluevox/Chunk/Data/ChunkColumn.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
+#include "DynamicMesh/DynamicMesh3.h"
 #include "UObject/Object.h"
 #include "VirtualMapTaskManager.generated.h"
 
@@ -19,12 +20,21 @@ class AMainController;
 struct FLoadResult
 {
 	FLoadResult()
-		: bSuccess(false)
 	{
 	}
 	
 	bool bSuccess = false;
 	TArray<FChunkColumn> Columns = {};
+};
+
+struct FRenderResult
+{
+	FRenderResult()
+	{
+	}
+	
+	bool bSuccess = false;
+	UE::Geometry::FDynamicMesh3 Mesh;
 };
 
 /**

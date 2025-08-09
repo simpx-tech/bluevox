@@ -3,10 +3,11 @@
 
 #include "VirtualMap.h"
 
+#include "VirtualMapStats.h"
 #include "VirtualMapTaskManager.h"
 #include "Bluevox/Chunk/ChunkHelper.h"
+#include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
-#include "Bluevox/Chunk/Position/RegionPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/MainController.h"
 
@@ -21,25 +22,27 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 		const auto CurrentChunk = VirtualChunks.Find(LivePosition);
 		if (CurrentChunk)
 		{
-			const auto RegionPos = FRegionPosition::FromChunkPosition(LivePosition);
-			ChunksByRegion.FindOrAdd(RegionPos)--;
-			
-			CurrentChunk->LiveForPlayersAmount--;
-
-			// Downgrade live -> visual
-			if (CurrentChunk->LiveForPlayersAmount <= 0)
+			if (IsLocalController)
 			{
-				CurrentChunk->State = IsLocalController ? EChunkState::VisualOnly : EChunkState::RemoteVisualOnly;
-				ToRender.Add(LivePosition);
+				EnumRemoveFlags(CurrentChunk->State, EChunkState::LocalLive);
+			} else
+			{
+				CurrentChunk->LiveForRemotePlayersAmount--;
+			}
 
-				if (!IsLocalController)
-				{
-					ToUnload.Add(LivePosition);
-				}
+			CurrentChunk->State = CalculateState(*CurrentChunk);
+
+			// RemoteVisualOnly = No Collision, No Rendered + No remote players
+			if (!EnumHasAnyFlags(CurrentChunk->State, EChunkState::Collision | EChunkState::Rendered) && CurrentChunk->FarForRemotePlayersAmount == 0)
+			{
+				ToUnload.Add(LivePosition);
+			} else
+			{
+				ToRender.Add(LivePosition);
 			}
 		} else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Chunk %s not found in virtual map when trying to remove player."), *LivePosition.ToString());
+			UE_LOG(LogChunk, Warning, TEXT("Chunk %s not found in virtual map when trying to remove player."), *LivePosition.ToString());
 		}
 	}
 
@@ -48,60 +51,67 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 		const auto CurrentChunk = VirtualChunks.Find(FarPosition);
 		if (CurrentChunk)
 		{
-			const auto RegionPos = FRegionPosition::FromChunkPosition(FarPosition);
-			ChunksByRegion.FindOrAdd(RegionPos)--;
-			
-			if (CurrentChunk->LiveForPlayersAmount <= 0)
+			if (IsLocalController)
 			{
-				// Downgrade visual -> remote visual
+				EnumRemoveFlags(CurrentChunk->State, EChunkState::LocalFar);
+			} else
+			{
+				CurrentChunk->FarForRemotePlayersAmount--;
+			}
+
+			CurrentChunk->State = CalculateState(*CurrentChunk);
+
+			// RemoteVisualOnly = No Collision, No Rendered + No remote players
+			if (!EnumHasAnyFlags(CurrentChunk->State, EChunkState::Collision | EChunkState::Rendered) && CurrentChunk->FarForRemotePlayersAmount == 0)
+			{
 				ToUnload.Add(FarPosition);
 			} else
 			{
-				// Downgrade live -> remote live
 				ToRender.Add(FarPosition);
 			}
 		} else
 		{
-			UE_LOG(LogTemp, Warning, TEXT("Chunk %s not found in virtual map when trying to remove player."), *FarPosition.ToString());
+			UE_LOG(LogChunk, Warning, TEXT("Chunk %s not found in virtual map when trying to remove player."), *FarPosition.ToString());
 		}
 	}
 }
 
-void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSet<FChunkPosition>& LiveChunks, const TSet<FChunkPosition>& FarChunks)
+void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSet<FChunkPosition>& NewLiveChunks, const TSet<FChunkPosition>& NewFarChunks, const TSet<FChunkPosition>& FarToLive, const TSet<FChunkPosition>& LiveToFar)
 {
 	TSet<FChunkPosition> ToLoad;
-	ToLoad.Reserve(FarChunks.Num());
+	ToLoad.Reserve(NewFarChunks.Num());
 
 	TSet<FChunkPosition> ToRender;
-	ToRender.Reserve(LiveChunks.Num());
-
-	TSet<FChunkPosition> ToUnload;
-	ToUnload.Reserve(FarChunks.Num());
+	ToRender.Reserve(NewLiveChunks.Num());
 
 	TSet<FChunkPosition> ToSend;
-	ToSend.Reserve(FarChunks.Num() + LiveChunks.Num());
+	ToSend.Reserve(NewFarChunks.Num() + NewLiveChunks.Num());
 
 	const auto IsLocalController = Controller == GameManager->LocalController;
 	
-	for (auto& LivePosition : LiveChunks)
+	for (auto& LivePosition : NewLiveChunks)
 	{
 		const auto CurrentChunk = VirtualChunks.Find(LivePosition);
 
 		if (CurrentChunk)
 		{
-			CurrentChunk->LiveForPlayersAmount++;
-			CurrentChunk->State = EChunkState::Live;
+			if (IsLocalController)
+			{
+				EnumAddFlags(CurrentChunk->State, EChunkState::LocalLive);
+			} else
+			{
+				CurrentChunk->LiveForRemotePlayersAmount++;
+			}
+
+			CurrentChunk->State = CalculateState(*CurrentChunk);
 		} else
 		{
 			FVirtualChunk NewChunk;
-			NewChunk.State = EChunkState::Live;
-			NewChunk.LiveForPlayersAmount = 1;
-			VirtualChunks.Add(LivePosition, NewChunk);
-		
-			ToLoad.Add(LivePosition);
+			NewChunk.State = IsLocalController ? EChunkState::Live | EChunkState::LocalLive : EChunkState::RemoteLive;
+			NewChunk.LiveForRemotePlayersAmount = IsLocalController ? 0 : 1;
 
-			const auto RegionPos = FRegionPosition::FromChunkPosition(LivePosition);
-			ChunksByRegion.FindOrAdd(RegionPos)++;
+			VirtualChunks.Add(LivePosition, NewChunk);
+			ToLoad.Add(LivePosition);
 		}
 
 		ToRender.Add(LivePosition);
@@ -114,22 +124,22 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 
 	const auto PlayerChunkPosition = FChunkPosition::FromActorLocation(Controller->GetPawn()->GetActorLocation());
 	const auto MaxDistance = Controller->GetFarDistance() - 1;
-	for (auto& FarPosition : FarChunks)
+	for (auto& FarPosition : NewFarChunks)
 	{
 		const auto Distance = UChunkHelper::GetDistance(PlayerChunkPosition, FarPosition);
+		const auto ShouldRender = Distance <= MaxDistance;
 		
 		// Already loaded
 		if (VirtualChunks.Contains(FarPosition))
 		{
-			// Only affect rendering, if is local player, we should also render it visually
+			// Only affect rendering
 			if (IsLocalController)
 			{
-				const auto CurrentChunk = VirtualChunks.Find(FarPosition);
-				// Enable rendered, doesn't change the collision state
-				CurrentChunk->State = CurrentChunk->State | EChunkState::Rendered;
-
-				if (Distance <= MaxDistance)
+				if (ShouldRender)
 				{
+					const auto CurrentChunk = VirtualChunks.Find(FarPosition);
+					// Enable rendered, doesn't change the rest
+					CurrentChunk->State = CurrentChunk->State | EChunkState::Rendered;
 					ToRender.Add(FarPosition);
 				}
 			} else
@@ -139,13 +149,16 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 		} else
 		{
 			FVirtualChunk NewChunk;
-			NewChunk.State = IsLocalController ? EChunkState::VisualOnly : EChunkState::RemoteVisualOnly;
+			NewChunk.State = IsLocalController
+				? EChunkState::LocalFar | (ShouldRender ? EChunkState::Rendered : EChunkState::None)
+				: EChunkState::RemoteVisualOnly;
+			NewChunk.FarForRemotePlayersAmount = IsLocalController ? 0 : 1;
 			VirtualChunks.Add(FarPosition, NewChunk);
 			ToLoad.Add(FarPosition);
 
 			if (IsLocalController)
 			{
-				if (Distance <= MaxDistance)
+				if (ShouldRender)
 				{
 					ToRender.Add(FarPosition);
 				}
@@ -153,9 +166,52 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 			{
 				ToSend.Add(FarPosition);
 			}
-			
-			const auto RegionPos = FRegionPosition::FromChunkPosition(FarPosition);
-			ChunksByRegion.FindOrAdd(RegionPos)++;
+		}
+	}
+
+	for (const auto& LivePosition : FarToLive)
+	{
+		const auto CurrentChunk = VirtualChunks.Find(LivePosition);
+		if (CurrentChunk)
+		{
+			if (IsLocalController)
+			{
+				EnumRemoveFlags(CurrentChunk->State, EChunkState::LocalFar);
+				EnumAddFlags(CurrentChunk->State, EChunkState::LocalLive);
+			} else
+			{
+				CurrentChunk->FarForRemotePlayersAmount--;
+				CurrentChunk->LiveForRemotePlayersAmount++;
+			}
+
+			CurrentChunk->State = CalculateState(*CurrentChunk);
+			ToRender.Add(LivePosition);
+		} else
+		{
+			UE_LOG(LogChunk, Warning, TEXT("Chunk %s not found in virtual map when trying to move from Far to Live."), *LivePosition.ToString());
+		}
+	}
+
+	for (const auto& FarPosition : LiveToFar)
+	{
+		const auto CurrentChunk = VirtualChunks.Find(FarPosition);
+		if (CurrentChunk)
+		{
+			if (IsLocalController)
+			{
+				EnumRemoveFlags(CurrentChunk->State, EChunkState::LocalLive);
+				EnumAddFlags(CurrentChunk->State, EChunkState::LocalFar);
+			} else
+			{
+				CurrentChunk->LiveForRemotePlayersAmount--;
+				CurrentChunk->FarForRemotePlayersAmount++;
+			}
+
+			CurrentChunk->State = CalculateState(*CurrentChunk);
+			ToRender.Add(FarPosition);
+		} else
+		{
+			UE_LOG(LogChunk, Warning, TEXT("Chunk %s not found in virtual map when trying to move from Live to Far."), *FarPosition.ToString());
 		}
 	}
 	
@@ -167,14 +223,19 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller, const TSe
 void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 	const FChunkPosition& OldPosition, const FChunkPosition& NewPosition)
 {
+	SCOPE_CYCLE_COUNTER(STAT_VirtualMap_HandlePlayerMovement);
+	
 	TSet<FChunkPosition> OldLive;
 	TSet<FChunkPosition> OldFar;
 
 	TSet<FChunkPosition> CurLive;
 	TSet<FChunkPosition> CurFar;
+
+	TSet<FChunkPosition> BorderChunks;
 	
 	UChunkHelper::GetChunksAroundLiveAndFar(OldPosition, Controller->GetFarDistance(), GameRules::Distances::LiveDistance, OldFar, OldLive);
 	UChunkHelper::GetChunksAroundLiveAndFar(NewPosition, Controller->GetFarDistance(), GameRules::Distances::LiveDistance, CurFar, CurLive);
+	UChunkHelper::GetBorderChunks(OldPosition, Controller->GetFarDistance(), BorderChunks);
 
 	const auto AllOld = OldLive.Union(OldFar);
 	const auto AllCur = CurLive.Union(CurFar);
@@ -188,11 +249,15 @@ void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 	const auto FarToLive = OldFar.Intersect(CurLive);
 	const auto LiveToFar = OldLive.Intersect(CurFar);
 
-	const auto AddedFar = FarAddedOnly.Union(LiveToFar);
-	const auto AddedLive = LiveAddedOnly.Union(FarToLive);
+	const auto ToRenderBorder = BorderChunks.Intersect(AllCur);
+
+	UE_LOG(LogChunk, Verbose, TEXT("Player %s moved from %s to %s. Added Live: %d, Added Far: %d, Removed Live: %d, Removed Far: %d"),
+		*Controller->GetName(), *OldPosition.ToString(), *NewPosition.ToString(),
+		LiveAddedOnly.Num(), FarAddedOnly.Num(), LiveRemovedOnly.Num(), FarRemovedOnly.Num());
 	
-	AddPlayerToChunks(Controller, AddedLive, AddedFar);
+	AddPlayerToChunks(Controller, LiveAddedOnly, FarAddedOnly, FarToLive, LiveToFar);
 	RemovePlayerFromChunks(Controller, LiveRemovedOnly, FarRemovedOnly);
+	TaskManager->ScheduleRender(ToRenderBorder);
 }
 
 UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
@@ -212,7 +277,7 @@ void UVirtualMap::RegisterPlayer(const AMainController* Player)
 	TSet<FChunkPosition> LiveChunks;
 	UChunkHelper::GetChunksAroundLiveAndFar(GlobalPosition, Player->GetFarDistance(), GameRules::Distances::LiveDistance, FarChunks, LiveChunks);
 
-	AddPlayerToChunks(Player, LiveChunks, FarChunks);
+	AddPlayerToChunks(Player, LiveChunks, FarChunks, {}, {});
 }
 
 void UVirtualMap::UnregisterPlayer(const AMainController* Player)
@@ -226,7 +291,7 @@ void UVirtualMap::UnregisterPlayer(const AMainController* Player)
 
 	RemovePlayerFromChunks(Player, LiveChunks, FarChunks);
 }
- 
+
 void UVirtualMap::UpdateFarDistanceForPlayer(const AMainController* Player,
 	const int32 OldFarDistance, const int32 NewFarDistance)
 {
@@ -241,8 +306,8 @@ void UVirtualMap::Tick(float DeltaTime)
 		const FChunkPosition CurrentChunkPosition = FChunkPosition::FromActorLocation(CurrentPosition);
 		if (CurrentChunkPosition != LastPosition)
 		{
-			ChunkPositionByPlayer[Controller] = CurrentChunkPosition;
 			HandlePlayerMovement(Controller, LastPosition, CurrentChunkPosition);
+			ChunkPositionByPlayer[Controller] = CurrentChunkPosition;
 		}
 	}
 }

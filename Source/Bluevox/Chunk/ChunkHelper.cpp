@@ -5,6 +5,25 @@
 
 #include "Position/ChunkPosition.h"
 
+void UChunkHelper::GetBorderChunks(const FChunkPosition& GlobalPosition, const int32 Distance,
+	TSet<FChunkPosition>& OutPositions)
+{
+	for (int32 X = GlobalPosition.X - Distance; X <= GlobalPosition.X + Distance; ++X)
+	{
+		for (int32 Y = GlobalPosition.Y - Distance; Y <= GlobalPosition.Y + Distance; ++Y)
+		{
+			if (FMath::Abs(X - GlobalPosition.X) == Distance || FMath::Abs(Y - GlobalPosition.Y) == Distance)
+			{
+				FChunkPosition ChunkPosition;
+				ChunkPosition.X = X;
+				ChunkPosition.Y = Y;
+
+				OutPositions.Add(ChunkPosition);
+			}
+		}
+	}
+}
+
 void UChunkHelper::GetChunksAroundLiveAndFar(const FChunkPosition& GlobalPosition,
                                              const int32 FarDistance, const int32 LiveDistance, TSet<FChunkPosition>& OutFar,
                                              TSet<FChunkPosition>& OutLive)

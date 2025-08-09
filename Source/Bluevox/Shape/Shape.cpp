@@ -3,7 +3,7 @@
 
 #include "Shape.h"
 
-#include "Bluevox/Chunk/LogStat.h"
+#include "Bluevox/Chunk/ChunkStats.h"
 #include "Bluevox/Chunk/RenderGroup.h"
 #include "Bluevox/Chunk/Position/LocalPosition.h"
 #include "Bluevox/Game/GameRules.h"

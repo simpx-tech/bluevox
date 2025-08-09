@@ -9,6 +9,7 @@
 #include "Bluevox/Chunk/ChunkRegistry.h"
 #include "Bluevox/Chunk/Generator/WorldGenerator.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
+#include "Bluevox/Network/PlayerNetwork.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
 #include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
 #include "Bluevox/Tick/TickManager.h"
@@ -65,6 +66,19 @@ void AGameManager::BeginPlay()
 	if (bOverrideWorldGenerator && WorldSave && WorldGeneratorClassOverride)
 	{
 		WorldSave->WorldGenerator = NewObject<UWorldGenerator>(WorldSave, WorldGeneratorClassOverride)->Init(this);
+	}
+
+	if (LocalController)
+	{
+		LocalController->GameManager = this;
+		LocalController->PlayerNetwork->Init(this, LocalController, LocalPlayerState);
+		// DEV DisableInput(this);
+
+		if (bServer)
+		{
+			WorldSave->LoadPlayer(LocalController);
+			VirtualMap->RegisterPlayer(LocalController);
+		}	
 	}
 }
 

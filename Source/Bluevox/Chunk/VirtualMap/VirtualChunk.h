@@ -16,8 +16,11 @@ struct FVirtualChunk
 	}
 
 	UPROPERTY()
-	uint16 LiveForPlayersAmount = 0;
-	
-	UPROPERTY()
 	EChunkState State = EChunkState::None;
+
+	UPROPERTY()
+	uint16 LiveForRemotePlayersAmount = 0;
+
+	UPROPERTY()
+	uint16 FarForRemotePlayersAmount = 0;
 };

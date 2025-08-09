@@ -80,18 +80,21 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 void AMainCharacter::HandleMoveAction(const FInputActionValue& Value)
 {
-	const auto Direction = Value.Get<FVector2D>();
-	const auto Forward = GetActorForwardVector();
-	const auto Right = GetActorRightVector();
-
-	const FVector ForwardMovement = Forward * Direction.Y;
-	const FVector RightMovement = Right * Direction.X;
-	
-	if (Controller)
-	{
-		AddMovementInput(ForwardMovement, 1.0f);
-		AddMovementInput(RightMovement, 1.0f);
-	}
+	// const auto Direction = Value.Get<FVector2D>();
+	// const auto Forward = GetActorForwardVector();
+	// const auto Right = GetActorRightVector();
+	//
+	// const FVector ForwardMovement = Forward * Direction.Y;
+	// const FVector RightMovement = Right * Direction.X;
+	//
+	// if (Controller)
+	// {
+	// 	AddMovementInput(ForwardMovement, 1.0f);
+	// 	AddMovementInput(RightMovement, 1.0f);
+	// }
+	FVector2D D = Value.Get<FVector2D>();
+	AddMovementInput(GetActorForwardVector(), D.Y);
+	AddMovementInput(GetActorRightVector(),   D.X);
 }
 
 void AMainCharacter::HandleLookAction(const FInputActionValue& Value)
@@ -106,11 +109,13 @@ void AMainCharacter::HandleLookAction(const FInputActionValue& Value)
 
 void AMainCharacter::HandleJumpAction(const FInputActionValue& Value)
 {
-	AddMovementInput(FVector::UpVector, VerticalSpeed);
+	// AddMovementInput(FVector::UpVector, VerticalSpeed);
+	AddMovementInput(FVector::UpVector, 1.0f);
 }
 
 void AMainCharacter::HandleCrouchAction(const FInputActionValue& Value)
 {
-	AddMovementInput(FVector::DownVector, VerticalSpeed);
+	// AddMovementInput(FVector::DownVector, VerticalSpeed);
+	AddMovementInput(FVector::DownVector, 1.0f);
 }
 

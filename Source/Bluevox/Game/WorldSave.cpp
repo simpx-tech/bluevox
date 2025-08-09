@@ -107,7 +107,7 @@ bool UWorldSave::SavePlayer(AMainController* PlayerController) const
 
 	TArray<uint8> ByteArray;
 	FMemoryWriter MemoryWriter(ByteArray, true);
-	PlayerController->Serialize(MemoryWriter);
+	PlayerController->SerializeForWorldSave(MemoryWriter);
 
 	if (!FFileHelper::SaveArrayToFile(MoveTemp(ByteArray), *FilePath))
 	{

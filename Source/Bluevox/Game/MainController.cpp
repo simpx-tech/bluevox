@@ -42,15 +42,6 @@ void AMainController::Sv_SetClientReady_Implementation(bool bReady)
 void AMainController::BeginPlay()
 {
 	Super::BeginPlay();
-	GameManager = Cast<AGameManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AGameManager::StaticClass()));
-	PlayerNetwork->Init(GameManager, GameManager->LocalController, GameManager->LocalPlayerState);
-	// DEV DisableInput(this);
-
-	if (GameManager->bServer)
-	{
-		GameManager->WorldSave->LoadPlayer(this);
-		GameManager->VirtualMap->RegisterPlayer(this);
-	}
 }
 
 void AMainController::SetServerReady(const bool bReady)
@@ -74,6 +65,12 @@ void AMainController::GetLifetimeReplicatedProps(
 }
 
 void AMainController::Serialize(FArchive& Ar)
+{
+	Super::Serialize(Ar);
+	Ar << SavedGlobalPosition;
+}
+
+void AMainController::SerializeForWorldSave(FArchive& Ar)
 {
 	Ar << SavedGlobalPosition;
 }
