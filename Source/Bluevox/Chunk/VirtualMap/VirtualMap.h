@@ -30,36 +30,15 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	UPROPERTY()
 	UVirtualMapTaskManager* TaskManager;
 
-	static EChunkState CalculateState(const FVirtualChunk& Chunk)
-	{
-		if (EnumHasAnyFlags(Chunk.State, EChunkState::LocalLive))
-		{
-			return EChunkState::Live | EChunkState::LocalLive;
-		}
-
-		if (Chunk.LiveForRemotePlayersAmount > 0)
-		{
-			return EChunkState::RemoteLive
-				// Effectively turning into a live chunk (Collision + Rendered)
-				| (EnumHasAnyFlags(Chunk.State, EChunkState::LocalFar) ? EChunkState::Rendered : EChunkState::None)
-				// We should keep the local far state if it was set
-				| Chunk.State & EChunkState::LocalFar;
-		}
-
-		if (EnumHasAnyFlags(Chunk.State, EChunkState::LocalFar))
-		{
-			return EChunkState::VisualOnly | EChunkState::LocalFar;
-		}
-
-		return EChunkState::RemoteVisualOnly;
-	}
+	UFUNCTION()
+	void RemovePlayerFromChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToRemoveLoad, const TSet<FChunkPosition>& ToRemoveLive);
 
 	UFUNCTION()
-	void RemovePlayerFromChunks(const AMainController* Controller, const TSet<FChunkPosition>& LiveChunks, const TSet<FChunkPosition>& FarChunks);
+	void AddPlayerToChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToLoad, const TSet<FChunkPosition>& ToLoadAndRender);
 
 	UFUNCTION()
-	void AddPlayerToChunks(const AMainController* Controller, const TSet<FChunkPosition>& NewLiveChunks, const TSet<FChunkPosition>& NewFarChunks, const TSet<FChunkPosition>& FarToLive, const TSet<FChunkPosition>& LiveToFar);
-
+	void HandleStateUpdate(const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad);
+	
 	UFUNCTION()
 	void HandlePlayerMovement(const AMainController* Controller, const FChunkPosition& OldPosition, const FChunkPosition& NewPosition);
 

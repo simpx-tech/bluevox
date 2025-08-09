@@ -14,25 +14,23 @@ void UChunkHelper::GetBorderChunks(const FChunkPosition& GlobalPosition, const i
 		{
 			if (FMath::Abs(X - GlobalPosition.X) == Distance || FMath::Abs(Y - GlobalPosition.Y) == Distance)
 			{
-				FChunkPosition ChunkPosition;
-				ChunkPosition.X = X;
-				ChunkPosition.Y = Y;
-
-				OutPositions.Add(ChunkPosition);
+				OutPositions.Emplace({ X, Y });
 			}
 		}
 	}
 }
 
-void UChunkHelper::GetChunksAroundLiveAndFar(const FChunkPosition& GlobalPosition,
-                                             const int32 FarDistance, const int32 LiveDistance, TSet<FChunkPosition>& OutFar,
+void UChunkHelper::GetChunksAroundLoadAndLive(const FChunkPosition& GlobalPosition,
+                                             const int32 Distance, TSet<FChunkPosition>& OutLoad,
                                              TSet<FChunkPosition>& OutLive)
 {
-	const auto MinX = GlobalPosition.X - FarDistance;
-	const auto MaxX = GlobalPosition.X + FarDistance;
+	const auto LiveDistance = Distance - 1;
+	
+	const auto MinX = GlobalPosition.X - Distance;
+	const auto MaxX = GlobalPosition.X + Distance;
 
-	const auto MinY = GlobalPosition.Y - FarDistance;
-	const auto MaxY = GlobalPosition.Y + FarDistance;
+	const auto MinY = GlobalPosition.Y - Distance;
+	const auto MaxY = GlobalPosition.Y + Distance;
 
 	for (int32 X = MinX; X <= MaxX; ++X)
 	{
@@ -48,7 +46,7 @@ void UChunkHelper::GetChunksAroundLiveAndFar(const FChunkPosition& GlobalPositio
 			}
 			else
 			{
-				OutFar.Add(ChunkPosition);
+				OutLoad.Add(ChunkPosition);
 			}
 		}
 	}

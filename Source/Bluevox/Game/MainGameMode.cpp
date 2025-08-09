@@ -23,6 +23,24 @@ void AMainGameMode::BeginPlay()
 	GameManager = Cast<AGameManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AGameManager::StaticClass()));
 }
 
+APlayerController* AMainGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole,
+	const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId,
+	FString& ErrorMessage)
+{
+	const auto PC = Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId,
+		ErrorMessage);
+
+	const auto MainController = Cast<AMainController>(PC);
+	if (!MainController)
+	{
+		return nullptr;
+	}
+
+	MainController->Id = LastPlayerId++;
+	
+	return PC;
+}
+
 void AMainGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);

@@ -21,7 +21,12 @@ class BLUEVOX_API AMainGameMode : public AGameModeBase
 	UPROPERTY(EditAnywhere);
 	AGameManager* GameManager = nullptr;
 
+	UPROPERTY(EditAnywhere)
+	uint16 LastPlayerId = 0;
+	
 	virtual void BeginPlay() override;
+
+	virtual APlayerController* Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal, const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 
 	virtual void Logout(AController* Exiting) override;
 };

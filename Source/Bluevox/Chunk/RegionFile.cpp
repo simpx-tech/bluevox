@@ -1,5 +1,6 @@
 #include "RegionFile.h"
 
+#include "LogChunk.h"
 #include "Bluevox/Game/GameRules.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
@@ -10,6 +11,8 @@
 
 void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* ChunkData)
 {
+	UE_LOG(LogChunk, Verbose, TEXT("Saving chunk data for position %s in disk."), *Position.ToString());
+	
 	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
 
 	FBufferArchive ChunkArchive;
@@ -23,7 +26,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 	const auto Success = Th_WriteSegment(Index, CompressedData);
 	if (!Success)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to write chunk data for position %s in region file."), *Position.ToString());
+		UE_LOG(LogTemp, Error, TEXT("Failed to write chunk data for position %s in region file."), *Position.ToString());
 	}
 }
 
@@ -34,7 +37,7 @@ bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChun
 	TArray<uint8> Data;
 	if (!Th_ReadSegment(Index, Data))
 	{
-		UE_LOG(LogTemp, Warning, TEXT("Failed to read chunk data for position %s in region file."), *Position.ToString());
+		UE_LOG(LogTemp, Error, TEXT("Failed to read chunk data for position %s in region file."), *Position.ToString());
 		return false;
 	}
 
@@ -60,7 +63,7 @@ TSharedPtr<FRegionFile> FRegionFile::NewFromDisk(const FString& WorldName,
 		const auto File = CreateOnDisk(
 			RegionFilePath,
 			GameRules::Region::File::SegmentSizeBytes,
-			GameRules::Region::Size * GameRules::Region::Size * GameRules::Region::Size
+			GameRules::Region::Size * GameRules::Region::Size
 		);
 
 		if (!File)

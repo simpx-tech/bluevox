@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Utils/PrintSystemError.h"
 #include "SegmentedHeader.generated.h"
 
 USTRUCT(BlueprintType)
@@ -36,6 +37,9 @@ struct FSegmentedHeaderBase
 
 	UPROPERTY()
 	uint32 SectionsCount = 0;
+
+	UPROPERTY()
+	uint32 TotalHeaderSize = 0;
 };
 
 USTRUCT(BlueprintType)
@@ -50,20 +54,18 @@ struct FSegmentedHeader : public FSegmentedHeaderBase
 	FSegmentedHeader(const uint32 InSegmentSize, const uint32 InSectionsCount)
 		: FSegmentedHeaderBase(InSegmentSize, InSectionsCount)
 	{
+		TotalHeaderSize = sizeof(FSegmentedHeaderBase) +
+								  static_cast<uint64>(InSectionsCount) * sizeof(FSectionHeader);
+
 		SectionsHeaders.SetNum(InSectionsCount);
+		for (uint32 i = 0; i < InSectionsCount; ++i)
+		{
+			SectionsHeaders[i].Offset = TotalHeaderSize;
+		}
 	}
 
 	UPROPERTY()
 	TArray<FSectionHeader> SectionsHeaders;
-
-	static FSegmentedHeader Create(const uint32 InSegmentSize, const uint32 InSectionsCount)
-	{
-		FSegmentedHeader Header;
-		Header.SegmentSize = InSegmentSize;
-		Header.SectionsCount = InSectionsCount;
-		Header.SectionsHeaders.SetNum(InSectionsCount);
-		return Header;
-	}
 
 	static bool ReadFrom(IFileHandle* Handle, FSegmentedHeader& Out)
 	{
@@ -107,6 +109,7 @@ struct FSegmentedHeader : public FSegmentedHeaderBase
 		const auto AsFlat = FSegmentedHeaderBase(SegmentSize, SectionsCount);
 		if (!Handle->Write(reinterpret_cast<const uint8*>(&AsFlat), sizeof(AsFlat)))
 		{
+			PrintSystemError();
 			return false;
 		}
 
@@ -116,6 +119,7 @@ struct FSegmentedHeader : public FSegmentedHeaderBase
 			return Handle->Write(
 				reinterpret_cast<const uint8*>(SectionsHeaders.GetData()), Bytes);
 		}
+		
 		return true;
 	}
 };

@@ -80,6 +80,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainCharacter* LocalCharacter = nullptr;
 
+	UPROPERTY(EditAnywhere, Category = "Game")
+	uint16 LocalPlayerId = 0;
+	
 	UPROPERTY(EditAnywhere)
 	UWorldSave* WorldSave = nullptr;
 };

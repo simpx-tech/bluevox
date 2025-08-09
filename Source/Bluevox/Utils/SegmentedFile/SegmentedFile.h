@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "SegmentedHeader.h"
+#include "Bluevox/Utils/PrintSystemError.h"
 
 struct FSegmentedFile
 {
@@ -11,10 +12,31 @@ struct FSegmentedFile
 
 	~FSegmentedFile()
 	{
+		FWriteScopeLock WriteLock(FileLock);
 		if (FileHandle)
 		{
 			FileHandle->Flush();
 			FileHandle.Reset();
+		}
+	}
+
+	void WriteZeroes(const uint32 AtPosition, const int64 NumZeroBytes) const
+	{
+		constexpr int32 ChunkSize = 4096;
+		constexpr uint8 ZeroChunk[ChunkSize] = { 0 };
+
+		int64 Remaining = NumZeroBytes;
+		FileHandle->Seek(AtPosition);
+		while (Remaining > 0)
+		{
+			const int64 ToWrite = FMath::Min(Remaining, static_cast<int64>(ChunkSize));
+			if (!FileHandle->Write(ZeroChunk, ToWrite))
+			{
+				PrintSystemError();
+				UE_LOG(LogTemp, Error, TEXT("Failed to write zero bytes."));
+				break;
+			}
+			Remaining -= ToWrite;
 		}
 	}
 
@@ -23,32 +45,29 @@ struct FSegmentedFile
 		FWriteScopeLock WriteLock(FileLock);
 		if (!Header.SectionsHeaders.IsValidIndex(Index))
 		{
-			checkf(false, TEXT("Invalid section index: %d"), Index);
+			ensureMsgf(false, TEXT("Invalid section index: %d"), Index);
 			return false;
 		}
 
+		auto& SectionHeader = Header.SectionsHeaders[Index];
+
+		// TODO consider case where it fails to write the segment, we should not update the header in that case
+		// TODO make a stage/tmp file or more advanced safe strategies
 		// Resize if necessary
 		const auto TotalSize = Data.Num();
-		if (TotalSize > static_cast<int32>(Header.SectionsHeaders[Index].SegmentsUsed * Header.SegmentSize))
+		if (TotalSize > static_cast<int32>(SectionHeader.SegmentsUsed * Header.SegmentSize))
 		{
 			const auto SegmentsNeeded = FMath::CeilToInt(static_cast<float>(TotalSize) / Header.SegmentSize);
-			const auto SegmentsAdded = SegmentsNeeded - Header.SectionsHeaders[Index].SegmentsUsed;
-			const auto BytesOffset = SegmentsAdded * Header.SegmentSize;
-
-			Header.SectionsHeaders[Index].SegmentsUsed = SegmentsNeeded;
+			const auto SegmentsAdded = SegmentsNeeded - SectionHeader.SegmentsUsed;
+			const int64 BytesOffset = SegmentsAdded * Header.SegmentSize;
 
 			// If there are other segments after this one, we need to shift them
 			if (Index + 1 < Header.SectionsHeaders.Num())
 			{
 				const auto NextHeader = Header.SectionsHeaders[Index + 1];
-					
-				for (int32 i = Index + 1; i < Header.SectionsHeaders.Num(); ++i)
-				{
-					Header.SectionsHeaders[i].Offset += BytesOffset;
-				}
 
 				const auto LastHeader = Header.SectionsHeaders.Last();
-				const auto EndPosition = LastHeader.Offset + LastHeader.SegmentsUsed * Header.SegmentSize;
+				const int64 EndPosition = LastHeader.Offset + LastHeader.SegmentsUsed * Header.SegmentSize;
 
 				const auto ShiftSize = EndPosition - NextHeader.Offset;
 
@@ -58,7 +77,8 @@ struct FSegmentedFile
 				FileHandle->Seek(NextHeader.Offset);
 				if (!FileHandle->Read(ToMove.GetData(), ShiftSize))
 				{
-					checkf(false, TEXT("Failed to read segments to shift"));
+					PrintSystemError();
+					ensureMsgf(false, TEXT("Failed to read segments to shift"));
 					return false;
 				}
 
@@ -66,19 +86,40 @@ struct FSegmentedFile
 				FileHandle->Seek(NewOffset);
 				if (!FileHandle->Write(ToMove.GetData(), ToMove.Num()))
 				{
-					checkf(false, TEXT("Failed to write shifted segments to file"));
+					PrintSystemError();
+					ensureMsgf(false, TEXT("Failed to write shifted segments to file"));
 					return false;
 				}
 
-				// Update headers on disk
-				Header.WriteTo(FileHandle.Get());
+				for (int32 i = Index + 1; i < Header.SectionsHeaders.Num(); ++i)
+				{
+					Header.SectionsHeaders[i].Offset += BytesOffset;
+				}
 			}
+
+			// Since with size 0, it's actually storing the last byte from the last segment, we need to add 1 byte offset
+			if (SectionHeader.SegmentsUsed == 0)
+			{
+				SectionHeader.Offset++;
+			}
+			SectionHeader.SegmentsUsed = SegmentsNeeded;
+
+			// Fill the rest of the section with zeroes
+			const auto Size = SegmentsNeeded * Header.SegmentSize;
+			WriteZeroes(SectionHeader.Offset + TotalSize, Size - TotalSize);
 		}
-		
+
+		// Update headers on disk
+		SectionHeader.Size = TotalSize;
+		Header.WriteTo(FileHandle.Get());
+		FileHandle->Flush();
+
+		// Finally, write the data
 		FileHandle->Seek(Header.SectionsHeaders[Index].Offset);
 		if (!FileHandle->Write(Data.GetData(), TotalSize))
 		{
-			checkf(false, TEXT("Failed to write segment data to file"));
+			PrintSystemError();
+			ensureMsgf(false, TEXT("Failed to write segment data to file"));
 			return false;
 		}
 
@@ -90,7 +131,7 @@ struct FSegmentedFile
 		FReadScopeLock ReadLock(FileLock);
 		if (!Header.SectionsHeaders.IsValidIndex(Index))
 		{
-			checkf(false, TEXT("Invalid section index: %d"), Index);
+			ensureMsgf(false, TEXT("Invalid section index: %d"), Index);
 			return false;
 		}
 
@@ -100,11 +141,13 @@ struct FSegmentedFile
 			return true;
 		}
 		
-		const auto TotalSize = Header.SectionsHeaders[Index].SegmentsUsed * Header.SegmentSize;
+		const auto TotalSize = Header.SectionsHeaders[Index].Size;
 
 		OutData.SetNumUninitialized(TotalSize);
 		if (!FileHandle->ReadAt(OutData.GetData(), TotalSize, Header.SectionsHeaders[Index].Offset))
 		{
+			PrintSystemError();
+			ensureMsgf(false, TEXT("Failed to read segment data from file at index %d"), Index);
 			return false;
 		}
 
@@ -115,22 +158,23 @@ struct FSegmentedFile
 	{
 		if (SegmentsCount == 0 || SegmentedSize == 0)
 		{
-			checkf(false, TEXT("SegmentsCount and SegmentedSize must be greater than 0"));
+			ensureMsgf(false, TEXT("SegmentsCount and SegmentedSize must be greater than 0"));
 			return nullptr;
 		}
 
 		if (FPaths::FileExists(FilePath))
 		{
-			checkf(false, TEXT("File already exists: %s"), *FilePath);
+			ensureMsgf(false, TEXT("File already exists: %s"), *FilePath);
 			return nullptr;
 		}
 
 		const auto SegmentedFile = MakeShared<FSegmentedFile>();
 
-		SegmentedFile->FileHandle = TUniquePtr<IFileHandle>(FPlatformFileManager::Get().GetPlatformFile().OpenWrite(*FilePath, false, true));
+		SegmentedFile->FileHandle = TUniquePtr<IFileHandle>(FPlatformFileManager::Get().GetPlatformFile().OpenWrite(*FilePath, true, true));
 		
-		SegmentedFile->Header = FSegmentedHeader::Create(SegmentedSize, SegmentsCount);
+		SegmentedFile->Header = FSegmentedHeader{SegmentedSize, SegmentsCount};
 		SegmentedFile->Header.WriteTo(SegmentedFile->FileHandle.Get());
+		SegmentedFile->FileHandle->Flush();
 
 		return SegmentedFile; 
 	}
@@ -139,16 +183,17 @@ struct FSegmentedFile
 	{
 		if (!FPaths::FileExists(FilePath))
 		{
-			checkf(false, TEXT("File does not exist: %s"), *FilePath);
+			ensureMsgf(false, TEXT("File does not exist: %s"), *FilePath);
 			return nullptr;
 		}
 
 		const auto SegmentedFile = MakeShared<FSegmentedFile>();
-		SegmentedFile->FileHandle = TUniquePtr<IFileHandle>(FPlatformFileManager::Get().GetPlatformFile().OpenWrite(*FilePath, false, true));
+		SegmentedFile->FileHandle = TUniquePtr<IFileHandle>(FPlatformFileManager::Get().GetPlatformFile().OpenWrite(*FilePath, true, true));
 
 		if (!SegmentedFile->FileHandle)
 		{
-			checkf(false, TEXT("Failed to open file: %s"), *FilePath);
+			PrintSystemError();
+			ensureMsgf(false, TEXT("Failed to open file: %s"), *FilePath);
 			return nullptr;
 		}
 

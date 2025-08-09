@@ -28,18 +28,20 @@ AChunk::AChunk()
 	RootComponent = MeshComponent;
 }
 
-void AChunk::BeginPlay()
-{
-	Super::BeginPlay();
-}
-
 void AChunk::SetRenderState(const EChunkState State) const
 {
-	const bool HasCollision = EnumHasAnyFlags(State, EChunkState::Collision);
-	MeshComponent->SetCollisionEnabled(HasCollision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
-	
-	const auto Visible = EnumHasAnyFlags(State, EChunkState::Rendered);
+	const auto Visible = EnumHasAnyFlags(State, EChunkState::Live);
 	MeshComponent->SetVisibility(Visible);
+
+	if (State == EChunkState::None)
+	{
+		if (UBodySetup* BS = MeshComponent->GetBodySetup())
+		{
+			BS->RemoveSimpleCollision();
+			BS->InvalidatePhysicsData();
+		}
+		MeshComponent->SetMesh(FDynamicMesh3());
+	}
 }
 
 bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)

@@ -48,6 +48,7 @@ void AGameManager::BeginPlay()
 	
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	LocalController = Cast<AMainController>(Controller);
+	LocalPlayerId = LocalController ? LocalController->Id : 0;
 
 	const auto PlayerState = UGameplayStatics::GetPlayerState(GetWorld(), 0);
 	LocalPlayerState = PlayerState;

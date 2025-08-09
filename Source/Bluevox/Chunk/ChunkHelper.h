@@ -20,7 +20,8 @@ class BLUEVOX_API UChunkHelper : public UBlueprintFunctionLibrary
 public:
 	static void GetBorderChunks(const FChunkPosition& GlobalPosition, int32 Distance, TSet<FChunkPosition>& OutPositions);
 	
-	static void GetChunksAroundLiveAndFar(const FChunkPosition& GlobalPosition, int32 FarDistance, int32 LiveDistance, TSet<FChunkPosition>& OutFar, TSet<FChunkPosition>& OutLive);
+	static void GetChunksAroundLoadAndLive(const FChunkPosition& GlobalPosition, int32 Distance, TSet<FChunkPosition>& OutLoad, TSet<
+	                                       FChunkPosition>& OutLive);
 
 	static void GetChunksAround(const FChunkPosition& GlobalPosition, int32 Distance, TSet<FChunkPosition>& OutPositions);
 

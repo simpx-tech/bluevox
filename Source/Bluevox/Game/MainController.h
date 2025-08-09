@@ -31,9 +31,12 @@ class BLUEVOX_API AMainController : public APlayerController
 	void HandleOnClientReadyChanged() const;
 
 	UPROPERTY(Replicated)
-	int32 FarDistance = 12;
+	int32 FarDistance = 2;
 	
 public:
+	UPROPERTY()
+	uint16 Id = 0;
+	
 	// DEV remember to update this before saving
 	UPROPERTY()
 	FGlobalPosition SavedGlobalPosition;
