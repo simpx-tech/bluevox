@@ -153,14 +153,16 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 		PendingRender.Remove(ChunkPosition);
 		if (ProcessingRender.Contains(ChunkPosition))
 		{
-			ProcessingRender.Add(ChunkPosition, -1);
+			ProcessingRender.Find(ChunkPosition)->LastRenderIndex = -1;
 		}
 		
 		if (ProcessingUnload.Contains(ChunkPosition))
 		{
-			ProcessingUnload.Add(ChunkPosition, true);
+			ProcessingUnload.Add(ChunkPosition, true);			
 			continue;
 		}
+
+		ProcessingUnload.Add(ChunkPosition, true);
 
 		const auto RegionPosition = FRegionPosition::FromChunkPosition(ChunkPosition);
 		const auto LocalChunkPosition = FLocalChunkPosition::FromChunkPosition(ChunkPosition);
@@ -180,6 +182,8 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 			},
 			[ChunkPosition, this]
 			{
+				UE_LOG(LogChunk, Verbose, TEXT("Processing unload for chunk %s"), *ChunkPosition.ToString());
+				
 				if (ProcessingUnload.FindRef(ChunkPosition) == true)
 				{
 					GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);	
@@ -212,7 +216,10 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 
 			const auto RenderId = LastRenderIndex++;
 			
-			ProcessingRender.Add(ChunkPosition, RenderId);
+			auto& ProcessingRef = ProcessingRender.FindOrAdd(ChunkPosition);
+			ProcessingRef.LastRenderIndex = RenderId;
+			ProcessingRef.PendingTasks++;
+			
 			ToRemove.Add(ChunkPosition);
 
 			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
@@ -227,13 +234,15 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 				},
 				[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
 				{
-					if (ProcessingRender.FindRef(ChunkPosition) == RenderId)
+					auto Processing = ProcessingRender.Find(ChunkPosition);
+					Processing->PendingTasks--;
+					// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
+					if (Processing->LastRenderIndex == RenderId && Result.bSuccess)
 					{
-						if (Result.bSuccess) {
-							Chunk->CommitRender(MoveTemp(Result.Mesh));
-						}
+						Chunk->CommitRender(MoveTemp(Result.Mesh));
+					}
 
-						// Only remove if is the last one
+					if (Processing->PendingTasks == 0) {
 						ProcessingRender.Remove(ChunkPosition);
 					}
 				}

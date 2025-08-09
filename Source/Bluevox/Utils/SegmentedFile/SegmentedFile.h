@@ -23,7 +23,7 @@ struct FSegmentedFile
 	void WriteZeroes(const uint32 AtPosition, const int64 NumZeroBytes) const
 	{
 		constexpr int32 ChunkSize = 4096;
-		constexpr uint8 ZeroChunk[ChunkSize] = { 0 };
+		constexpr uint8 ZeroChunk[ChunkSize] = {};
 
 		int64 Remaining = NumZeroBytes;
 		FileHandle->Seek(AtPosition);
@@ -53,7 +53,6 @@ struct FSegmentedFile
 
 		// TODO consider case where it fails to write the segment, we should not update the header in that case
 		// TODO make a stage/tmp file or more advanced safe strategies
-		// Resize if necessary
 		const auto TotalSize = Data.Num();
 		if (TotalSize > static_cast<int32>(SectionHeader.SegmentsUsed * Header.SegmentSize))
 		{

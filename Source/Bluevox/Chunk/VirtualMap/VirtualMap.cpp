@@ -188,8 +188,8 @@ void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 	const auto AllOld = OldLoad.Union(OldLive);
 	const auto AllCur = CurLoad.Union(CurLive);
 
-	const auto AddedLive = CurLive.Difference(OldLive);
-	const auto AddedLoad = CurLoad.Difference(OldLoad);
+	const auto AddedLive = CurLive.Difference(AllOld);
+	const auto AddedLoad = CurLoad.Difference(AllOld);
 
 	const auto LoadToLive = OldLoad.Intersect(CurLive);
 	const auto LiveToLoad = OldLive.Intersect(CurLoad);

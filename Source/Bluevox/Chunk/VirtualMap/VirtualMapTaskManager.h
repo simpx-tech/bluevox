@@ -37,6 +37,12 @@ struct FRenderResult
 	UE::Geometry::FDynamicMesh3 Mesh;
 };
 
+struct FProcessingRender
+{
+	int32 LastRenderIndex = -1;
+	int32 PendingTasks = 0;
+};
+
 /**
  *
  */
@@ -51,7 +57,7 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	UPROPERTY()
 	TSet<FChunkPosition> PendingRender;
 
-	TMap<FChunkPosition, int32> ProcessingRender;
+	TMap<FChunkPosition, FProcessingRender> ProcessingRender;
 
 	UPROPERTY()
 	int32 LastRenderIndex = 0;
