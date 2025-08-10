@@ -15,18 +15,23 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 	
 	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
 
-	FBufferArchive ChunkArchive;
-	ChunkData->Serialize(ChunkArchive);
+	FBufferArchive Uncompressed;
+	Uncompressed << ChunkData->Columns;
 
-	TArray<uint8> CompressedData;
-	FArchiveSaveCompressedProxy Compressor = FArchiveSaveCompressedProxy(CompressedData, NAME_Zlib);
-	Compressor << ChunkArchive;
-	Compressor.Flush();
-	
-	const auto Success = Th_WriteSegment(Index, CompressedData);
-	if (!Success)
+	TArray<uint8> Compressed;
+	FArchiveSaveCompressedProxy Compressor(Compressed, NAME_Zlib);
+	Compressor << Uncompressed;
+	Compressor.Close();
+
+	if (Compressor.GetError())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to write chunk data for position %s in region file."), *Position.ToString());
+		UE_LOG(LogChunk, Error, TEXT("Compression failed for chunk %s."), *Position.ToString());
+		return;
+	}
+
+	if (!Th_WriteSegment(Index, Compressed))
+	{
+		UE_LOG(LogChunk, Error, TEXT("Failed to write chunk %s."), *Position.ToString());
 	}
 }
 
@@ -34,23 +39,30 @@ bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChun
 {
 	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
 
-	TArray<uint8> Data;
-	if (!Th_ReadSegment(Index, Data))
+	TArray<uint8> Compressed;
+	if (!Th_ReadSegment(Index, Compressed)) return false;
+	if (Compressed.Num() == 0) { OutColumns.Reset(); return false; }
+
+	FArchiveLoadCompressedProxy Decompressor(Compressed, NAME_Zlib);
+	if (Decompressor.GetError())
 	{
-		UE_LOG(LogTemp, Error, TEXT("Failed to read chunk data for position %s in region file."), *Position.ToString());
+		UE_LOG(LogChunk, Error, TEXT("Invalid compressed data for chunk %s."), *Position.ToString());
 		return false;
 	}
 
-	if (Data.Num() == 0)
+	FBufferArchive Uncompressed;
+	Decompressor << Uncompressed;
+	Decompressor.Close();
+
+	if (Decompressor.GetError())
 	{
+		UE_LOG(LogChunk, Error, TEXT("Decompression failed for chunk %s."), *Position.ToString());
 		return false;
 	}
-	
-	FArchiveLoadCompressedProxy Decompressor = FArchiveLoadCompressedProxy(Data, NAME_Zlib);
-	Decompressor << OutColumns;
-	Decompressor.Flush();
-	
-	return true;
+
+	FMemoryReader Reader(Uncompressed, true);
+	Reader << OutColumns;
+	return !Reader.IsError();
 }
 
 TSharedPtr<FRegionFile> FRegionFile::NewFromDisk(const FString& WorldName,
@@ -68,7 +80,7 @@ TSharedPtr<FRegionFile> FRegionFile::NewFromDisk(const FString& WorldName,
 
 		if (!File)
 		{
-			UE_LOG(LogTemp, Error, TEXT("Failed to create region file at %s"), *RegionFilePath);
+			UE_LOG(LogChunk, Error, TEXT("Failed to create region file at %s"), *RegionFilePath);
 			return nullptr;
 		}
 

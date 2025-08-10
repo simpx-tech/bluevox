@@ -13,16 +13,17 @@ struct FLocalChunkPosition
 	{
 	}
 
+	FLocalChunkPosition(const uint8 InX, const uint8 InY)
+		: X(InX), Y(InY)
+	{
+	}
+
 	static FLocalChunkPosition FromChunkPosition(const FChunkPosition& ChunkPosition)
 	{
-		FLocalChunkPosition LocalChunkPosition;
-
-		LocalChunkPosition.X = (ChunkPosition.X % GameRules::Region::Size + GameRules::Region::Size)
-			% GameRules::Region::Size;
-		LocalChunkPosition.Y = (ChunkPosition.Y % GameRules::Region::Size + GameRules::Region::Size)
-			% GameRules::Region::Size;
-		
-		return LocalChunkPosition;
+		return {
+			static_cast<uint8>(PositiveMod(ChunkPosition.X, GameRules::Region::Size)),
+			static_cast<uint8>(PositiveMod(ChunkPosition.X, GameRules::Region::Size)),
+		};
 	}
 
 	UPROPERTY()

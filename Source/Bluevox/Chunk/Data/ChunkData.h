@@ -28,6 +28,11 @@ public:
 	
 	virtual void Serialize(FArchive& Ar) override;
 
+	void SerializeForSave(FArchive& Ar)
+	{
+		Ar << Columns;
+	}
+
 	static int32 GetIndex(const int32 X, const int32 Y)
 	{
 		return X + Y * GameRules::Chunk::Size;
