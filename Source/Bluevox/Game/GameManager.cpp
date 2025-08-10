@@ -22,10 +22,17 @@ AGameManager::AGameManager()
 	PrimaryActorTick.bCanEverTick = false;
 }
 
+void AGameManager::OnBeginWorldTearDown(UWorld* World)
+{
+	WorldSave->Save();
+}
+
 // Called when the game starts or when spawned
 void AGameManager::BeginPlay()
 {
 	Super::BeginPlay();
+
+	FWorldDelegates::OnWorldBeginTearDown.AddUObject(this, &AGameManager::OnBeginWorldTearDown);
 
 	bServer = GetNetMode() == NM_ListenServer || GetNetMode() == NM_DedicatedServer || GetNetMode() == NM_Standalone;
 	bClient = GetNetMode() == NM_Client || GetNetMode() == NM_Standalone || GetNetMode() == NM_ListenServer;
@@ -60,9 +67,9 @@ void AGameManager::BeginPlay()
 	// TODO temp
 	WorldSave = UWorldSave::CreateOrLoadWorldSave(this, "TestWorld", UFlatWorldGenerator::StaticClass());
 	
-	if (bOverrideWorldGenerator && WorldSave && WorldGeneratorClassOverride)
+	if (bOverrideWorldGenerator && WorldSave && WorldGeneratorOverride)
 	{
-		WorldSave->WorldGenerator = NewObject<UWorldGenerator>(WorldSave, WorldGeneratorClassOverride)->Init(this);
+		WorldSave->WorldGenerator = WorldGeneratorOverride->Init(this);
 	}
 
 	if (LocalController)

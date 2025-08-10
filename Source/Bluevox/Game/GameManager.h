@@ -6,6 +6,7 @@
 #include "GameFramework/Actor.h"
 #include "GameManager.generated.h"
 
+class UWorldGenerator;
 class UMaterialRegistry;
 class UShapeRegistry;
 class UWorldSave;
@@ -24,6 +25,9 @@ public:
 	// Sets default values for this actor's properties
 	AGameManager();
 
+	UFUNCTION()
+	void OnBeginWorldTearDown(UWorld* World);
+
 protected:
 	// Called when the game starts or when spawned
 	virtual void BeginPlay() override;
@@ -35,8 +39,8 @@ public:
 	UPROPERTY(EditAnywhere, Category = "Development")
 	bool bOverrideWorldGenerator = false;
 
-	UPROPERTY(EditAnywhere, Category = "Development", meta = (EditCondition = "bOverrideWorldGenerator"))
-	TSubclassOf<class UWorldGenerator> WorldGeneratorClassOverride;
+	UPROPERTY(EditAnywhere, Instanced, Category = "Development", meta = (EditCondition = "bOverrideWorldGenerator", ShowOnlyInnerProperties))
+	TObjectPtr<UWorldGenerator> WorldGeneratorOverride;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
 	UMaterial* ChunkMaterial = nullptr;

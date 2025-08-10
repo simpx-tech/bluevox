@@ -11,7 +11,7 @@
 /**
  * 
  */
-UCLASS()
+UCLASS(EditInlineNew, DefaultToInstanced)
 class BLUEVOX_API UFlatWorldGenerator : public UWorldGenerator
 {
 	GENERATED_BODY()

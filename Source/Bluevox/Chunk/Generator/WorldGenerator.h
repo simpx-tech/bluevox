@@ -14,7 +14,7 @@ class UChunkData;
 /**
  * 
  */
-UCLASS()
+UCLASS(Abstract, BlueprintType, Blueprintable, EditInlineNew, DefaultToInstanced)
 class BLUEVOX_API UWorldGenerator : public UObject
 {
 	GENERATED_BODY()

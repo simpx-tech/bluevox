@@ -10,7 +10,7 @@ class UFastNoiseWrapper;
 /**
  * 
  */
-UCLASS()
+UCLASS(EditInlineNew, DefaultToInstanced)
 class BLUEVOX_API UTestWorldGenerator : public UWorldGenerator
 {
 	GENERATED_BODY()
