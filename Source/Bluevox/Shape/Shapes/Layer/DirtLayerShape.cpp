@@ -1,0 +1,16 @@
+﻿// Fill out your copyright notice in the Description page of Project Settings.
+
+
+#include "DirtLayerShape.h"
+
+#include "Bluevox/Game/GameRules.h"
+
+FName UDirtLayerShape::GetNameId() const
+{
+	return GameRules::Constants::GShape_Layer_Dirt;
+}
+
+uint16 UDirtLayerShape::GetMaterialId() const
+{
+	return 1;
+}

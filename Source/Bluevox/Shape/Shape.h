@@ -27,9 +27,6 @@ class BLUEVOX_API UShape : public UObject
 	friend class UShapeRegistry;
 
 protected:
-	UPROPERTY()
-	TArray<int32> AllowedMaterials;
-
 	virtual ~UShape() override;
 
 	virtual void GenerateRenderGroups();
@@ -44,8 +41,10 @@ protected:
 
 	TArray<FRenderGroup*> RenderGroups;
 
-	static inline void AddRenderToMesh(const FRenderGroup& Render, UE::Geometry::FDynamicMesh3& Mesh,
-								const FLocalPosition& InPosition, uint16 Size, uint16 MaterialId);
+	virtual uint16 GetMaterialId() const
+	{
+		return 0;
+	}
 
 	// DEV add constexpr values and also a dynamic path if needed
 	// DEV add min/max values (?)
@@ -60,18 +59,11 @@ public:
 	virtual FName GetNameId() const;
 	
 	// TODO cache result instead of call this every time (?)
-	virtual void Render(UE::Geometry::FDynamicMesh3& Mesh, const EFace Face, const FLocalPosition& Position, int32 Size, int32 MaterialId) const;
+	virtual void Render(UE::Geometry::FDynamicMesh3& Mesh, const EFace Face, const FLocalPosition& Position, int32 Size) const;
 
 	UShape* InitializeData();
 
 	FRenderGroup* GetRenderGroup(EFace Direction) const;
-
-	virtual void InitializeAllowedMaterials(UMaterialRegistry* Registry);
-
-	bool IsMaterialAllowed(const int32 MaterialId) const
-	{
-		return AllowedMaterials.Contains(MaterialId);
-	}
 
 	virtual bool IsOpaque(EFace Face) const
 	{

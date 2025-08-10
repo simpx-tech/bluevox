@@ -26,7 +26,7 @@ class BLUEVOX_API UShapeRegistry : public UObject
 public:
 	void RegisterAll();
 
-	uint8 GetShapeIdByName(const FName& ShapeName) const;
+	uint16 GetShapeIdByName(const FName& ShapeName) const;
 
 	const UShape* GetShapeById(const int32 ShapeId) const;
 

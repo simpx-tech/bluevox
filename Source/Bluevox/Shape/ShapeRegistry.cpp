@@ -8,7 +8,7 @@
 
 int32 UShapeRegistry::RegisterShape(const FName& ShapeName, const TSubclassOf<UObject>& ShapeClass)
 {
-	UShape* Shape = Cast<UShape>(NewObject<UObject>(this, ShapeClass, ShapeName));
+	UShape* Shape = Cast<UShape>(NewObject<UObject>(this, ShapeClass));
 	Shape->InitializeData();
 	const auto Index = RegisteredShapes.Add(Shape);
 	ShapeByName.Add(ShapeName, Index);
@@ -36,7 +36,7 @@ void UShapeRegistry::RegisterAll()
 	}
 }
 
-uint8 UShapeRegistry::GetShapeIdByName(const FName& ShapeName) const
+uint16 UShapeRegistry::GetShapeIdByName(const FName& ShapeName) const
 {
 	const auto Index = ShapeByName.Find(ShapeName);
 	if (Index && RegisteredShapes.IsValidIndex(*Index))

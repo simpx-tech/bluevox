@@ -19,12 +19,6 @@ class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 
 	UNoiseWorldGenerator();
 
-	UPROPERTY(EditAnywhere)
-	FName ShapeName = GameRules::Constants::GShape_Layer;
-	
-	UPROPERTY(EditAnywhere)
-	FName MaterialName = GameRules::Constants::GMaterial_Stone;
-
 	UPROPERTY()
 	UFastNoiseWrapper* Noise;
 

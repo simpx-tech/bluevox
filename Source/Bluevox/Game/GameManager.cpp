@@ -11,7 +11,6 @@
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Network/PlayerNetwork.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
-#include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -40,9 +39,6 @@ void AGameManager::BeginPlay()
 
 	ShapeRegistry = NewObject<UShapeRegistry>(this, TEXT("ShapeRegistry"));
 	ShapeRegistry->RegisterAll();
-
-	MaterialRegistry = NewObject<UMaterialRegistry>(this, TEXT("ShapeMaterialRegistry"));
-	MaterialRegistry->RegisterAll();
 	
 	TickManager = NewObject<UTickManager>(this, TEXT("TickManager"))->Init();
 	

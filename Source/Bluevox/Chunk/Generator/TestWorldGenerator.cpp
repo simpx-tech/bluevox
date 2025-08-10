@@ -8,6 +8,7 @@
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Shape/ShapeRegistry.h"
 
 UTestWorldGenerator::UTestWorldGenerator()
 {
@@ -20,16 +21,20 @@ void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 {
 	OutColumns.SetNum(GameRules::Chunk::Size * GameRules::Chunk::Size);
 
-	const auto ShapeId = 1;
-	const auto MaterialId = 0;
+	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
+	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Grass);
+	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Stone);
 
+	const auto MaxHeight = FMath::FloorToInt(GameRules::Chunk::Height * 0.75f);
+	FRandomStream RandomStream(123);
+	
 	if (Position.X == 0 && Position.Y == 0)
 	{
 		for (int X = 0; X < GameRules::Chunk::Size; ++X)
 		{
 			for (int Y = 0; Y < GameRules::Chunk::Size; ++Y)
 			{
-				if (X < 2 && Y < 2)
+				if (X < 4 && Y < 4)
 				{
 					const auto Index = UChunkData::GetIndex(X, Y);
 					auto& Column = OutColumns[Index];
@@ -40,11 +45,17 @@ void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 					const float NoiseValue = Noise->GetNoise2D(WorldX * 0.5f, WorldY * 0.5f);
 
 					const unsigned short Height = FMath::RoundToInt(
-						(NoiseValue + 1) * (GameRules::Chunk::Height / 2));
-					Column.Pieces.Emplace(static_cast<uint16>(
-							static_cast<uint16>(MaterialId) << 8 | static_cast<uint16>(ShapeId)
-							), Height);
-					Column.Pieces.Emplace(0, GameRules::Chunk::Height - Height);
+						(NoiseValue + 1) * (MaxHeight / 2));
+
+					const auto GrassHeight = RandomStream.RandRange(1, 2);
+					const auto DirtHeight = RandomStream.RandRange(1, 6);
+					const auto StoneHeight = Height - GrassHeight - DirtHeight;
+					const auto VoidHeight = GameRules::Chunk::Height - Height;
+			
+					Column.Pieces.Emplace(StoneId, StoneHeight);
+					Column.Pieces.Emplace(DirtId, DirtHeight);
+					Column.Pieces.Emplace(GrassId, GrassHeight);
+					Column.Pieces.Emplace(GameRules::Constants::GShapeId_Void, VoidHeight);
 				} else
 				{
 					const int Index = UChunkData::GetIndex(X, Y);

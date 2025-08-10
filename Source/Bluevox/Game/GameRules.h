@@ -6,15 +6,9 @@ namespace GameRules::Constants
 	
 	inline const FName GShape_Void(TEXT("core:shape:void"));
 	inline const FName GShape_Layer(TEXT("core:shape:layer"));
-	inline const FName GShape_Ramp_N(TEXT("core:shape:ramp_n"));
-	inline const FName GShape_Ramp_S(TEXT("core:shape:ramp_s"));
-	inline const FName GShape_Ramp_W(TEXT("core:shape:ramp_w"));
-	inline const FName GShape_Ramp_E(TEXT("core:shape:ramp_e"));
-
-	inline const FName GMaterial_Void(TEXT("core:material:void"));
-	inline const FName GMaterial_Stone(TEXT("core:material:stone"));
-	inline const FName GMaterial_Grass(TEXT("core:material:grass"));
-	inline const FName GMaterial_Glass(TEXT("core:material:glass"));
+	inline const FName GShape_Layer_Dirt(TEXT("core:shape:layer_dirt"));
+	inline const FName GShape_Layer_Grass(TEXT("core:shape:layer_grass"));
+	inline const FName GShape_Layer_Stone(TEXT("core:shape:layer_stone"));
 }
 
 #if UE_BUILD_SHIPPING

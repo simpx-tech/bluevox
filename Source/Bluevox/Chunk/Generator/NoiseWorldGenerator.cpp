@@ -9,7 +9,6 @@
 #include "FastNoiseWrapper.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
-#include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
 
 UNoiseWorldGenerator::UNoiseWorldGenerator()
 {
@@ -21,9 +20,12 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 {
 	OutColumns.SetNum(GameRules::Chunk::Size * GameRules::Chunk::Size);
 
-	const auto ShapeId = GameManager->ShapeRegistry->GetShapeIdByName(ShapeName);
-	const auto MaterialId = GameManager->MaterialRegistry->GetMaterialByName(MaterialName);
+	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
+	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Grass);
+	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Stone);
 
+	const auto MaxHeight = FMath::FloorToInt(GameRules::Chunk::Height * 0.75f);
+	
 	for (int X = 0; X < GameRules::Chunk::Size; ++X)
 	{
 		for (int Y = 0; Y < GameRules::Chunk::Size; ++Y)
@@ -37,11 +39,17 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 			const float NoiseValue = Noise->GetNoise2D(WorldX * 0.5f, WorldY * 0.5f);
 
 			const unsigned short Height = FMath::RoundToInt(
-				(NoiseValue + 1) * (GameRules::Chunk::Height / 2));
-			Column.Pieces.Emplace(static_cast<uint16>(
-					static_cast<uint16>(MaterialId) << 8 | static_cast<uint16>(ShapeId)
-					), Height);
-			Column.Pieces.Emplace(0, GameRules::Chunk::Height - Height);
+				(NoiseValue + 1) * (MaxHeight / 2));
+
+			const auto GrassHeight = FMath::RandRange(1, 2);
+			const auto DirtHeight = FMath::RandRange(1, 6);
+			const auto StoneHeight = Height - GrassHeight - DirtHeight;
+			const auto VoidHeight = GameRules::Chunk::Height - Height;
+			
+			Column.Pieces.Emplace(StoneId, StoneHeight);
+			Column.Pieces.Emplace(DirtId, DirtHeight);
+			Column.Pieces.Emplace(GrassId, GrassHeight);
+			Column.Pieces.Emplace(GameRules::Constants::GShapeId_Void, VoidHeight);
 		}
 	}
 }

@@ -21,10 +21,7 @@ public:
 	int32 GroundHeight = 64.0f;
 
 	UPROPERTY(EditAnywhere)
-	FName ShapeName = GameRules::Constants::GShape_Layer;
-	
-	UPROPERTY(EditAnywhere)
-	FName MaterialName = GameRules::Constants::GMaterial_Stone;
+	FName ShapeName = GameRules::Constants::GShape_Layer_Dirt;
 	
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 

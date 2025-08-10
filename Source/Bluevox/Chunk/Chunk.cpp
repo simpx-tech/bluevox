@@ -70,7 +70,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	{
 		for (int32 LocalY = 0; LocalY < GameRules::Chunk::Size; ++LocalY)
 		{
-			if (Position.X == 0 && Position.Y == 0 && LocalX == 0 && LocalY == 0)
+			if (Position.X == 0 && Position.Y == 0 && LocalX == 2 && LocalY == 2)
 			{
 				UE_LOG(LogTemp, Warning, TEXT("breakpoint"));
 			}
@@ -93,7 +93,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				// TODO in future we would have more complex logic here
 				Neighbor.Shape = ShapeRegistry->GetShapeById(Neighbor.Piece->Id);
 				Neighbor.Start = 0;
-				Neighbor.Size = Column.Pieces[0].GetSize();
+				Neighbor.Size = Column.Pieces[0].Size;
 				Neighbor.Index = 0;
 			}
 		
@@ -102,7 +102,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece)
 				
 				const auto& Piece = Data->Columns[ColumnIndex].Pieces[PieceIdx];
-				const int32 PieceSize = Piece.GetSize();
+				const int32 PieceSize = Piece.Size;
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 
 				// Quick path, skip void
@@ -116,7 +116,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 						{
 							Neighbor.Start += Neighbor.Size;
 							Neighbor.Index += 1;
-							Neighbor.Size = Neighbor.Column->Pieces[Neighbor.Index].GetSize();
+							Neighbor.Size = Neighbor.Column->Pieces[Neighbor.Index].Size;
 							Neighbor.Piece = &Neighbor.Column->Pieces[Neighbor.Index];
 							Neighbor.Shape = ShapeRegistry->GetShapeById(Neighbor.Piece->Id);
 						}
@@ -141,6 +141,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 
 					bool bContinue;
 					auto& Neighbor = Neighbors[static_cast<uint8>(Face)];
+
 					do
 					{
 						const auto NeighborIsOpaque = Neighbor.Shape->IsOpaque(OppositeFace);
@@ -149,7 +150,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 						{
 							if (AccumulatedSize > 0)
 							{
-								Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize, Piece.Id);
+								Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize);
 								
 								AccumulatedSize = 0;
 								AccumulatedZ = -1;
@@ -169,10 +170,12 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 							CurZ + PieceSize >= Neighbor.Start + Neighbor.Size &&
 							Neighbor.Index + 1 < Neighbor.Column->Pieces.Num())
 						{
+							const auto CurIsAheadNeighborBy = CurZ > Neighbor.Start ? CurZ - Neighbor.Start : 0;
+							InternalZ += Neighbor.Size - CurIsAheadNeighborBy;
 							Neighbor.Start += Neighbor.Size;
-							InternalZ += Neighbor.Size;
+							
 							Neighbor.Index += 1;
-							Neighbor.Size = Neighbor.Column->Pieces[Neighbor.Index].GetSize();
+							Neighbor.Size = Neighbor.Column->Pieces[Neighbor.Index].Size;
 							Neighbor.Piece = &Neighbor.Column->Pieces[Neighbor.Index];
 							Neighbor.Shape = ShapeRegistry->GetShapeById(Neighbor.Piece->Id);
 							bContinue = true;
@@ -184,7 +187,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 
 					if (AccumulatedSize > 0)
 					{
-						Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize, Piece.Id);
+						Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize);
 					}
 				}
 
@@ -197,7 +200,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				}
 				if (bShouldRenderTop)
 				{
-					Shape->Render(OutMesh, EFace::Top, FLocalPosition(LocalX, LocalY, CurZ), PieceSize, Piece.Id);
+					Shape->Render(OutMesh, EFace::Top, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
 				}
 				
 				// Bottom, only render if we are not on the first piece
@@ -206,7 +209,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 					const auto NeighborShape = ShapeRegistry->GetShapeById(Data->Columns[ColumnIndex].Pieces[PieceIdx - 1].Id);
 					if (!NeighborShape->IsOpaque(EFace::Top))
 					{
-						Shape->Render(OutMesh, EFace::Bottom, FLocalPosition(LocalX, LocalY, CurZ), PieceSize, Piece.Id);
+						Shape->Render(OutMesh, EFace::Bottom, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
 					}
 				}
 				

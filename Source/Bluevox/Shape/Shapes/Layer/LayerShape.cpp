@@ -5,23 +5,12 @@
 
 #include "Bluevox/Chunk/CullingMask.h"
 #include "Bluevox/Chunk/RenderGroup.h"
-#include "Bluevox/Chunk/Position/LocalPosition.h"
 #include "Bluevox/Game/GameRules.h"
-#include "Bluevox/ShapeMaterial/ShapeMaterialRegistry.h"
-#include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
 
 FName ULayerShape::GetNameId() const
 {
 	return GameRules::Constants::GShape_Layer;
-}
-
-void ULayerShape::InitializeAllowedMaterials(UMaterialRegistry* Registry)
-{
-	using namespace GameRules::Constants;
-	AllowedMaterials.Add(Registry->GetMaterialByName(GMaterial_Glass));
-	AllowedMaterials.Add(Registry->GetMaterialByName(GMaterial_Stone));
-	AllowedMaterials.Add(Registry->GetMaterialByName(GMaterial_Glass));
 }
 
 void ULayerShape::GenerateRenderGroups()

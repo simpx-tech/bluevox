@@ -67,9 +67,6 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UShapeRegistry* ShapeRegistry = nullptr;
-
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
-	UMaterialRegistry* MaterialRegistry = nullptr;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;

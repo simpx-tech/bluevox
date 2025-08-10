@@ -72,10 +72,6 @@ FRenderGroup* UShape::GetRenderGroup(const EFace Direction) const
 	}
 }
 
-void UShape::InitializeAllowedMaterials(UMaterialRegistry* Registry)
-{
-}
-
 UShape::~UShape()
 {
 	if (NorthRenderGroup != nullptr)
@@ -113,7 +109,7 @@ void UShape::GenerateRenderGroups()
 }
 
 void UShape::Render(FDynamicMesh3& Mesh, const EFace Face,
-	const FLocalPosition& Position, const int32 Size, const int32 MaterialId) const
+	const FLocalPosition& Position, const int32 Size) const
 {
 	SCOPE_CYCLE_COUNTER(STAT_Shape_Render);
 	
@@ -123,6 +119,8 @@ void UShape::Render(FDynamicMesh3& Mesh, const EFace Face,
 		return;
 	}
 
+	const auto MaterialId = GetMaterialId();
+	
 	const auto SizeVector = FVector{1, 1, static_cast<double>(Size)};
 	const auto PositionVector = FVector{
 		Position.X * GameRules::Scaling::XYWorldSize,

@@ -13,10 +13,9 @@ UCLASS()
 class BLUEVOX_API ULayerShape : public UShape
 {
 	GENERATED_BODY()
-
+	
+public:
 	virtual FName GetNameId() const override;
-
-	virtual void InitializeAllowedMaterials(UMaterialRegistry* Registry) override;
-
+	
 	virtual void GenerateRenderGroups() override;
 };
