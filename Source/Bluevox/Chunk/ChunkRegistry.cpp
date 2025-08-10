@@ -8,7 +8,6 @@
 #include "RegionFile.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Data/ChunkData.h"
-#include "Generator/WorldGenerator.h"
 #include "Position/LocalChunkPosition.h"
 
 UChunkRegistry* UChunkRegistry::Init(AGameManager* InGameManager)
@@ -111,6 +110,7 @@ void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
 		LoadedByRegion.FindOrAdd(RegionPosition) -= 1;
 		if (LoadedByRegion[RegionPosition] <= 0)
 		{
+			UE_LOG(LogChunk, Verbose, TEXT("Unloading region %s because no chunks are loaded."), *RegionPosition.ToString());
 			LoadedByRegion.Remove(RegionPosition);
 			Regions.Remove(RegionPosition);
 		}
@@ -145,9 +145,16 @@ void UChunkRegistry::Th_RegisterChunk(const FChunkPosition& Position, UChunkData
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Registering chunk data for position %s"), *Position.ToString());
 	FWriteScopeLock Lock(ChunksDataLock);
+
+	if (!ChunksData.Contains(Position))
+	{
+		LoadedByRegion.FindOrAdd(FRegionPosition::FromChunkPosition(Position)) += 1;
+	}
+	
 	ChunksData.Add(Position, Data);
 }
 
+// TODO if used in other places, may cause to have unused RegionFiles
 bool UChunkRegistry::Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns)
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Fetching chunk data from disk for position %s"), *Position.ToString());
@@ -162,39 +169,6 @@ bool UChunkRegistry::Th_HasChunkData(const FChunkPosition& Position)
 {
 	FReadScopeLock Lock(ChunksDataLock);
 	return ChunksData.Contains(Position);
-}
-
-UChunkData* UChunkRegistry::Th_LoadChunkData(const FChunkPosition& Position, UChunkData* Fallback)
-{
-	{
-		FReadScopeLock Lock(ChunksDataLock);
-		const auto ChunkData = Th_GetChunkData(Position);
-		if (ChunkData)
-		{
-			return ChunkData;
-		}
-	}
-	
-	// const auto NewChunkData = Th_FetchChunkDataFromDisk(Position, Fallback);
-	// if (NewChunkData)
-	// {
-	// 	{
-	// 		FScopeLock Lock(&ChunksDataLock);
-	// 		ChunksData.Add(Position, NewChunkData);
-	//
-	// 		const auto RegionPosition = FRegionPosition::FromChunkPosition(Position);
-	// 		const auto OldValue = LoadedByRegion.FindOrAdd(RegionPosition);
-	// 		LoadedByRegion[RegionPosition] = OldValue + 1;
-	// 	}
-	// 	
-	// 	return NewChunkData;
-	// }
-
-	// const auto ChunkData = NewObject<UChunkData>(this, UChunkData::StaticClass());
-	// Fallback->ClearInternalFlags(EInternalObjectFlags::Async);
-	// GameManager->WorldSave->WorldGenerator->GenerateChunk(Position, TODO);
-
-	return Fallback;
 }
 
 AChunk* UChunkRegistry::GetChunkActor(const FChunkPosition& Position) const

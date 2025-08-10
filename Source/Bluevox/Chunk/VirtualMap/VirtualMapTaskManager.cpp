@@ -104,7 +104,7 @@ void UVirtualMapTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksTo
 	for (const auto& ChunkPosition : ChunksToRender)
 	{
 		// Only add the ones that are not being unloaded
-		if (!ProcessingUnload.Contains(ChunkPosition))
+		if (ProcessingUnload.FindRef(ChunkPosition) == false)
 		{
 			// Not render here, only render when all chunks are loaded
 			// TODO probably there's a better way to handle this
@@ -170,7 +170,7 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 
 		if (!Region)
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Failed to unload chunk %s: region file not found."), *ChunkPosition.ToString());
+			UE_LOG(LogChunk, Warning, TEXT("Failed to unload chunk %s: region %s file not found."), *ChunkPosition.ToString(), *RegionPosition.ToString());
 			continue;
 		}
 

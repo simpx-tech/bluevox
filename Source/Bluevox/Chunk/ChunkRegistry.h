@@ -74,8 +74,5 @@ public:
 	bool Th_HasChunkData(const FChunkPosition& Position);
 
 	UFUNCTION()
-	UChunkData* Th_LoadChunkData(const FChunkPosition& Position, UChunkData* Fallback);
-
-	UFUNCTION()
 	AChunk* GetChunkActor(const FChunkPosition& Position) const;
 };

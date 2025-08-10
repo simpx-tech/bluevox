@@ -30,18 +30,12 @@ AChunk::AChunk()
 
 void AChunk::SetRenderState(const EChunkState State) const
 {
+	UE_LOG(LogChunk, Verbose, TEXT("SetRenderState for chunk %s to %s"), *Position.ToString(), *UEnum::GetValueAsString(State));
 	const auto Visible = EnumHasAnyFlags(State, EChunkState::Live);
 	MeshComponent->SetVisibility(Visible);
 
-	if (State == EChunkState::None)
-	{
-		if (UBodySetup* BS = MeshComponent->GetBodySetup())
-		{
-			BS->RemoveSimpleCollision();
-			BS->InvalidatePhysicsData();
-		}
-		MeshComponent->SetMesh(FDynamicMesh3());
-	}
+	const auto Collision = EnumHasAnyFlags(State, EChunkState::Collision);
+	MeshComponent->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 }
 
 bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)

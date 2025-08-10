@@ -35,6 +35,7 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 				ToRender.Add(LivePosition);
 			} else
 			{
+				VirtualChunks.Remove(LivePosition);
 				ToUnload.Add(LivePosition);
 			}
 		} else
@@ -58,10 +59,11 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 
 			if (VirtualChunk.ShouldBeKeptAlive())
 			{
-				ToRender.Add(LoadPosition);
 				VirtualChunk.RecalculateState();
+				ToRender.Add(LoadPosition);
 			} else
 			{
+				VirtualChunks.Remove(LoadPosition);
 				ToUnload.Add(LoadPosition);
 			}
 		} else
@@ -202,9 +204,7 @@ void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 
 	AddPlayerToChunks(Controller, AddedLoad, AddedLive);
 	RemovePlayerFromChunks(Controller, RemovedLoad, RemovedLive);
-
-	// Border chunks
-	TaskManager->ScheduleRender(LoadToLive.Union(LiveToLoad));
+	HandleStateUpdate(LoadToLive, LiveToLoad);
 }
 
 UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)

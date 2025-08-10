@@ -7,20 +7,6 @@
 #include "UObject/Object.h"
 #include "TickManager.generated.h"
 
-namespace TickManagerFunc
-{
-	struct FNo_Validate
-	{
-		template<class... Ts>
-		constexpr bool operator()(Ts&&...) const noexcept { return true; }
-	};
-
-	struct FNo_Finally
-	{
-		constexpr void operator()() const noexcept {}
-	};
-}
-
 /**
  * 
  */
