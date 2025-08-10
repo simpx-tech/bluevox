@@ -45,6 +45,8 @@ void AMainGameMode::Logout(AController* Exiting)
 {
 	Super::Logout(Exiting);
 
+	UE_LOG(LogTemp, Log, TEXT("Player %s logged out"), *Exiting->GetName());
+
 	const auto MainController = Cast<AMainController>(Exiting);
 	const auto MainCharacter = Cast<AMainCharacter>(MainController->GetPawn());
 

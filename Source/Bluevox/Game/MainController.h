@@ -30,8 +30,8 @@ class BLUEVOX_API AMainController : public APlayerController
 	UFUNCTION(BlueprintCallable, Category = "Game")
 	void HandleOnClientReadyChanged() const;
 
-	UPROPERTY(Replicated)
-	int32 FarDistance = 2;
+	UPROPERTY(EditAnywhere, Replicated)
+	int32 FarDistance = 12;
 	
 public:
 	UPROPERTY()

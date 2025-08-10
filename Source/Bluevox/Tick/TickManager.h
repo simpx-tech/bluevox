@@ -59,7 +59,8 @@ class BLUEVOX_API UTickManager : public UObject, public FTickableGameObject
 	UFUNCTION()
 	void GameTick();
 
-	// TODO handle BeginDestroy -> wait for all tasks to finish
+	UFUNCTION()
+	void OnWorldBeginTearDown(UWorld* World);
 	
 public:
 	void RecalculateBudget();

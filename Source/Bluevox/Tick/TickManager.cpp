@@ -118,6 +118,23 @@ void UTickManager::GameTick()
 	bRunningGameTick = false;
 }
 
+void UTickManager::OnWorldBeginTearDown(UWorld* World)
+{
+	while (PendingTasks > 0)
+	{
+		while (!ScheduledFns.IsEmpty())
+		{
+			TFunction<void()> Func;
+			if (ScheduledFns.Dequeue(Func))
+			{
+				Func();
+			}
+		}
+
+		FPlatformProcess::Sleep(0.01f);
+	}
+}
+
 void UTickManager::RecalculateBudget()
 {
 	const double SecondsPerCycle = FPlatformTime::GetSecondsPerCycle();
@@ -132,6 +149,7 @@ void UTickManager::RecalculateBudget()
 UTickManager* UTickManager::Init()
 {
 	RecalculateBudget();
+	FWorldDelegates::OnWorldBeginTearDown.AddUObject(this, &UTickManager::OnWorldBeginTearDown);
 	return this;
 }
 
