@@ -81,7 +81,7 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	uint32 PacketIdCounter = 0;
 
 	UPROPERTY(EditAnywhere)
-	uint32 ChunkSize = 1024;
+	uint32 ChunkSize = 1024; // 1 KB
 	
 	UPROPERTY(EditAnywhere)
 	uint32 MaxSentBytesPerSecond = 1024 * 64; // 64 KB/s

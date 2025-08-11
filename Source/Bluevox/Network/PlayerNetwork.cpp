@@ -54,6 +54,9 @@ void UPlayerNetwork::TryToRunPacket(const uint32 PacketId, UNetworkPacket* Packe
 	{
 		UE_LOG(LogPlayerNetwork, Verbose, TEXT("PacketId %u is not the expected %u, queuing for later execution."), PacketId, ExpectedPacketId);
 		PendingExecution.HeapPush(FPendingExecution{ PacketId, Packet });
+	} else
+	{
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("Received packet with PacketId %u, but expected %u. Ignoring."), PacketId, ExpectedPacketId);
 	}
 }
 
@@ -64,8 +67,9 @@ void UPlayerNetwork::HandlePacketHeader(const FPacketHeader& PacketHeader)
 
 	FPendingReceive PendingReceive(PacketHeader);
 	PendingReceive.Data.SetNumUninitialized(PacketHeader.TotalSize);
-	PendingReceive.MissingChunks = FMath::CeilToInt(static_cast<float>(PacketHeader.TotalSize / ChunkSize)) + 1;
-	PendingReceive.ReceivedChunks.SetNum(PendingReceive.MissingChunks, false);
+	const int32 NumChunks = (PacketHeader.TotalSize + ChunkSize - 1) / ChunkSize;
+	PendingReceive.MissingChunks = NumChunks;
+	PendingReceive.ReceivedChunks.Init(false, NumChunks);
 	PendingReceives.Add(PacketHeader.PacketId, MoveTemp(PendingReceive));
 }
 
@@ -76,9 +80,9 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 		return true;
 	}
 
-	for (int32 Offset = PendingSend.Offset; Offset <= PendingSend.LastOffset; Offset += ChunkSize)
-	{
-		const auto SizeToCopy = FMath::Min(PendingSend.Data.Num() - PendingSend.Offset, static_cast<int32>(ChunkSize));
+	const int32 End = PendingSend.Data.Num();
+	while (PendingSend.Offset < End) {
+		const int32 SizeToCopy = FMath::Min(End - PendingSend.Offset, static_cast<int32>(ChunkSize));
 	
 		FPacketChunk PacketChunk;
 		PacketChunk.PacketId = PendingSend.PacketId;
@@ -100,17 +104,21 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 			Sv_ReceiveServerChunk(PacketChunk);
 		}
 
-		if (PendingSend.Offset >= PendingSend.LastOffset)
-		{
-			PendingSend.bSentAll = true;
-		}
+		// if (PendingSend.Offset >= PendingSend.LastOffset)
+		// {
+		// 	PendingSend.bSentAll = true;
+		// }
 
+		PendingSend.Offset += SizeToCopy;
+		
 		if (SentThisSecond >= MaxSentBytesPerSecond)
 		{
 			UE_LOG(LogPlayerNetwork, Verbose, TEXT("Hit max send limit, stopping at Offset=%d for PacketId=%u"), PendingSend.Offset, PendingSend.PacketId);
 			return false;
 		}
 	}
+	
+	PendingSend.bSentAll = true;
 
 	return true;
 }
@@ -123,7 +131,8 @@ bool UPlayerNetwork::ProcessPendingResend(FPendingResend& PendingResend)
 	}
 	
 	const auto& PendingSend = PendingSends[PendingResend.PacketId];
-	const int32 MaxChunkIndex = PendingSend.Data.Num() / ChunkSize - 1;
+	const int32 NumChunks = (PendingSend.Data.Num() + ChunkSize - 1) / ChunkSize;
+	const int32 MaxChunkIndex = NumChunks - 1;
 	
 	for (int32 Index = PendingResend.LastSentIndex + 1; Index < PendingResend.Indexes.Num(); ++Index)
 	{
@@ -188,6 +197,11 @@ void UPlayerNetwork::HandlePacketChunk(const FPacketChunk& PacketChunk)
 		UE_LOG(LogPlayerNetwork, Warning, TEXT("Received chunk for unknown PacketId=%u"), PacketChunk.PacketId);
 		return;
 	}
+
+	if (PacketChunk.Index < 0 || PacketChunk.Index >= PendingReceive->ReceivedChunks.Num()) {
+		UE_LOG(LogTemp, Warning, TEXT("Received chunk with invalid index %d for PacketId=%u"), PacketChunk.Index, PacketChunk.PacketId);
+		return;
+	}
 	
 	if (PendingReceive->ReceivedChunks[PacketChunk.Index])
 	{
@@ -207,11 +221,10 @@ void UPlayerNetwork::HandlePacketChunk(const FPacketChunk& PacketChunk)
 		UE_LOG(LogPlayerNetwork, Verbose, TEXT("All chunks received for PacketId=%u"), PacketChunk.PacketId);
 		
 		// All chunks received, process the packet
-		UNetworkPacket* Packet = NewObject<UNetworkPacket>();
+		UNetworkPacket* Packet = NewObject<UNetworkPacket>(GetTransientPackage(), PendingReceive->PacketType);
 
 		Packet->DecompressAndSerialize(PendingReceive->Data);
 		TryToRunPacket(PacketChunk.PacketId, Packet);
-		PendingReceives.Remove(PacketChunk.PacketId);
 		
 		if (PendingReceive->bLocalPacket)
 		{
@@ -222,7 +235,6 @@ void UPlayerNetwork::HandlePacketChunk(const FPacketChunk& PacketChunk)
 			});
 		} else
 		{
-			// Only run if we're in a client/server environment
 			if (GameManager->bServer)
 			{
 				Cl_ConfirmReceivedPacket(PacketChunk.PacketId);
@@ -231,6 +243,8 @@ void UPlayerNetwork::HandlePacketChunk(const FPacketChunk& PacketChunk)
 				Sv_ConfirmReceivedPacket(PacketChunk.PacketId);
 			}
 		}
+
+		PendingReceives.Remove(PacketChunk.PacketId);
 	}
 }
 
