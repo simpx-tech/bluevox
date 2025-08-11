@@ -81,7 +81,11 @@ void AGameManager::BeginPlay()
 		if (bServer)
 		{
 			WorldSave->LoadPlayer(LocalController);
-			VirtualMap->RegisterPlayer(LocalController);
+
+			if (bAutomaticallyRegisterPlayer)
+			{
+				VirtualMap->RegisterPlayer(LocalController);	
+			}
 		}	
 	}
 }

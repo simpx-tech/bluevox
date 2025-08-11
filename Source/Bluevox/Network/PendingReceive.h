@@ -22,7 +22,7 @@ struct FPendingReceive : public FPacketHeader
 	TArray<uint8> Data;
 
 	UPROPERTY()
-	double LastPacketTime = 0;
+	int32 LastPacketTimeSecs = 0;
 
 	UPROPERTY()
 	int32 MissingChunks = 0;

@@ -37,6 +37,9 @@ public:
 	bool bEraseAllSavesOnStart = false;
 
 	UPROPERTY(EditAnywhere, Category = "Development")
+	bool bAutomaticallyRegisterPlayer = true;
+
+	UPROPERTY(EditAnywhere, Category = "Development")
 	bool bOverrideWorldGenerator = false;
 
 	UPROPERTY(EditAnywhere, Instanced, Category = "Development", meta = (EditCondition = "bOverrideWorldGenerator", ShowOnlyInnerProperties))

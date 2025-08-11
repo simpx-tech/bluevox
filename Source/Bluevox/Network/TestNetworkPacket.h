@@ -27,5 +27,5 @@ public:
 	virtual void Serialize(FArchive& Ar) override;
 
 	UFUNCTION(BlueprintCallable)
-	void Initialize();
+	void Initialize(int32 Size = 1000000);
 };

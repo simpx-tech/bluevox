@@ -11,10 +11,10 @@ void UTestNetworkPacket::Serialize(FArchive& Ar)
 	Ar << TestArray;
 }
 
-void UTestNetworkPacket::Initialize()
+void UTestNetworkPacket::Initialize(const int32 Size)
 {
-	TestArray.Reserve(1'000'000);
-	for (int32 i = 0; i < 1'000'000; ++i)
+	TestArray.Reserve(Size);
+	for (int32 i = 0; i < Size; ++i)
 	{
 		TestArray.Add(i % 256);
 	}
