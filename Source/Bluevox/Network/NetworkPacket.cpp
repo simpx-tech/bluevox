@@ -30,3 +30,7 @@ void UNetworkPacket::DecompressAndSerialize(const TArray<uint8>& InData)
 void UNetworkPacket::OnReceive(AGameManager* GameManager)
 {
 }
+
+void UNetworkPacket::Serialize(FArchive& Ar)
+{
+}

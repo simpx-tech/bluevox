@@ -18,6 +18,12 @@ class BLUEVOX_API UChunkData : public UObject
 	GENERATED_BODY()
 	
 public:
+	UChunkData* Init(TArray<FChunkColumn>&& InColumns)
+	{
+		Columns = MoveTemp(InColumns);
+		return this;
+	}
+	
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
 

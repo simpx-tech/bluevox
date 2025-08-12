@@ -52,7 +52,7 @@ struct FPendingResend
 	uint32 PacketId = 0;
 
 	UPROPERTY()
-	int32 LastSentIndex = 0;
+	int32 LastSentIndex = -1;
 
 	UPROPERTY()
 	TArray<int32> Indexes;
@@ -82,6 +82,9 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 
 	UPROPERTY(EditAnywhere)
 	uint32 ChunkSize = 1024; // 1 KB
+
+	// TODO erase this over time, so we don't accumulate too many unknown chunks in memory
+	TMap<uint32, TArray<FPacketChunk>> UnknownChunks;
 	
 	UPROPERTY(EditAnywhere)
 	uint32 MaxSentBytesPerSecond = 1024 * 64; // 64 KB/s
@@ -97,9 +100,15 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 
 	UPROPERTY()
 	TArray<FPendingExecution> PendingExecution;
+
+	UPROPERTY()
+	TArray<FPendingSend> PlayerNotReadyWaitingSends;
 	
 	UPROPERTY()
 	uint32 ExpectedPacketId = 0;
+
+	UPROPERTY()
+	bool bClientNetReady = false;
 
 	UFUNCTION()
 	void TryToRunPacket(uint32 PacketId, UNetworkPacket* Packet);
@@ -120,10 +129,10 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	bool ProcessPendingResend(FPendingResend& PendingResend);
 	
 	UFUNCTION(Client, Reliable)
-	void Cl_ReceiveClientChunk(const FPacketChunk& PacketChunk);
+	void Cl_ReceiveServerChunk(const FPacketChunk& PacketChunk);
 
 	UFUNCTION(Server, Reliable)
-	void Sv_ReceiveServerChunk(const FPacketChunk& PacketChunk);
+	void Sv_ReceiveClientChunk(const FPacketChunk& PacketChunk);
 
 	UFUNCTION()
 	void HandlePacketChunk(const FPacketChunk& PacketChunk);
@@ -163,6 +172,13 @@ public:
 
 	UFUNCTION(Category="Network")
 	void HandleConfirmedPacket(uint32 PacketId);
+
+	UFUNCTION(Server, Reliable)
+	void NotifyClientNetReady();
+
+	virtual bool IsSupportedForNetworking() const override;
+	
+	virtual bool IsNameStableForNetworking() const override;
 	
 protected:
 	// Called when the game starts

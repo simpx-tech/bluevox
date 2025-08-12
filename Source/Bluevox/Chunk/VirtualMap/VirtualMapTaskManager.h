@@ -37,10 +37,31 @@ struct FRenderResult
 	UE::Geometry::FDynamicMesh3 Mesh;
 };
 
+USTRUCT(BlueprintType)
 struct FProcessingRender
 {
+	GENERATED_BODY()
+
+	UPROPERTY()
 	int32 LastRenderIndex = -1;
+
+	UPROPERTY()
 	int32 PendingTasks = 0;
+};
+
+USTRUCT(BlueprintType)
+struct FPendingNetSendChunks
+{
+	GENERATED_BODY()
+	
+	UPROPERTY()
+	TArray<FChunkPosition> ToSend;
+
+	UPROPERTY()
+	TSet<FChunkPosition> WaitingFor;
+
+	UPROPERTY()
+	const AMainController* Player = nullptr;
 };
 
 /**
@@ -51,24 +72,45 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 {
 	GENERATED_BODY()
 
+	friend class UChunkDataNetworkPacket;
+
 	UPROPERTY()
 	TMap<FChunkPosition, bool> ProcessingLoad;
 
 	UPROPERTY()
 	TSet<FChunkPosition> PendingRender;
 
+	UPROPERTY()
 	TMap<FChunkPosition, FProcessingRender> ProcessingRender;
 
+	UPROPERTY()
+	TSet<FChunkPosition> WaitingToBeSent;
+
+	UPROPERTY()
+	bool bServer;
+	
 	UPROPERTY()
 	int32 LastRenderIndex = 0;
 	
 	UPROPERTY()
 	TMap<FChunkPosition, bool> ProcessingUnload;
-	
-	TMap<FChunkPosition, TArray<const AMainController*>> PendingNetSend;
+
+	/**
+	 * List of chunks together which are pending to be sent to the client.
+	 */
+	TSparseArray<FPendingNetSendChunks> PendingNetSendPackets;
+
+	/**
+	 * Mapping from the chunk position to a list of pending net packets is an array
+	 * because a chunk can be requested by multiple players.
+	 */
+	TMap<FChunkPosition, TArray<int32>> PendingNetSendPacketByPosition;
 	
 	UPROPERTY()
 	AGameManager* GameManager = nullptr;
+
+	void Sv_ProcessPendingNetSend(FPendingNetSendChunks&& PendingNetSend) const;
+	
 public:
 	UVirtualMapTaskManager* Init(AGameManager* InGameManager);
 	
@@ -79,7 +121,7 @@ public:
 	void ScheduleRender(const TSet<FChunkPosition>& ChunksToRender);
 
 	UFUNCTION()
-	void ScheduleNetSend(const AMainController* ToPlayer, const TSet<FChunkPosition>& ChunksToSend);
+	void Sv_ScheduleNetSend(const AMainController* ToPlayer, const TSet<FChunkPosition>& ChunksToSend);
 
 	UFUNCTION()
 	void ScheduleUnload(const TSet<FChunkPosition>& ChunksToUnload);

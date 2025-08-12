@@ -79,6 +79,13 @@ struct FChunkPosition
 		return *this;
 	}
 
+	friend FArchive& operator<<(FArchive& Ar, FChunkPosition& Position)
+	{
+		Ar << Position.X;
+		Ar << Position.Y;
+		return Ar;
+	}
+
 	FString ToString() const
 	{
 		return FString::Printf(TEXT("ChunkPosition(X: %d, Y: %d)"), X, Y);

@@ -31,7 +31,7 @@ void AMainController::SetFarDistance_Implementation(const int32 NewFarDistance)
 {
 	const auto OldFarDistance = FarDistance;
 	FarDistance = NewFarDistance;
-	GameManager->VirtualMap->UpdateFarDistanceForPlayer(this, OldFarDistance, FarDistance);
+	GameManager->VirtualMap->Sv_UpdateFarDistanceForPlayer(this, OldFarDistance, FarDistance);
 }
 
 void AMainController::Sv_SetClientReady_Implementation(bool bReady)
@@ -41,7 +41,24 @@ void AMainController::Sv_SetClientReady_Implementation(bool bReady)
 
 void AMainController::BeginPlay()
 {
+	GameManager = Cast<AGameManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AGameManager::StaticClass()));
+	PlayerNetwork->Init(GameManager, this, PlayerState);
+	
 	Super::BeginPlay();
+
+	if (GameManager->bServer && GameManager->LocalController != this && GameManager->bInitialized)
+	{
+		GameManager->VirtualMap->RegisterPlayer(this);
+	}
+}
+
+void AMainController::OnRep_PlayerState()
+{
+	Super::OnRep_PlayerState();
+	if (PlayerState && GameManager->bInitialized && GameManager->bClient)
+	{
+		PlayerNetwork->NotifyClientNetReady();
+	}
 }
 
 void AMainController::SetServerReady(const bool bReady)

@@ -8,6 +8,7 @@
 #include "PacketChunk.h"
 #include "ServerNetworkPacket.h"
 #include "Bluevox/Game/GameManager.h"
+#include "GameFramework/PlayerState.h"
 
 void UPlayerNetwork::Sv_SendPacketHeader_Implementation(const FPacketHeader& PacketHeader)
 {
@@ -71,6 +72,14 @@ void UPlayerNetwork::HandlePacketHeader(const FPacketHeader& PacketHeader)
 	PendingReceive.MissingChunks = NumChunks;
 	PendingReceive.ReceivedChunks.Init(false, NumChunks);
 	PendingReceives.Add(PacketHeader.PacketId, MoveTemp(PendingReceive));
+
+	if (UnknownChunks.Contains(PacketHeader.PacketId))
+	{
+		for (const auto& Chunk : UnknownChunks[PacketHeader.PacketId])
+		{
+			HandlePacketChunk(Chunk);
+		}
+	}
 }
 
 bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
@@ -90,24 +99,26 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 		PacketChunk.Index = PendingSend.Offset / ChunkSize;
 		FMemory::Memcpy(PacketChunk.Data.GetData(), PendingSend.Data.GetData() + PendingSend.Offset, SizeToCopy);
 
+		// DEV temp for debugging resend
 		PendingSend.Offset += SizeToCopy;
 		SentThisSecond += SizeToCopy;
 	
 		if (bServer)
 		{
+			UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sending chunk to client: PacketId=%u, DataSize=%d, Index=%d"),
+				PacketChunk.PacketId, PacketChunk.Data.Num(), PacketChunk.Index);
+			
 			// From Server
-			Cl_ReceiveClientChunk(PacketChunk);
+			Cl_ReceiveServerChunk(PacketChunk);
 		}
 		else
 		{
+			UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sending chunk to server: PacketId=%u, DataSize=%d, Index=%d"),
+				PacketChunk.PacketId, PacketChunk.Data.Num(), PacketChunk.Index);
+			
 			// From Client
-			Sv_ReceiveServerChunk(PacketChunk);
+			Sv_ReceiveClientChunk(PacketChunk);
 		}
-
-		// if (PendingSend.Offset >= PendingSend.LastOffset)
-		// {
-		// 	PendingSend.bSentAll = true;
-		// }
 
 		PendingSend.Offset += SizeToCopy;
 		
@@ -117,7 +128,8 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 			return false;
 		}
 	}
-	
+
+	UE_LOG(LogPlayerNetwork, Verbose, TEXT("All chunks sent for PacketId=%u"), PendingSend.PacketId);
 	PendingSend.bSentAll = true;
 
 	return true;
@@ -127,6 +139,7 @@ bool UPlayerNetwork::ProcessPendingResend(FPendingResend& PendingResend)
 {
 	if (!PendingSends.Contains(PendingResend.PacketId))
 	{
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("[ProcessPendingResend] No pending send found for PacketId=%u"), PendingResend.PacketId);
 		return true;
 	}
 	
@@ -157,11 +170,11 @@ bool UPlayerNetwork::ProcessPendingResend(FPendingResend& PendingResend)
 		
 		if (bServer)
 		{
-			Cl_ReceiveClientChunk(PacketChunk);
+			Cl_ReceiveServerChunk(PacketChunk);
 		}
 		else
 		{
-			Sv_ReceiveServerChunk(PacketChunk);
+			Sv_ReceiveClientChunk(PacketChunk);
 		}
 
 		if (SentThisSecond >= MaxSentBytesPerSecond && Index < PendingResend.Indexes.Num() - 1)
@@ -176,12 +189,12 @@ bool UPlayerNetwork::ProcessPendingResend(FPendingResend& PendingResend)
 	return true;
 }
 
-void UPlayerNetwork::Cl_ReceiveClientChunk_Implementation(const FPacketChunk& PacketChunk)
+void UPlayerNetwork::Cl_ReceiveServerChunk_Implementation(const FPacketChunk& PacketChunk)
 {
 	HandlePacketChunk(PacketChunk);
 }
 
-void UPlayerNetwork::Sv_ReceiveServerChunk_Implementation(const FPacketChunk& PacketChunk)
+void UPlayerNetwork::Sv_ReceiveClientChunk_Implementation(const FPacketChunk& PacketChunk)
 {
 	HandlePacketChunk(PacketChunk);
 }
@@ -195,6 +208,7 @@ void UPlayerNetwork::HandlePacketChunk(const FPacketChunk& PacketChunk)
 	if (!PendingReceive)
 	{
 		UE_LOG(LogPlayerNetwork, Warning, TEXT("Received chunk for unknown PacketId=%u"), PacketChunk.PacketId);
+		UnknownChunks.FindOrAdd(PacketChunk.PacketId).Add(PacketChunk);
 		return;
 	}
 
@@ -274,6 +288,16 @@ void UPlayerNetwork::Sv_ConfirmReceivedPacket_Implementation(const uint32 Packet
 	HandleConfirmedPacket(PacketId);
 }
 
+bool UPlayerNetwork::IsSupportedForNetworking() const
+{
+	return true;
+}
+
+bool UPlayerNetwork::IsNameStableForNetworking() const
+{
+	return true;
+}
+
 void UPlayerNetwork::BeginPlay()
 {
 	Super::BeginPlay();
@@ -281,6 +305,8 @@ void UPlayerNetwork::BeginPlay()
 
 void UPlayerNetwork::Cl_AskForResend_Implementation(const uint32 PacketId, const TArray<int32>& Indexes)
 {
+	UE_LOG(LogPlayerNetwork, Verbose, TEXT("Server asked for resend: PacketId=%u, Indexes=%s"), 
+		PacketId, *FString::JoinBy(Indexes, TEXT(", "), [](int32 Index) { return FString::FromInt(Index); }));
 	// TODO check if these indexes were not even sent, if is the case, do not add to pending resends, same for server
 	PendingResends.Add(FPendingResend{
 		PacketId,
@@ -290,6 +316,8 @@ void UPlayerNetwork::Cl_AskForResend_Implementation(const uint32 PacketId, const
 
 void UPlayerNetwork::Sv_AskForResend_Implementation(const uint32 PacketId, const TArray<int32>& Indexes)
 {
+	UE_LOG(LogPlayerNetwork, Verbose, TEXT("Client asked for resend: PacketId=%u, Indexes=%s"), 
+		PacketId, *FString::JoinBy(Indexes, TEXT(", "), [](int32 Index) { return FString::FromInt(Index); }));
 	PendingResends.Add(FPendingResend{
 		PacketId,
 		Indexes,
@@ -301,7 +329,7 @@ void UPlayerNetwork::SendToServer(UNetworkPacket* Packet)
 	TArray<uint8> SerializedData;
 	Packet->Compress(SerializedData);
 
-	UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sending packet to server: PacketId=%u, Size=%d, PacketType=%s"), PacketIdCounter, SerializedData.Num(), *Packet->GetClass()->GetName());
+	const auto SerializedDataSize = SerializedData.Num();
 
 	auto PendingSend = FPendingSend{
 		PacketIdCounter++,
@@ -310,16 +338,21 @@ void UPlayerNetwork::SendToServer(UNetworkPacket* Packet)
 		MoveTemp(SerializedData),
 	};
 	PendingSend.LastOffset = PendingSend.Data.Num() / ChunkSize * ChunkSize;
-
-	Sv_SendPacketHeader(PendingSend);
-	
 	PendingSends.Add(PendingSend.PacketId, MoveTemp(PendingSend));
+	Sv_SendPacketHeader(PendingSend);
+
+	UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sent packet header to server: PacketId=%u, Size=%d, PacketType=%s"), 
+		PacketIdCounter - 1, SerializedDataSize, *Packet->GetClass()->GetName());
 }
 
 void UPlayerNetwork::SendToClient(UNetworkPacket* Packet)
 {
 	TArray<uint8> SerializedData;
+	// TODO with this approach, we force to make a full copy of the data to inside the UNetworkPacket before compressing,
+	// which is not ideal, for example, we have to create a copy of the chunk data for the UChunkDataNetworkPacket.
 	Packet->Compress(SerializedData);
+
+	const auto SerializedDataSize = SerializedData.Num();
 
 	auto PendingSend = FPendingSend{
 		PacketIdCounter++,
@@ -328,18 +361,47 @@ void UPlayerNetwork::SendToClient(UNetworkPacket* Packet)
 		MoveTemp(SerializedData),
 	};
 	PendingSend.LastOffset = PendingSend.Data.Num() / ChunkSize * ChunkSize;
-	PendingSends.Add(PendingSend.PacketId, PendingSend);
 
-	Cl_SendPacketHeader(PendingSend);
+	if (bClientNetReady)
+	{
+		PendingSends.Add(PendingSend.PacketId, PendingSend);
+		Cl_SendPacketHeader(PendingSend);
 
-	UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sending packet to player: PacketId=%u, Size=%d, PacketType=%s"), 
-		PacketIdCounter - 1, SerializedData.Num(), *Packet->GetClass()->GetName());
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sent packet header to player: PacketId=%u, Size=%d, PacketType=%s"), 
+			PacketIdCounter - 1, SerializedDataSize, *Packet->GetClass()->GetName());
+	} else
+	{
+		PlayerNotReadyWaitingSends.Add(MoveTemp(PendingSend));
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("Player not ready to receive packets, queuing packet: PacketId=%u, Size=%d, PacketType=%s"), 
+			PacketIdCounter - 1, SerializedDataSize, *Packet->GetClass()->GetName());
+	}
 }
 
 void UPlayerNetwork::HandleConfirmedPacket(const uint32 PacketId)
 {
 	UE_LOG(LogPlayerNetwork, Verbose, TEXT("Packet confirmed to be received by counterpart: PacketId=%u"), PacketId);
 	PendingSends.Remove(PacketId);
+}
+
+void UPlayerNetwork::NotifyClientNetReady_Implementation()
+{
+	UE_LOG(LogPlayerNetwork, Log, TEXT("Client %s notified server that is ready to receive packets."), *LocalPlayerState->GetPlayerName());
+	if (bClientNetReady)
+	{
+		return;
+	}
+	
+	bClientNetReady = true;
+
+	for (auto& PendingSend : PlayerNotReadyWaitingSends)
+	{
+		const auto& MovedPendingSend = PendingSends.Add(PendingSend.PacketId, MoveTemp(PendingSend));
+		Cl_SendPacketHeader(MovedPendingSend);
+
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sent queued (waiting for ready) packet header to player: PacketId=%u, Size=%d, PacketType=%s"), 
+			MovedPendingSend.PacketId, MovedPendingSend.Data.Num(), *MovedPendingSend.PacketType->GetName());
+	}
+	PlayerNotReadyWaitingSends.Empty();
 }
 
 void UPlayerNetwork::TickComponent(float DeltaTime, ELevelTick TickType,

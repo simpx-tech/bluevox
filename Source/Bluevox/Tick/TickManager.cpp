@@ -190,3 +190,7 @@ void UTickManager::Th_ScheduleFn(TFunction<void()>&& Func)
 	ScheduledFns.Enqueue(MoveTemp(Func));
 }
 
+ETickableTickType UTickManager::GetTickableTickType() const
+{
+	return HasAnyFlags(RF_ClassDefaultObject) ? ETickableTickType::Never : ETickableTickType::Always;
+}

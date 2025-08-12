@@ -16,6 +16,7 @@ struct FPendingReceive : public FPacketHeader
 	explicit FPendingReceive(const FPacketHeader& Header)
 		: FPacketHeader(Header)
 	{
+		Data.SetNumUninitialized(Header.TotalSize);
 	}
 
 	UPROPERTY()

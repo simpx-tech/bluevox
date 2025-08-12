@@ -75,6 +75,8 @@ public:
 	void RunAsyncThen(AsyncFunc&& AsyncFn, ThenFunc&& ThenFn);
 
 	void Th_ScheduleFn(TFunction<void()>&& Func);
+
+	virtual ETickableTickType GetTickableTickType() const override;
 };
 
 template<class A, class T>

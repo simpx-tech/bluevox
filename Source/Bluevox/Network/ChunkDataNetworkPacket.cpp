@@ -3,11 +3,24 @@
 
 #include "ChunkDataNetworkPacket.h"
 
+#include "Bluevox/Chunk/ChunkRegistry.h"
+#include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/Data/ChunkData.h"
+#include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
+#include "Bluevox/Chunk/VirtualMap/VirtualMapTaskManager.h"
+#include "Bluevox/Game/GameManager.h"
 
 void UChunkDataNetworkPacket::OnReceive(AGameManager* GameManager)
 {
-	// DEV save to ChunkRegistry + Start spawn chunk process (?)
+	UE_LOG(LogChunk, Verbose, TEXT("Received chunk data packet with %d chunks"), Data.Num());
+	const auto VirtualMapTaskManager = GameManager->VirtualMap->TaskManager;
+	const auto ChunkRegistry = GameManager->ChunkRegistry;
+
+	for (auto& DataWithPosition : Data)
+	{
+		VirtualMapTaskManager->WaitingToBeSent.Remove(DataWithPosition.Position);
+		ChunkRegistry->Th_RegisterChunk(DataWithPosition.Position, NewObject<UChunkData>()->Init(MoveTemp(DataWithPosition.Columns)));
+	}
 }
 
 void UChunkDataNetworkPacket::Serialize(FArchive& Ar)
@@ -15,12 +28,7 @@ void UChunkDataNetworkPacket::Serialize(FArchive& Ar)
 	Super::Serialize(Ar);
 	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
-		ChunkData->Serialize(Ar);
+		Ar << Data;
 	}
 }
 
-UChunkDataNetworkPacket* UChunkDataNetworkPacket::Init(UChunkData* InData)
-{
-	ChunkData = InData;
-	return this;
-}

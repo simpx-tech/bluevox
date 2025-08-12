@@ -101,7 +101,7 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 			ScheduleLoad.Add(ChunkPosition);
 		}
 
-		if (!IsLocalPlayer)
+		if (!IsLocalPlayer && bServer)
 		{
 			ScheduleSend.Add(ChunkPosition);
 		}
@@ -127,7 +127,7 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 
 		ScheduleRender.Add(ChunkPosition);
 
-		if (!IsLocalPlayer)
+		if (!IsLocalPlayer && bServer)
 		{
 			ScheduleSend.Add(ChunkPosition);
 		}
@@ -135,7 +135,7 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 
 	TaskManager->ScheduleLoad(ScheduleLoad);
 	TaskManager->ScheduleRender(ScheduleRender);
-	TaskManager->ScheduleNetSend(Controller, ScheduleSend);
+	TaskManager->Sv_ScheduleNetSend(Controller, ScheduleSend);
 }
 
 void UVirtualMap::HandleStateUpdate(const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad)
@@ -210,8 +210,9 @@ void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
-	TaskManager = NewObject<UVirtualMapTaskManager>(this, TEXT("VirtualMapTaskManager"));
+	TaskManager = NewObject<UVirtualMapTaskManager>(this);
 	TaskManager->Init(InGameManager);
+	bServer = InGameManager->bServer;
 	return this;
 }
 
@@ -239,7 +240,7 @@ void UVirtualMap::UnregisterPlayer(const AMainController* Player)
 	RemovePlayerFromChunks(Player, LoadChunks, LiveChunks);
 }
 
-void UVirtualMap::UpdateFarDistanceForPlayer(const AMainController* Player,
+void UVirtualMap::Sv_UpdateFarDistanceForPlayer(const AMainController* Player,
 	const int32 OldFarDistance, const int32 NewFarDistance)
 {
 	// DEV
@@ -262,4 +263,9 @@ void UVirtualMap::Tick(float DeltaTime)
 TStatId UVirtualMap::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UVirtualMap, STATGROUP_Tickables);
+}
+
+ETickableTickType UVirtualMap::GetTickableTickType() const
+{
+	return HasAnyFlags(RF_ClassDefaultObject) ? ETickableTickType::Never : ETickableTickType::Always;
 }

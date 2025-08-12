@@ -6,6 +6,7 @@
 #include "EnhancedInputSubsystems.h"  
 #include "EnhancedInputComponent.h"
 #include "GameManager.h"
+#include "Bluevox/Network/PlayerNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 
@@ -55,6 +56,13 @@ void AMainCharacter::BeginPlay()
 void AMainCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
+}
+
+void AMainCharacter::PossessedBy(AController* NewController)
+{
+	Super::PossessedBy(NewController);
+
+	UE_LOG(LogTemp, Warning, TEXT("Pawn possessed by controller: %s"), *NewController->GetName());
 }
 
 // Called to bind functionality to input

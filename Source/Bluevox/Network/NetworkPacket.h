@@ -22,4 +22,6 @@ public:
 
 	UFUNCTION(BlueprintCallable, Category = "Network")
 	virtual void OnReceive(AGameManager* GameManager);
+
+	virtual void Serialize(FArchive& Ar) override;
 };

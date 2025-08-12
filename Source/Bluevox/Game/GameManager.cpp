@@ -72,21 +72,26 @@ void AGameManager::BeginPlay()
 		WorldSave->WorldGenerator = WorldGeneratorOverride->Init(this);
 	}
 
-	if (LocalController)
+	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 	{
-		LocalController->GameManager = this;
-		LocalController->PlayerNetwork->Init(this, LocalController, LocalPlayerState);
-		// DEV DisableInput(this);
-
-		if (bServer)
+		AMainController* PC = Cast<AMainController>(Iterator->Get());
+		if (PC)
 		{
-			WorldSave->LoadPlayer(LocalController);
+			PC->GameManager = this;
+			PC->PlayerNetwork->Init(this, PC, LocalPlayerState);
 
+			if (bServer)
+			{
+				WorldSave->LoadPlayer(PC);
+			}
+			
 			if (bAutomaticallyRegisterPlayer)
 			{
-				VirtualMap->RegisterPlayer(LocalController);	
+				VirtualMap->RegisterPlayer(PC);			
 			}
-		}	
+		}
 	}
+
+	bInitialized = true;
 }
 

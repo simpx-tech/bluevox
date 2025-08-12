@@ -78,13 +78,15 @@ public:
 	UInputMappingContext* DefaultInputContext;
 
 	virtual void BeginPlay() override;
+
+	virtual void OnRep_PlayerState() override;
 	
 	UFUNCTION(BlueprintCallable)
 	void SetServerReady(bool bReady);
 
 	UFUNCTION(BlueprintCallable)
 	void SetClientReady(bool bReady);
-
+	
 	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void Serialize(FArchive& Ar) override;

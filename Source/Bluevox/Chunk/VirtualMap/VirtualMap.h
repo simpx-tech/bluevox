@@ -20,6 +20,7 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	GENERATED_BODY()
 
 	friend class UVirtualMapTaskManager;
+	friend class UChunkDataNetworkPacket;
 
 	UPROPERTY()
 	TMap<const AMainController*, FChunkPosition> ChunkPositionByPlayer;
@@ -44,6 +45,9 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 
 	UPROPERTY()
 	class AGameManager* GameManager = nullptr;
+
+	UPROPERTY()
+	bool bServer = false;
 	
 public:
 	UVirtualMap* Init(AGameManager* InGameManager);
@@ -52,9 +56,11 @@ public:
 
 	void UnregisterPlayer(const AMainController* Player);
 
-	void UpdateFarDistanceForPlayer(const AMainController* Player, const int32 OldFarDistance, const int32 NewFarDistance);
+	void Sv_UpdateFarDistanceForPlayer(const AMainController* Player, const int32 OldFarDistance, const int32 NewFarDistance);
 
 	virtual void Tick(float DeltaTime) override;
 
 	virtual TStatId GetStatId() const override;
+
+	virtual ETickableTickType GetTickableTickType() const override;
 };
