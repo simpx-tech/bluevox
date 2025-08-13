@@ -3,6 +3,12 @@
 
 #include "ChunkData.h"
 
+void UChunkData::BeginDestroy()
+{
+	UE_LOG(LogTemp, Verbose, TEXT("UChunkData::BeginDestroy called for ChunkData %p"), this);
+	UObject::BeginDestroy();
+}
+
 void UChunkData::Serialize(FArchive& Ar)
 {
 	UObject::Serialize(Ar);

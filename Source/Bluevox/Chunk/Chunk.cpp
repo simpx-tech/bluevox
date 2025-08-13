@@ -31,10 +31,10 @@ AChunk::AChunk()
 void AChunk::SetRenderState(const EChunkState State) const
 {
 	UE_LOG(LogChunk, Verbose, TEXT("SetRenderState for chunk %s to %s"), *Position.ToString(), *UEnum::GetValueAsString(State));
-	const auto Visible = EnumHasAnyFlags(State, EChunkState::Live);
+	const auto Visible = EnumHasAllFlags(State, EChunkState::Visible);
 	MeshComponent->SetVisibility(Visible);
 
-	const auto Collision = EnumHasAnyFlags(State, EChunkState::Collision);
+	const auto Collision = EnumHasAllFlags(State, EChunkState::Collision);
 	MeshComponent->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 }
 
@@ -52,8 +52,6 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	{
 		return false;
 	}
-
-	ChunkRegistry->LockForRender(Position);
 	
 	OutMesh.EnableAttributes();
 	OutMesh.Attributes()->SetNumUVLayers(2);
@@ -219,9 +217,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	}
 
 	RenderedAtDirtyChanges.Set(Data->Changes);
-
-	ChunkRegistry->ReleaseForRender(Position);
-
+	
 	const auto End = FPlatformTime::Cycles64();
 	UE_LOG(LogChunk, Verbose, TEXT("Chunk %s rendered in %f ms"), *Position.ToString(),
 		FPlatformTime::ToMilliseconds64(End - Start));

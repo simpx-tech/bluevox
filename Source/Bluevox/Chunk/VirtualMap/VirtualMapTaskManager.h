@@ -49,18 +49,12 @@ struct FProcessingRender
 	int32 PendingTasks = 0;
 };
 
-USTRUCT(BlueprintType)
 struct FPendingNetSendChunks
 {
-	GENERATED_BODY()
-	
-	UPROPERTY()
 	TArray<FChunkPosition> ToSend;
 
-	UPROPERTY()
 	TSet<FChunkPosition> WaitingFor;
 
-	UPROPERTY()
 	const AMainController* Player = nullptr;
 };
 
@@ -98,21 +92,24 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	/**
 	 * List of chunks together which are pending to be sent to the client.
 	 */
-	TSparseArray<FPendingNetSendChunks> PendingNetSendPackets;
+	TSparseArray<FPendingNetSendChunks> PendingPackets;
 
 	/**
 	 * Mapping from the chunk position to a list of pending net packets is an array
 	 * because a chunk can be requested by multiple players.
 	 */
-	TMap<FChunkPosition, TArray<int32>> PendingNetSendPacketByPosition;
+	TMap<FChunkPosition, TArray<int32>> PendingPacketsByPosition;
 	
 	UPROPERTY()
 	AGameManager* GameManager = nullptr;
 
-	void Sv_ProcessPendingNetSend(FPendingNetSendChunks&& PendingNetSend) const;
+	void Sv_ProcessPendingNetSend(const FPendingNetSendChunks& PendingNetSend) const;
 	
 public:
 	UVirtualMapTaskManager* Init(AGameManager* InGameManager);
+
+	UFUNCTION()
+	void HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Packet);
 	
 	UFUNCTION()
 	void ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad);

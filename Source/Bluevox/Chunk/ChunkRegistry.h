@@ -29,13 +29,17 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	
 	TMap<FRegionPosition, TSharedPtr<FRegionFile>> Regions;
 
+	UPROPERTY()
 	TMap<FRegionPosition, int32> LoadedByRegion;
 
 	FRWLock RegionsLock;
 
 	UPROPERTY()
+	bool bServer = false;
+
+	UPROPERTY()
 	AGameManager* GameManager;
-	
+
 	UPROPERTY()
 	TMap<FChunkPosition, UChunkData*> ChunksData;
 
@@ -43,6 +47,12 @@ class BLUEVOX_API UChunkRegistry : public UObject
 
 	UPROPERTY()
 	TMap<FChunkPosition, AChunk*> ChunkActors;
+
+	UPROPERTY()
+	TMap<FChunkPosition, uint16> ChunksMarkedForUse;  
+  
+	UPROPERTY()
+	TSet<FChunkPosition> ChunksScheduledToRemove;
 	
 public:
 	UChunkRegistry* Init(AGameManager* InGameManager);
@@ -55,11 +65,11 @@ public:
 
 	FChunkColumn& Th_GetColumn(const FColumnPosition& GlobalColPosition);
 
-	void UnregisterChunk(const FChunkPosition& Position);
+	void Th_UnregisterChunk(const FChunkPosition& Position);
 
 	void LockForRender(const FChunkPosition& Position);
 
-	void ReleaseForRender(const FChunkPosition& Position);
+	void UnlockForRender(const FChunkPosition& Position);
 	
 	UFUNCTION()
 	UChunkData* Th_GetChunkData(const FChunkPosition& Position);

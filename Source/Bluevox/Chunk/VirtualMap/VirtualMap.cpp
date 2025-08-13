@@ -3,28 +3,31 @@
 
 #include "VirtualMap.h"
 
+#include "LogVirtualMap.h"
 #include "VirtualMapStats.h"
 #include "VirtualMapTaskManager.h"
 #include "Bluevox/Chunk/ChunkHelper.h"
-#include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/MainController.h"
 
 void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToRemoveLoad, const TSet<FChunkPosition>& ToRemoveLive)
 {
+	UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Removing player %s from chunks. Load: %d, Live: %d"), 
+		*Controller->GetName(), ToRemoveLoad.Num(), ToRemoveLive.Num());
 	TSet<FChunkPosition> ToUnload;
 	TSet<FChunkPosition> ToRender;
 
 	const auto IsLocalPlayer = GameManager->LocalController == Controller;
 	for (const auto& LivePosition : ToRemoveLive)
 	{
+		UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Removing player %s from Live chunk %s"), *Controller->GetName(), *LivePosition.ToString());
 		if (VirtualChunks.Contains(LivePosition))
 		{
 			auto& VirtualChunk = VirtualChunks[LivePosition];
 			if (IsLocalPlayer)
 			{
-				VirtualChunk.bLocal = false;
+				VirtualChunk.bLiveLocal = false;
 			}
 
 			VirtualChunk.LiveForCount--;
@@ -38,22 +41,23 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 				VirtualChunks.Remove(LivePosition);
 				ToUnload.Add(LivePosition);
 			}
+
+			UE_LOG(LogVirtualMap, VeryVerbose, TEXT("After remove player %s from Live chunk %s: State: %s, LiveFor: %d, LoadedFor: %d, bLocal: %d"), *Controller->GetName(), *LivePosition.ToString(), 
+				*UEnum::GetValueAsString(VirtualChunk.State), VirtualChunk.LiveForCount, VirtualChunk.LoadedForCount, VirtualChunk.bLiveLocal);
 		} else
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Trying to remove player %s from chunk %s, but chunk does not exist!"),
+			UE_LOG(LogVirtualMap, Warning, TEXT("Trying to remove player %s from chunk %s, but chunk does not exist!"),
 				*Controller->GetName(), *LivePosition.ToString());
 		}
 	}
 
 	for (const auto& LoadPosition : ToRemoveLoad)
 	{
+		UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Removing player %s from Load chunk %s"), *Controller->GetName(), *LoadPosition.ToString());
+		
 		if (VirtualChunks.Contains(LoadPosition))
 		{
 			auto& VirtualChunk = VirtualChunks[LoadPosition];
-			if (IsLocalPlayer)
-			{
-				VirtualChunk.bLocal = false;
-			}
 
 			VirtualChunk.LoadedForCount--;
 
@@ -66,9 +70,12 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 				VirtualChunks.Remove(LoadPosition);
 				ToUnload.Add(LoadPosition);
 			}
+
+			UE_LOG(LogVirtualMap, VeryVerbose, TEXT("After remove player %s from Load chunk %s: State: %s, LiveFor: %d, LoadedFor: %d, bLocal: %d"), *Controller->GetName(), *LoadPosition.ToString(),
+				*UEnum::GetValueAsString(VirtualChunk.State), VirtualChunk.LiveForCount, VirtualChunk.LoadedForCount, VirtualChunk.bLiveLocal);
 		} else
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Trying to remove player %s from chunk %s, but chunk does not exist!"),
+			UE_LOG(LogVirtualMap, Warning, TEXT("Trying to remove player %s from chunk %s, but chunk does not exist!"),
 				*Controller->GetName(), *LoadPosition.ToString());
 		}
 	}
@@ -77,7 +84,7 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 }
 
 void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
-	const TSet<FChunkPosition>& ToLoad, const TSet<FChunkPosition>& ToLoadAndRender)
+	const TSet<FChunkPosition>& ToLoad, const TSet<FChunkPosition>& ToLive)
 {
 	TSet<FChunkPosition> ScheduleLoad;
 	TSet<FChunkPosition> ScheduleRender;
@@ -86,19 +93,27 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 	const auto IsLocalPlayer = GameManager->LocalController == Controller;
 	for (const auto& ChunkPosition : ToLoad)
 	{
+		UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Adding player %s to Load chunk %s"), *Controller->GetName(), *ChunkPosition.ToString());
+		
 		if (VirtualChunks.Contains(ChunkPosition))
 		{
 			auto& VirtualChunk = VirtualChunks[ChunkPosition];
 			VirtualChunk.LoadedForCount++;
-			VirtualChunk.bLocal = VirtualChunk.bLocal || IsLocalPlayer;
+
+			UE_LOG(LogVirtualMap, VeryVerbose, TEXT("After add player %s to Load chunk %s: State: %s, LiveFor: %d, LoadedFor: %d"), *Controller->GetName(), *ChunkPosition.ToString(),
+				*UEnum::GetValueAsString(VirtualChunk.State), VirtualChunk.LiveForCount, VirtualChunk.LoadedForCount);
 		} else
 		{
 			FVirtualChunk NewVirtualChunk;
 			NewVirtualChunk.LoadedForCount = 1;
 			NewVirtualChunk.State = EChunkState::None;
-			NewVirtualChunk.bLocal = IsLocalPlayer;
+			NewVirtualChunk.bLiveLocal = false;
 			VirtualChunks.Add(ChunkPosition, NewVirtualChunk);
 			ScheduleLoad.Add(ChunkPosition);
+
+			UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Added new Load chunk %s for player %s, State: %s, LiveFor: %d, LoadedFor: %d, bLocal: %d"),
+				*ChunkPosition.ToString(), *Controller->GetName(),
+				*UEnum::GetValueAsString(NewVirtualChunk.State), NewVirtualChunk.LiveForCount, NewVirtualChunk.LoadedForCount, NewVirtualChunk.bLiveLocal);
 		}
 
 		if (!IsLocalPlayer && bServer)
@@ -107,22 +122,36 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 		}
 	}
 
-	for (const auto& ChunkPosition : ToLoadAndRender)
+	for (const auto& ChunkPosition : ToLive)
 	{
+		UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Adding player %s to Live chunk %s"), *Controller->GetName(), *ChunkPosition.ToString());
+		
 		if (VirtualChunks.Contains(ChunkPosition))
 		{
 			auto& VirtualChunk = VirtualChunks[ChunkPosition];
 			VirtualChunk.LiveForCount++;
-			VirtualChunk.State = IsLocalPlayer ? EChunkState::Live : EChunkState::RemoteLive;
-			VirtualChunk.bLocal = VirtualChunk.bLocal || IsLocalPlayer;
+
+			if (IsLocalPlayer)
+			{
+				VirtualChunk.bLiveLocal = true;
+			}
+			
+			VirtualChunk.RecalculateState();
+
+			UE_LOG(LogVirtualMap, VeryVerbose, TEXT("After add player %s to Live chunk %s: State: %s, LiveFor: %d, LoadedFor: %d, bLocal: %d"), *Controller->GetName(), *ChunkPosition.ToString(),
+				*UEnum::GetValueAsString(VirtualChunk.State), VirtualChunk.LiveForCount, VirtualChunk.LoadedForCount, VirtualChunk.bLiveLocal);
 		} else
 		{
 			FVirtualChunk NewVirtualChunk;
 			NewVirtualChunk.LiveForCount = 1;
 			NewVirtualChunk.State = IsLocalPlayer ? EChunkState::Live : EChunkState::RemoteLive;
-			NewVirtualChunk.bLocal = IsLocalPlayer;
+			NewVirtualChunk.bLiveLocal = IsLocalPlayer;
 			VirtualChunks.Add(ChunkPosition, NewVirtualChunk);
 			ScheduleLoad.Add(ChunkPosition);
+
+			UE_LOG(LogVirtualMap, VeryVerbose, TEXT("Added new Live chunk %s for player %s, State: %s, LiveFor: %d, LoadedFor: %d, bLocal: %d"),
+				*ChunkPosition.ToString(), *Controller->GetName(),
+				*UEnum::GetValueAsString(NewVirtualChunk.State), NewVirtualChunk.LiveForCount, NewVirtualChunk.LoadedForCount, NewVirtualChunk.bLiveLocal);
 		}
 
 		ScheduleRender.Add(ChunkPosition);
@@ -138,8 +167,9 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 	TaskManager->Sv_ScheduleNetSend(Controller, ScheduleSend);
 }
 
-void UVirtualMap::HandleStateUpdate(const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad)
+void UVirtualMap::HandleStateUpdate(const AMainController* Controller, const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad)
 {
+	const auto IsLocalPlayer = GameManager->LocalController == Controller;
 	for (const auto& Pos : LoadToLive)
 	{
 		if (VirtualChunks.Contains(Pos))
@@ -147,10 +177,14 @@ void UVirtualMap::HandleStateUpdate(const TSet<FChunkPosition>& LoadToLive, cons
 			auto& VirtualChunk = VirtualChunks[Pos];
 			VirtualChunk.LoadedForCount--;
 			VirtualChunk.LiveForCount++;
+			if (IsLocalPlayer)
+			{
+				VirtualChunk.bLiveLocal = true;
+			}
 			VirtualChunk.RecalculateState();
 		} else
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Trying to update state for chunk %s to Live, but chunk does not exist!"),
+			UE_LOG(LogVirtualMap, Warning, TEXT("Trying to update state for chunk %s to Live, but chunk does not exist!"),
 				*Pos.ToString());
 		}
 	}
@@ -162,10 +196,14 @@ void UVirtualMap::HandleStateUpdate(const TSet<FChunkPosition>& LoadToLive, cons
 			auto& VirtualChunk = VirtualChunks[Pos];
 			VirtualChunk.LiveForCount--;
 			VirtualChunk.LoadedForCount++;
+			if (IsLocalPlayer)
+			{
+				VirtualChunk.bLiveLocal = false;
+			}
 			VirtualChunk.RecalculateState();
 		} else
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Trying to update state for chunk %s to CollisionOnly, but chunk does not exist!"),
+			UE_LOG(LogVirtualMap, Warning, TEXT("Trying to update state for chunk %s to CollisionOnly, but chunk does not exist!"),
 				*Pos.ToString());
 		}
 	}
@@ -199,12 +237,12 @@ void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 	const auto RemovedLoad = OldLoad.Difference(AllCur);
 	const auto RemovedLive = OldLive.Difference(AllCur);
 
-	UE_LOG(LogChunk, Verbose, TEXT("Player %s moved from %s to %s. Added Load: %d, Added Live: %d, LoadToLive: %d, LiveToLoad: %d, RemovedLoad: %d, RemovedLive: %d"),
+	UE_LOG(LogVirtualMap, Verbose, TEXT("Player %s moved from %s to %s. Added Load: %d, Added Live: %d, LoadToLive: %d, LiveToLoad: %d, RemovedLoad: %d, RemovedLive: %d"),
 		*Controller->GetName(), *OldPosition.ToString(), *NewPosition.ToString(), AddedLoad.Num(), AddedLive.Num(), LoadToLive.Num(), LiveToLoad.Num(), RemovedLoad.Num(), RemovedLive.Num());
 
 	AddPlayerToChunks(Controller, AddedLoad, AddedLive);
 	RemovePlayerFromChunks(Controller, RemovedLoad, RemovedLive);
-	HandleStateUpdate(LoadToLive, LiveToLoad);
+	HandleStateUpdate(Controller, LoadToLive, LiveToLoad);
 }
 
 UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
@@ -225,6 +263,9 @@ void UVirtualMap::RegisterPlayer(const AMainController* Player)
 	TSet<FChunkPosition> LiveChunks;
 	UChunkHelper::GetChunksAroundLoadAndLive(GlobalPosition, Player->GetFarDistance(), LoadChunks, LiveChunks);
 
+	UE_LOG(LogVirtualMap, Verbose, TEXT("Registering player %s at position %s with far distance %d"),
+		*Player->GetName(), *GlobalPosition.ToString(), Player->GetFarDistance());
+	
 	AddPlayerToChunks(Player, LoadChunks, LiveChunks);
 }
 

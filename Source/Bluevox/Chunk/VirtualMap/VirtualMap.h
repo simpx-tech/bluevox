@@ -8,7 +8,6 @@
 #include "UObject/Object.h"
 #include "VirtualMap.generated.h"
 
-class UVirtualMapTaskManager;
 class AMainController;
 
 /**
@@ -35,10 +34,10 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	void RemovePlayerFromChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToRemoveLoad, const TSet<FChunkPosition>& ToRemoveLive);
 
 	UFUNCTION()
-	void AddPlayerToChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToLoad, const TSet<FChunkPosition>& ToLoadAndRender);
+	void AddPlayerToChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToLoad, const TSet<FChunkPosition>& ToLive);
 
 	UFUNCTION()
-	void HandleStateUpdate(const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad);
+	void HandleStateUpdate(const AMainController* Controller, const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad);
 	
 	UFUNCTION()
 	void HandlePlayerMovement(const AMainController* Controller, const FChunkPosition& OldPosition, const FChunkPosition& NewPosition);

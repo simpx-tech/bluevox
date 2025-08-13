@@ -75,6 +75,8 @@ void UPlayerNetwork::HandlePacketHeader(const FPacketHeader& PacketHeader)
 
 	if (UnknownChunks.Contains(PacketHeader.PacketId))
 	{
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("Processing %d previous unknown chunks for PacketId=%u"),
+			UnknownChunks[PacketHeader.PacketId].Num(), PacketHeader.PacketId);
 		for (const auto& Chunk : UnknownChunks[PacketHeader.PacketId])
 		{
 			HandlePacketChunk(Chunk);
@@ -99,8 +101,6 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 		PacketChunk.Index = PendingSend.Offset / ChunkSize;
 		FMemory::Memcpy(PacketChunk.Data.GetData(), PendingSend.Data.GetData() + PendingSend.Offset, SizeToCopy);
 
-		// DEV temp for debugging resend
-		PendingSend.Offset += SizeToCopy;
 		SentThisSecond += SizeToCopy;
 	
 		if (bServer)

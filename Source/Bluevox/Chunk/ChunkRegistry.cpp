@@ -13,6 +13,7 @@
 UChunkRegistry* UChunkRegistry::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
+	bServer = GameManager->bServer;
 	return this;
 }
 
@@ -54,6 +55,12 @@ AChunk* UChunkRegistry::SpawnChunk(const FChunkPosition Position)
 		return ChunkActors[Position];
 	}
 
+	if (!Th_HasChunkData(Position))
+	{
+		UE_LOG(LogChunk, Error, TEXT("Trying to spawn chunk actor for position %s, but chunk data does not exist!"), *Position.ToString());
+		return nullptr;
+	}
+
 	const auto Chunk = GetWorld()->SpawnActor<AChunk>(
 		AChunk::StaticClass(),
 		FVector(
@@ -82,9 +89,16 @@ FChunkColumn& UChunkRegistry::Th_GetColumn(const FColumnPosition& GlobalColPosit
 	return ChunksData[ChunkPos]->GetColumn(LocalColPosition);
 }
 
-void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
+void UChunkRegistry::Th_UnregisterChunk(const FChunkPosition& Position)
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Unregistering chunk at position %s"), *Position.ToString());
+
+	if (ChunksMarkedForUse.Contains(Position))
+	{
+		UE_LOG(LogChunk, Verbose, TEXT("Chunk %s is marked for use, scheduling removal later."), *Position.ToString());
+		ChunksScheduledToRemove.Add(Position);
+		return;
+	}
 	
 	if (ChunkActors.Contains(Position))
 	{
@@ -119,20 +133,74 @@ void UChunkRegistry::UnregisterChunk(const FChunkPosition& Position)
 
 void UChunkRegistry::LockForRender(const FChunkPosition& Position)
 {
-	Th_GetChunkData(Position)->Lock.ReadLock();
-	Th_GetChunkData(Position + FChunkPosition{0, 1})->Lock.ReadLock();
-	Th_GetChunkData(Position + FChunkPosition{0, -1})->Lock.ReadLock();
-	Th_GetChunkData(Position + FChunkPosition{1, 0})->Lock.ReadLock();
-	Th_GetChunkData(Position + FChunkPosition{-0, 0})->Lock.ReadLock();
+	static const std::array Offsets = {
+		FChunkPosition{0, 0},
+		FChunkPosition{0, 1},
+		FChunkPosition{0, -1},
+		FChunkPosition{1, 0},
+		FChunkPosition{-1, 0}
+	};
+	
+	{
+		FReadScopeLock Lock(ChunksDataLock);
+
+		for (const auto& Offset : Offsets)
+		{
+			ChunksData.FindRef(Position + Offset)->Lock.ReadLock();
+		}
+	}
+
+	{
+		FWriteScopeLock WriteLock(ChunksDataLock);
+		for (const auto& Offset : Offsets)
+		{
+			ChunksMarkedForUse.FindOrAdd(Position + Offset) += 1;
+		}
+	}
 }
 
-void UChunkRegistry::ReleaseForRender(const FChunkPosition& Position)
+void UChunkRegistry::UnlockForRender(const FChunkPosition& Position)
 {
-	Th_GetChunkData(Position)->Lock.ReadUnlock();
-	Th_GetChunkData(Position + FChunkPosition{0, 1})->Lock.ReadUnlock();
-	Th_GetChunkData(Position + FChunkPosition{0, -1})->Lock.ReadUnlock();
-	Th_GetChunkData(Position + FChunkPosition{1, 0})->Lock.ReadUnlock();
-	Th_GetChunkData(Position + FChunkPosition{-0, 0})->Lock.ReadUnlock();
+	TArray<FChunkPosition> RemoveChunksMarkedForUse;
+
+	{
+		FReadScopeLock Lock(ChunksDataLock);
+	
+		static const std::array Offsets = {
+			FChunkPosition{0, 0},
+			FChunkPosition{0, 1},
+			FChunkPosition{0, -1},
+			FChunkPosition{1, 0},
+			FChunkPosition{-1, 0}
+		};
+		
+		for (const auto& Offset : Offsets)
+		{
+			ChunksData.FindRef(Position + Offset)->Lock.ReadUnlock();
+			if (ChunksMarkedForUse.Contains(Position + Offset))
+			{
+				auto& AmountMarkedForUse = *ChunksMarkedForUse.Find(Position + Offset);
+				AmountMarkedForUse -= 1;
+				
+				if (AmountMarkedForUse <= 0)
+				{
+					RemoveChunksMarkedForUse.Add(Position + Offset);
+				}
+			}
+		}
+	}
+
+	for (const auto& ChunkPosition : RemoveChunksMarkedForUse)
+	{
+		UE_LOG(LogChunk, Verbose, TEXT("Chunk %s is no longer marked for use."), *ChunkPosition.ToString());
+		ChunksMarkedForUse.Remove(ChunkPosition);
+		if (ChunksScheduledToRemove.Contains(ChunkPosition))
+		{
+			UE_LOG(LogChunk, Verbose, TEXT("Chunk %s was scheduled for removal, removing now."), *ChunkPosition.ToString());
+			Th_UnregisterChunk(ChunkPosition);
+			ChunksScheduledToRemove.Remove(ChunkPosition);
+		}
+	}
 }
 
 UChunkData* UChunkRegistry::Th_GetChunkData(const FChunkPosition& Position)
@@ -146,11 +214,12 @@ void UChunkRegistry::Th_RegisterChunk(const FChunkPosition& Position, UChunkData
 	UE_LOG(LogChunk, Verbose, TEXT("Registering chunk data for position %s"), *Position.ToString());
 	FWriteScopeLock Lock(ChunksDataLock);
 
-	if (!ChunksData.Contains(Position))
+	if (!ChunksData.Contains(Position) && bServer)
 	{
 		LoadedByRegion.FindOrAdd(FRegionPosition::FromChunkPosition(Position)) += 1;
 	}
-	
+
+	ChunksScheduledToRemove.Remove(Position);
 	ChunksData.Add(Position, Data);
 }
 

@@ -17,7 +17,7 @@
 #include "Bluevox/Tick/TickManager.h"
 #include "DynamicMesh/DynamicMesh3.h"
 
-void UVirtualMapTaskManager::Sv_ProcessPendingNetSend(FPendingNetSendChunks&& PendingNetSend) const
+void UVirtualMapTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunks& PendingNetSend) const
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Processing pending net send for player %s, sending %d chunks"),
 		*PendingNetSend.Player->GetName(), PendingNetSend.ToSend.Num());
@@ -50,11 +50,57 @@ UVirtualMapTaskManager* UVirtualMapTaskManager::Init(AGameManager* InGameManager
 	return this;
 }
 
+void UVirtualMapTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Packet)
+{
+	const auto ChunkRegistry = GameManager->ChunkRegistry;
+	UE_LOG(LogChunk, Verbose, TEXT("Handling chunk data network packet with %d chunks"), Packet->Data.Num());
+	const auto TickManager = GameManager->TickManager;
+	for (auto& ChunkData : Packet->Data)
+	{
+		const auto ChunkPosition = ChunkData.Position;
+
+		if (!WaitingToBeSent.Contains(ChunkPosition))
+		{
+			// DEV temp
+			// UE_LOG(LogChunk, Warning, TEXT("Received chunk data for chunk %s, but it was not in the waiting list!"), *ChunkPosition.ToString());
+			// continue;
+		}
+
+		WaitingToBeSent.Remove(ChunkPosition);
+		
+		if (ChunkRegistry->Th_HasChunkData(ChunkPosition))
+		{
+			UE_LOG(LogChunk, Warning, TEXT("Received chunk data for chunk %s, but it already exists!"), *ChunkPosition.ToString());
+			continue;
+		}
+
+		if (ProcessingUnload.Contains(ChunkPosition))
+		{
+			UE_LOG(LogChunk, Warning, TEXT("Received chunk data for chunk %s, but it is being unloaded! Ignoring the data."), *ChunkPosition.ToString());
+			continue;
+		}
+
+		auto* ChunkDataObject = NewObject<UChunkData>(ChunkRegistry);
+		ChunkDataObject->Init(MoveTemp(ChunkData.Columns));
+		ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkDataObject);
+
+		// Prevent stuttering the game
+		TickManager->Th_ScheduleFn([this, ChunkPosition, ChunkRegistry]
+		{
+			if (!ProcessingUnload.Contains(ChunkPosition))
+			{
+				ChunkRegistry->SpawnChunk(ChunkPosition);	
+			}
+		});
+	}
+}
+
 void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 {
 	if (!bServer)
 	{
 		UE_LOG(LogChunk, Warning, TEXT("Adding %d chunks to wait queue, waiting them to be sent from the server"), ChunksToLoad.Num());
+		// DEV only add if not already exists
 		WaitingToBeSent.Append(ChunksToLoad);
 		return;
 	}
@@ -87,11 +133,11 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 
 				if (ProcessingLoad.FindRef(ChunkPosition) == true)
 				{
-					const auto ChunkData = NewObject<UChunkData>();
+					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry);
 					ChunkData->Columns = MoveTemp(Result.Columns);
 					GameManager->ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkData);
 
-					if (PendingNetSendPacketByPosition.Contains(ChunkPosition))
+					if (PendingPacketsByPosition.Contains(ChunkPosition))
 					{
 						UE_LOG(LogChunk, VeryVerbose, TEXT("Chunk %s has PendingNetSend"), *ChunkPosition.ToString());
 						if (
@@ -99,21 +145,19 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 							)
 						{
 							TArray<int32> ToRemove;
-							for (const auto& PendingIndex : PendingNetSendPacketByPosition[ChunkPosition])
+							for (const auto& PackageIndex : PendingPacketsByPosition[ChunkPosition])
 							{
-								auto& PendingNetSend = PendingNetSendPackets[PendingIndex];
-								PendingNetSend.WaitingFor.Remove(ChunkPosition);
-								if (PendingNetSend.WaitingFor.Num() == 0)
+								auto& PendingPacket = PendingPackets[PackageIndex];
+								PendingPacket.WaitingFor.Remove(ChunkPosition);
+								
+								if (PendingPacket.WaitingFor.Num() == 0)
 								{
-									Sv_ProcessPendingNetSend(MoveTemp(PendingNetSend));
-									ToRemove.Add(PendingIndex);
+									Sv_ProcessPendingNetSend(PendingPacket);
+									PendingPackets.RemoveAt(PackageIndex);
 								}
 							}
 
-							for (const auto& Index : ToRemove)
-							{
-								PendingNetSendPackets.RemoveAt(Index);
-							}
+							PendingPacketsByPosition.Remove(ChunkPosition);
 						}
 					}
 
@@ -131,7 +175,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 				// We canceled the load, but it's automatically added to the ChunkRegistry, so we have to undo this
 				if (ProcessingLoad.FindRef(ChunkPosition) == false)
 				{
-					GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
+					GameManager->ChunkRegistry->Th_UnregisterChunk(ChunkPosition);
 				}
 				
 				ProcessingLoad.Remove(ChunkPosition);
@@ -173,8 +217,8 @@ void UVirtualMapTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
 		return;
 	}
 	
-	const auto NewPendingNetSendIndex = PendingNetSendPackets.Add(FPendingNetSendChunks{});
-	FPendingNetSendChunks& PendingNetSend = PendingNetSendPackets[NewPendingNetSendIndex];
+	const auto NewPendingNetSendIndex = PendingPackets.Add(FPendingNetSendChunks{});
+	FPendingNetSendChunks& PendingNetSend = PendingPackets[NewPendingNetSendIndex];
 	PendingNetSend.WaitingFor = ChunksToSend;
 	PendingNetSend.Player = ToPlayer;
 	PendingNetSend.ToSend = ChunksToSend.Array();
@@ -200,15 +244,15 @@ void UVirtualMapTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
 					*ChunkPosition.ToString(), *ToPlayer->GetName());
 			} else
 			{
-				PendingNetSendPacketByPosition.FindOrAdd(ChunkPosition).Add(NewPendingNetSendIndex);
+				PendingPacketsByPosition.FindOrAdd(ChunkPosition).Add(NewPendingNetSendIndex);
 			}
 		}
 	}
 
 	if (PendingNetSend.WaitingFor.Num() == 0)
 	{
-		Sv_ProcessPendingNetSend(MoveTemp(PendingNetSend));
-		PendingNetSendPackets.RemoveAt(NewPendingNetSendIndex);
+		Sv_ProcessPendingNetSend(PendingNetSend);
+		PendingPackets.RemoveAt(NewPendingNetSendIndex);
 	}
 }
 
@@ -219,7 +263,7 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 		for (const auto& ChunkPosition : ChunksToUnload)
 		{
 			WaitingToBeSent.Remove(ChunkPosition);
-			GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);
+			GameManager->ChunkRegistry->Th_UnregisterChunk(ChunkPosition);
 
 			if (ProcessingRender.Contains(ChunkPosition))
 			{
@@ -274,7 +318,7 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 				
 				if (ProcessingUnload.FindRef(ChunkPosition) == true)
 				{
-					GameManager->ChunkRegistry->UnregisterChunk(ChunkPosition);	
+					GameManager->ChunkRegistry->Th_UnregisterChunk(ChunkPosition);	
 				}
 
 				ProcessingUnload.Remove(ChunkPosition);
@@ -312,29 +356,37 @@ void UVirtualMapTaskManager::Tick(float DeltaTime)
 
 			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
 			Chunk->SetRenderState(State);
+			
+			// If state = none = border, so we can't render it (as it will have no neighbors)
+			if (State != EChunkState::None)
+			{
+				GameManager->ChunkRegistry->LockForRender(ChunkPosition);
 
-			GameManager->TickManager->RunAsyncThen(
-				[Chunk]
-				{
-					FRenderResult Result;
-					Result.bSuccess = Chunk->Th_BeginRender(Result.Mesh);
-					return MoveTemp(Result);
-				},
-				[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
-				{
-					const auto Processing = ProcessingRender.Find(ChunkPosition);
-					Processing->PendingTasks--;
-					// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
-					if (Processing->LastRenderIndex == RenderId && Result.bSuccess && Chunk)
+				GameManager->TickManager->RunAsyncThen(
+					[Chunk]
 					{
-						Chunk->CommitRender(MoveTemp(Result.Mesh));
-					}
+						FRenderResult Result;
+						Result.bSuccess = Chunk->Th_BeginRender(Result.Mesh);
+						return MoveTemp(Result);
+					},
+					[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
+					{
+						const auto Processing = ProcessingRender.Find(ChunkPosition);
+						Processing->PendingTasks--;
+						// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
+						if (Processing->LastRenderIndex == RenderId && Result.bSuccess && Chunk)
+						{
+							Chunk->CommitRender(MoveTemp(Result.Mesh));
+						}
 
-					if (Processing->PendingTasks == 0) {
-						ProcessingRender.Remove(ChunkPosition);
+						if (Processing->PendingTasks == 0) {
+							ProcessingRender.Remove(ChunkPosition);
+						}
+
+						GameManager->ChunkRegistry->UnlockForRender(ChunkPosition);
 					}
-				}
-			);
+				);
+			}
 		}
 
 		for (int32 i = 0; i < ToRemove.Num(); ++i)

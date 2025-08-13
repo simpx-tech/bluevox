@@ -23,6 +23,8 @@ public:
 		Columns = MoveTemp(InColumns);
 		return this;
 	}
+
+	virtual void BeginDestroy() override;
 	
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;

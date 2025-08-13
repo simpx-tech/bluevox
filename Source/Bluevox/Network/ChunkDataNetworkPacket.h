@@ -46,14 +46,14 @@ class BLUEVOX_API UChunkDataNetworkPacket : public UClientNetworkPacket
 {
 	GENERATED_BODY()
 
-	UPROPERTY()
-	TArray<FChunkDataWithPosition> Data;
-
 	virtual void OnReceive(AGameManager* GameManager) override;
 
 	virtual void Serialize(FArchive& Ar) override;
 
 public:
+	UPROPERTY()
+	TArray<FChunkDataWithPosition> Data;
+	
 	UChunkDataNetworkPacket* Init(TArray<FChunkDataWithPosition>&& InData)
 	{
 		Data = MoveTemp(InData);

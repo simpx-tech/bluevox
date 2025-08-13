@@ -33,7 +33,7 @@ struct FVirtualChunk
 	{
 		if (LiveForCount > 0)
 		{
-			State = bLocal ? EChunkState::Live : EChunkState::RemoteLive;
+			State = bLiveLocal ? EChunkState::Live : EChunkState::RemoteLive;
 		} else if (LoadedForCount > 0)
 		{
 			State = EChunkState::LoadOnly;
@@ -44,5 +44,5 @@ struct FVirtualChunk
 	}
 	
 	UPROPERTY()
-	bool bLocal = false;
+	bool bLiveLocal = false;
 };
