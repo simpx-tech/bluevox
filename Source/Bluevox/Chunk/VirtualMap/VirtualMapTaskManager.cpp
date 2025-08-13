@@ -310,6 +310,11 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 		GameManager->TickManager->RunAsyncThen(
 			[this, LocalChunkPosition, ChunkData, Region]
 			{
+				if (!ChunkData)
+				{
+					UE_LOG(LogChunk, Warning, TEXT("Failed to unload chunk data at local position %s: chunk data not found."), *LocalChunkPosition.ToString());
+					return;
+				}
 				Region->Th_SaveChunk(LocalChunkPosition, ChunkData);
 			},
 			[ChunkPosition, this]

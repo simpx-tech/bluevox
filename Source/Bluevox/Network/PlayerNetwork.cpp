@@ -385,7 +385,7 @@ void UPlayerNetwork::HandleConfirmedPacket(const uint32 PacketId)
 
 void UPlayerNetwork::NotifyClientNetReady_Implementation()
 {
-	UE_LOG(LogPlayerNetwork, Log, TEXT("Client %s notified server that is ready to receive packets."), *LocalPlayerState->GetPlayerName());
+	UE_LOG(LogPlayerNetwork, Log, TEXT("Client %s notified server that is ready to receive packets."), LocalPlayerState ? *LocalPlayerState->GetPlayerName() : TEXT("Unknown"));
 	if (bClientNetReady)
 	{
 		return;

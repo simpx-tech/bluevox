@@ -23,6 +23,7 @@ AMainCharacter::AMainCharacter()
 	MovementComponent->MaxFlySpeed = 1200.f;
 	MovementComponent->BrakingDecelerationFlying = 4096.0f;
 	MovementComponent->MaxAcceleration = 10'000.f;
+	MovementComponent->DefaultLandMovementMode = MOVE_Flying;
 }
 
 // Called when the game starts or when spawned
@@ -40,16 +41,16 @@ void AMainCharacter::BeginPlay()
 
 	GameManager = Cast<AGameManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AGameManager::StaticClass()));
 
-	GetCharacterMovement()->SetMovementMode(MOVE_None);
+	GetCharacterMovement()->SetMovementMode(MOVE_Flying);
 
 	// TODO temp
-	if (GameManager->bServer)
-	{
-		GameManager->LocalController->SetServerReady(true);	
-	} else if (GameManager->bClient)
-	{
-		GameManager->LocalController->SetClientReady(true);
-	}
+	// if (GameManager->bServer)
+	// {
+	// 	GameManager->LocalController->SetServerReady(true);	
+	// } else if (GameManager->bClient)
+	// {
+	// 	GameManager->LocalController->SetClientReady(true);
+	// }
 }
 
 // Called every frame

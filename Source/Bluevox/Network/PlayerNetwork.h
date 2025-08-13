@@ -87,7 +87,7 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	TMap<uint32, TArray<FPacketChunk>> UnknownChunks;
 	
 	UPROPERTY(EditAnywhere)
-	uint32 MaxSentBytesPerSecond = 1024 * 64; // 64 KB/s
+	uint32 MaxSentBytesPerSecond = 1024 * 512; // 512 kb/s
 
 	UPROPERTY(EditAnywhere)
 	int32 ResendTimeoutSecs = 5;
@@ -128,10 +128,10 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	UFUNCTION()
 	bool ProcessPendingResend(FPendingResend& PendingResend);
 	
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Cl_ReceiveServerChunk(const FPacketChunk& PacketChunk);
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Unreliable)
 	void Sv_ReceiveClientChunk(const FPacketChunk& PacketChunk);
 
 	UFUNCTION()
