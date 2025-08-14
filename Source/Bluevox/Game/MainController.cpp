@@ -70,7 +70,7 @@ void AMainController::SetServerReady(const bool bReady)
 void AMainController::SetClientReady(const bool bReady)
 {
 	Sv_SetClientReady(bReady);
-	EnableInput(this);
+	// EnableInput(this);
 }
 
 void AMainController::GetLifetimeReplicatedProps(

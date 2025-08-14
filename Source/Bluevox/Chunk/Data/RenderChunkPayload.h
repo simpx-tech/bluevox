@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ChunkColumn.h"
+#include "Bluevox/Chunk/VirtualMap/ChunkState.h"
 #include "RenderChunkPayload.generated.h"
 
 USTRUCT(BlueprintType)

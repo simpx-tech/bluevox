@@ -37,6 +37,9 @@ void AMainCharacter::BeginPlay()
 		{
 			Subsystem->AddMappingContext(PlayerController->DefaultInputContext, 0);
 		}
+	} else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::BeginPlay: Controller is not a MainController!"));
 	}
 
 	GameManager = Cast<AGameManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AGameManager::StaticClass()));
@@ -84,6 +87,9 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 			EnhancedInputComponent->BindAction(MainController->CrouchAction, ETriggerEvent::Triggered, this, &AMainCharacter::HandleCrouchAction);
 		}
+	} else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::SetupPlayerInputComponent: Controller is not a MainController!"));
 	}
 }
 

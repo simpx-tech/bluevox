@@ -24,6 +24,12 @@ AChunk::AChunk()
 	MeshComponent->bEnableComplexCollision = true;
 	MeshComponent->bCastShadowAsTwoSided = true;
 	MeshComponent->CollisionType = CTF_UseComplexAsSimple;
+	// MeshComponent->bDeferCollisionUpdates = true;
+	MeshComponent->bUseAsyncCooking = true;
+
+	MeshComponent->SetMobility(EComponentMobility::Type::Static);
+	MeshComponent->SetGenerateOverlapEvents(false);
+	MeshComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 
 	RootComponent = MeshComponent;
 }
@@ -34,8 +40,8 @@ void AChunk::SetRenderState(const EChunkState State) const
 	const auto Visible = EnumHasAllFlags(State, EChunkState::Visible);
 	MeshComponent->SetVisibility(Visible);
 
-	const auto Collision = EnumHasAllFlags(State, EChunkState::Collision);
-	MeshComponent->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
+	// const auto Collision = EnumHasAllFlags(State, EChunkState::Collision);
+	// MeshComponent->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 }
 
 bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)

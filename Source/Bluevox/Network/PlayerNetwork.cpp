@@ -92,6 +92,61 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 	}
 
 	const int32 End = PendingSend.Data.Num();
+
+	if (PendingSend.Offset >= End)
+	{
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("All chunks sent for PacketId=%u (early exit)"), PendingSend.PacketId);
+		PendingSend.bSentAll = true;
+		return true;
+	}
+
+	const int32 SizeToCopy = FMath::Min(End - PendingSend.Offset, static_cast<int32>(ChunkSize));
+
+	FPacketChunk PacketChunk;
+	PacketChunk.PacketId = PendingSend.PacketId;
+	PacketChunk.Data.SetNumUninitialized(SizeToCopy);
+	PacketChunk.Index = PendingSend.Offset / ChunkSize;
+	FMemory::Memcpy(PacketChunk.Data.GetData(), PendingSend.Data.GetData() + PendingSend.Offset, SizeToCopy);
+
+	SentThisSecond += SizeToCopy;
+
+	if (bServer)
+	{
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sending chunk to client: PacketId=%u, DataSize=%d, Index=%d"),
+			PacketChunk.PacketId, PacketChunk.Data.Num(), PacketChunk.Index);
+		
+		// From Server
+		Cl_ReceiveServerChunk(PacketChunk);
+	}
+	else
+	{
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("Sending chunk to server: PacketId=%u, DataSize=%d, Index=%d"),
+			PacketChunk.PacketId, PacketChunk.Data.Num(), PacketChunk.Index);
+		
+		// From Client
+		Sv_ReceiveClientChunk(PacketChunk);
+	}
+
+	PendingSend.Offset += SizeToCopy;
+
+	if (PendingSend.Offset >= End)
+	{
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("All chunks sent for PacketId=%u"), PendingSend.PacketId);
+		PendingSend.bSentAll = true;
+		return true;
+	}
+
+	return false;
+}
+
+bool UPlayerNetwork::ProcessAllPendingSend(FPendingSend& PendingSend)
+{
+	if (PendingSend.bSentAll)
+	{
+		return true;
+	}
+
+	const int32 End = PendingSend.Data.Num();
 	while (PendingSend.Offset < End) {
 		const int32 SizeToCopy = FMath::Min(End - PendingSend.Offset, static_cast<int32>(ChunkSize));
 	
@@ -136,6 +191,64 @@ bool UPlayerNetwork::ProcessPendingSend(FPendingSend& PendingSend)
 }
 
 bool UPlayerNetwork::ProcessPendingResend(FPendingResend& PendingResend)
+{
+	if (!PendingSends.Contains(PendingResend.PacketId))
+	{
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("[ProcessPendingResend] No pending send found for PacketId=%u"), PendingResend.PacketId);
+		return true;
+	}
+
+	const auto CurrentIndex = PendingResend.LastSentIndex + 1;
+	if (!PendingResend.Indexes.IsValidIndex(CurrentIndex))
+	{
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("[ProcessPendingResend] No indexes to resend for PacketId=%u"), PendingResend.PacketId);
+		return true;
+	}
+
+	const auto& PendingSend = PendingSends[PendingResend.PacketId];
+	const int32 NumChunks = (PendingSend.Data.Num() + ChunkSize - 1) / ChunkSize;
+	const int32 MaxChunkIndex = NumChunks - 1;
+
+	const auto ChunkIndex = PendingResend.Indexes[CurrentIndex];
+	
+	if (ChunkIndex < 0 || ChunkIndex > MaxChunkIndex)
+	{
+		UE_LOG(LogPlayerNetwork, Warning, TEXT("[ProcessPendingResend] Invalid chunk index %d for PacketId=%u"), ChunkIndex, PendingResend.PacketId);
+		return false;
+	}
+
+	FPacketChunk PacketChunk;
+	PacketChunk.PacketId = PendingResend.PacketId;
+	PacketChunk.Index = ChunkIndex;
+		
+	const int32 Offset = ChunkIndex * ChunkSize;
+	const int32 SizeToCopy = FMath::Min(PendingSend.Data.Num() - Offset, static_cast<int32>(ChunkSize));
+	PacketChunk.Data.SetNumUninitialized(SizeToCopy);
+	FMemory::Memcpy(PacketChunk.Data.GetData(), PendingSend.Data.GetData() + Offset, SizeToCopy);
+
+	SentThisSecond += SizeToCopy;
+		
+	if (bServer)
+	{
+		Cl_ReceiveServerChunk(PacketChunk);
+	}
+	else
+	{
+		Sv_ReceiveClientChunk(PacketChunk);
+	}
+
+	if (CurrentIndex < PendingResend.Indexes.Num() - 1)
+	{
+		UE_LOG(LogPlayerNetwork, Verbose, TEXT("Hit max send limit, stopping at ChunkIndex=%d for PacketId=%u"), ChunkIndex, PendingResend.PacketId);
+			
+		PendingResend.LastSentIndex = CurrentIndex;
+		return false;
+	}
+
+	return true;
+}
+
+bool UPlayerNetwork::ProcessAllPendingResend(FPendingResend& PendingResend)
 {
 	if (!PendingSends.Contains(PendingResend.PacketId))
 	{
@@ -264,7 +377,7 @@ void UPlayerNetwork::HandlePacketChunk(const FPacketChunk& PacketChunk)
 
 UPlayerNetwork::UPlayerNetwork()
 {
-	PrimaryComponentTick.bCanEverTick = true;
+	PrimaryComponentTick.bCanEverTick = false;
 	SetIsReplicatedByDefault(true);
 }
 
@@ -301,6 +414,61 @@ bool UPlayerNetwork::IsNameStableForNetworking() const
 void UPlayerNetwork::BeginPlay()
 {
 	Super::BeginPlay();
+	GetWorld()->GetTimerManager().SetTimer(NetTickTimer, this, &UPlayerNetwork::NetTick,
+										   0.0135f, true);
+}
+
+void UPlayerNetwork::NetTick()
+{
+	if (!PendingResends.IsEmpty())
+	{
+		const auto Finished = ProcessPendingResend(PendingResends[0]);
+		if (Finished)
+		{
+			PendingResends.RemoveAt(0);
+		}
+	} else if (!PendingSends.IsEmpty())
+	{
+		for (auto& PendingSend : PendingSends)
+		{
+			if (PendingSend.Value.bSentAll)
+			{
+				continue;
+			}
+			
+			ProcessPendingSend(PendingSend.Value);
+			break;
+		}
+	}
+
+	// Check for resend
+	for (auto& [PacketId, PendingReceive] : PendingReceives)
+	{
+		if (FPlatformTime::Seconds() > PendingReceive.LastPacketTimeSecs + ResendTimeoutSecs)
+		{
+			TArray<int32> MissingChunkIndexes;
+
+			for (int32 Index = 0; Index < PendingReceive.ReceivedChunks.Num(); ++Index)
+			{
+				if (!PendingReceive.ReceivedChunks[Index])
+				{
+					MissingChunkIndexes.Add(Index);
+				}
+			}
+			
+			UE_LOG(LogPlayerNetwork, Warning, TEXT("Ask to resend %d chunks for PacketId=%u"), MissingChunkIndexes.Num(), PacketId);
+			PendingReceive.LastPacketTimeSecs = FPlatformTime::Seconds();
+			
+			if (bServer)
+			{
+				Cl_AskForResend(PacketId, MissingChunkIndexes);
+			}
+			else
+			{
+				Sv_AskForResend(PacketId, MissingChunkIndexes);
+			}
+		}
+	}
 }
 
 void UPlayerNetwork::Cl_AskForResend_Implementation(const uint32 PacketId, const TArray<int32>& Indexes)
@@ -402,74 +570,5 @@ void UPlayerNetwork::NotifyClientNetReady_Implementation()
 			MovedPendingSend.PacketId, MovedPendingSend.Data.Num(), *MovedPendingSend.PacketType->GetName());
 	}
 	PlayerNotReadyWaitingSends.Empty();
-}
-
-void UPlayerNetwork::TickComponent(float DeltaTime, ELevelTick TickType,
-                                   FActorComponentTickFunction* ThisTickFunction)
-{
-	Super::TickComponent(DeltaTime, TickType, ThisTickFunction);
-
-	if (FPlatformTime::Seconds() > LastResetTime + 1.0)
-	{
-		SentThisSecond = 0;
-		LastResetTime = FPlatformTime::Seconds();
-	}
-
-	if (SentThisSecond >= MaxSentBytesPerSecond)
-	{
-		return;
-	}
-
-	int32 Idx = 0;
-	for (auto& PendingResend : PendingResends)
-	{
-		const auto ProcessedEverything = ProcessPendingResend(PendingResend);
-		if (!ProcessedEverything)
-		{
-			break;
-		}
-		Idx++;
-	}
-	if (Idx > 0)
-	{
-		PendingResends.RemoveAt(0, Idx);
-	}
-	
-	for (auto& PendingSend : PendingSends)
-	{
-		const auto Continue = ProcessPendingSend(PendingSend.Value);
-		if (!Continue)
-		{
-			break;
-		}
-	}
-
-	for (auto& [PacketId, PendingReceive] : PendingReceives)
-	{
-		if (FPlatformTime::Seconds() > PendingReceive.LastPacketTimeSecs + ResendTimeoutSecs)
-		{
-			TArray<int32> MissingChunkIndexes;
-
-			for (int32 Index = 0; Index < PendingReceive.ReceivedChunks.Num(); ++Index)
-			{
-				if (!PendingReceive.ReceivedChunks[Index])
-				{
-					MissingChunkIndexes.Add(Index);
-				}
-			}
-			
-			UE_LOG(LogPlayerNetwork, Warning, TEXT("Ask to resend %d chunks for PacketId=%u"), MissingChunkIndexes.Num(), PacketId);
-			PendingReceive.LastPacketTimeSecs = FPlatformTime::Seconds();
-			
-			if (bServer)
-			{
-				Cl_AskForResend(PacketId, MissingChunkIndexes);
-			}
-			else
-			{
-				Sv_AskForResend(PacketId, MissingChunkIndexes);
-			}
-		}
-	}
 }
 

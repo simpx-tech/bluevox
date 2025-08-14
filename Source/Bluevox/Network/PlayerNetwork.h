@@ -81,7 +81,7 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	uint32 PacketIdCounter = 0;
 
 	UPROPERTY(EditAnywhere)
-	uint32 ChunkSize = 1024; // 1 KB
+	uint32 ChunkSize = 3800; // 3.8 Kb
 
 	// TODO erase this over time, so we don't accumulate too many unknown chunks in memory
 	TMap<uint32, TArray<FPacketChunk>> UnknownChunks;
@@ -110,6 +110,9 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	UPROPERTY()
 	bool bClientNetReady = false;
 
+	UPROPERTY()
+	FTimerHandle NetTickTimer;
+
 	UFUNCTION()
 	void TryToRunPacket(uint32 PacketId, UNetworkPacket* Packet);
 	
@@ -121,12 +124,18 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 
 	UFUNCTION()
 	inline void HandlePacketHeader(const FPacketHeader& PacketHeader);
-	
+
 	UFUNCTION()
 	bool ProcessPendingSend(FPendingSend& PendingSend);
+	
+	UFUNCTION()
+	bool ProcessAllPendingSend(FPendingSend& PendingSend);
 
 	UFUNCTION()
 	bool ProcessPendingResend(FPendingResend& PendingResend);
+	
+	UFUNCTION()
+	bool ProcessAllPendingResend(FPendingResend& PendingResend);
 	
 	UFUNCTION(Client, Unreliable)
 	void Cl_ReceiveServerChunk(const FPacketChunk& PacketChunk);
@@ -158,10 +167,10 @@ public:
 	UFUNCTION(Server, Reliable)
 	void Sv_ConfirmReceivedPacket(uint32 PacketId);
 
-	UFUNCTION(Client, Reliable)
+	UFUNCTION(Client, Unreliable)
 	void Cl_AskForResend(uint32 PacketId, const TArray<int32>& Indexes);
 
-	UFUNCTION(Server, Reliable)
+	UFUNCTION(Server, Unreliable)
 	void Sv_AskForResend(uint32 PacketId, const TArray<int32>& Indexes);
 
 	UFUNCTION(BlueprintCallable, Category="Network")
@@ -173,6 +182,7 @@ public:
 	UFUNCTION(Category="Network")
 	void HandleConfirmedPacket(uint32 PacketId);
 
+	// TODO use the legacy voxel game approach
 	UFUNCTION(Server, Reliable)
 	void NotifyClientNetReady();
 
@@ -184,7 +194,7 @@ protected:
 	// Called when the game starts
 	virtual void BeginPlay() override;
 
-	virtual void TickComponent(float DeltaTime, ELevelTick TickType, FActorComponentTickFunction* ThisTickFunction) override;
+	virtual void NetTick();
 
 	UPROPERTY()
 	TArray<FPendingResend> PendingResends;

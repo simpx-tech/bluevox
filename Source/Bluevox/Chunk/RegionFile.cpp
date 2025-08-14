@@ -12,6 +12,12 @@
 void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* ChunkData)
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Saving chunk data for position %s in disk."), *Position.ToString());
+
+	if (!ChunkData)
+	{
+		UE_LOG(LogChunk, Error, TEXT("Chunk data is null for position %s."), *Position.ToString());
+		return;
+	}
 	
 	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
 

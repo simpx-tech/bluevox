@@ -9,12 +9,16 @@
 
 void UNetworkPacket::Compress(TArray<uint8>& OutData)
 {
+	
 	FBufferArchive ChunkArchive;
 	Serialize(ChunkArchive);
 
 	FArchiveSaveCompressedProxy Compressor = FArchiveSaveCompressedProxy(OutData, NAME_Zlib);
 	Compressor << ChunkArchive;
 	Compressor.Flush();
+
+	UE_LOG(LogTemp, Warning, TEXT("UNetworkPacket::Compressed %d to %d bytes"),
+		ChunkArchive.Num(), OutData.Num());
 }
 
 void UNetworkPacket::DecompressAndSerialize(const TArray<uint8>& InData)
@@ -25,6 +29,9 @@ void UNetworkPacket::DecompressAndSerialize(const TArray<uint8>& InData)
 	Decompressor.Flush();
 	FMemoryReader Reader(ChunkArchive);
 	Serialize(Reader);
+
+	UE_LOG(LogTemp, Warning, TEXT("UNetworkPacket::Decompressed %d bytes to %d"),
+		InData.Num(), ChunkArchive.Num());
 }
 
 void UNetworkPacket::OnReceive(AGameManager* GameManager)
