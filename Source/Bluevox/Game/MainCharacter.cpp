@@ -86,6 +86,10 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 			EnhancedInputComponent->BindAction(MainController->JumpAction, ETriggerEvent::Triggered, this, &AMainCharacter::HandleJumpAction);
 
 			EnhancedInputComponent->BindAction(MainController->CrouchAction, ETriggerEvent::Triggered, this, &AMainCharacter::HandleCrouchAction);
+
+			EnhancedInputComponent->BindAction(MainController->LeftClickAction, ETriggerEvent::Started, this, &AMainCharacter::HandleLeftClickAction);
+
+			EnhancedInputComponent->BindAction(MainController->RightClickAction, ETriggerEvent::Started, this, &AMainCharacter::HandleRightClickAction);
 		}
 	} else
 	{
@@ -120,6 +124,16 @@ void AMainCharacter::HandleLookAction(const FInputActionValue& Value)
 		AddControllerYawInput(LookDelta.X * LookSpeed);
 		AddControllerPitchInput(-LookDelta.Y * LookSpeed);
 	}
+}
+
+void AMainCharacter::HandleLeftClickAction()
+{
+	GameManager->LocalController->Sv_LeftClick();
+}
+
+void AMainCharacter::HandleRightClickAction()
+{
+	GameManager->LocalController->Sv_RightClick();
 }
 
 void AMainCharacter::HandleJumpAction(const FInputActionValue& Value)

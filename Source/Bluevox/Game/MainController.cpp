@@ -5,9 +5,11 @@
 
 #include "GameManager.h"
 #include "MainCharacter.h"
-#include "WorldSave.h"
+#include "Bluevox/Chunk/ChunkRegistry.h"
+#include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Network/PlayerNetwork.h"
+#include "Bluevox/Shape/ShapeRegistry.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -49,14 +51,14 @@ FBlockRaycastResult AMainController::BlockRaycast() const
 		? (FMath::Abs(N.X) > FMath::Abs(N.Z) ? 0 : 2)
 		: FMath::Abs(N.Y) > FMath::Abs(N.Z) ? 1 : 2;
 	FVector Face(0,0,0);
-	if (Axis == 0) Face.X = (N.X >= 0 ? 1 : -1);
-	if (Axis == 1) Face.Y = (N.Y >= 0 ? 1 : -1);
-	if (Axis == 2) Face.Z = (N.Z >= 0 ? 1 : -1);
+	if (Axis == 0) Face.X = N.X >= 0 ? 1 : -1;
+	if (Axis == 1) Face.Y = N.Y >= 0 ? 1 : -1;
+	if (Axis == 2) Face.Z = N.Z >= 0 ? 1 : -1;
 
-	DrawDebugLine(
-		GetWorld(), Start, Hit.ImpactPoint, FColor::Yellow, false, -1.0f, 0, 1.0f);
-	DrawDebugLine(
-		GetWorld(), Hit.ImpactPoint, Hit.ImpactPoint + Face * GameRules::Scaling::ZSize, FColor::Red, false, -1.0f, 0);
+	// DrawDebugLine(
+	// 	GetWorld(), Start, Hit.ImpactPoint, FColor::Yellow, false, -1.0f, 0, 1.0f);
+	// DrawDebugLine(
+	// 	GetWorld(), Hit.ImpactPoint, Hit.ImpactPoint + Face * GameRules::Scaling::ZSize, FColor::Red, false, -1.0f, 0);
 	
 	const double Increment = 0.25 * (Axis == 2 ? GameRules::Scaling::ZSize : GameRules::Scaling::XYWorldSize);
 	
@@ -77,22 +79,22 @@ void AMainController::Tick(float DeltaSeconds)
 		0, 0.0f, FColor::Blue,
 		FString::Printf(TEXT("Position: %s"), *ActorPosition.ToString()));
 	
-	const auto LookingAtBlock = BlockRaycast();
-	if (LookingAtBlock.bHit)
+	LastRaycastResult = BlockRaycast();
+	if (LastRaycastResult.bHit)
 	{
 		GEngine->AddOnScreenDebugMessage(
 			1, 0.0f, FColor::Green,
-			FString::Printf(TEXT("Looking at block: %s"), *LookingAtBlock.Position.ToString()));
+			FString::Printf(TEXT("Looking at block: %s"), *LastRaycastResult.Position.ToString()));
 		GEngine->AddOnScreenDebugMessage(
 			2, 0.0f, FColor::Blue,
-			FString::Printf(TEXT("Place position: %s"), *LookingAtBlock.PlacePosition.ToString()));
+			FString::Printf(TEXT("Place position: %s"), *LastRaycastResult.PlacePosition.ToString()));
 
 		DrawDebugBox(
-			GetWorld(), LookingAtBlock.Position.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			GetWorld(), LastRaycastResult.Position.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
 			FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
 			FQuat::Identity, FColor::Green, false, -1.0f);
 		DrawDebugBox(
-			GetWorld(), LookingAtBlock.PlacePosition.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			GetWorld(), LastRaycastResult.PlacePosition.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
 			FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
 			FQuat::Identity, FColor::Blue, false, -1.0f);
 	}
@@ -129,6 +131,29 @@ void AMainController::OnRep_PlayerState()
 	if (PlayerState && GameManager->bInitialized && GameManager->bClient)
 	{
 		PlayerNetwork->NotifyClientNetReady();
+	}
+}
+
+void AMainController::Broadcast_ChunkUpdate_Implementation(const FGlobalPosition Position,
+	const FPiece& Piece)
+{
+	GameManager->ChunkRegistry->SetPiece(Position, Piece);
+}
+
+void AMainController::Sv_LeftClick_Implementation()
+{
+	if (LastRaycastResult.bHit)
+	{
+		Broadcast_ChunkUpdate(LastRaycastResult.Position, FPiece());
+	}
+}
+
+void AMainController::Sv_RightClick_Implementation()
+{
+	if (LastRaycastResult.bHit)
+	{
+		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
+		GameManager->ChunkRegistry->SetPiece(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
 	}
 }
 

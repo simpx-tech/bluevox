@@ -13,12 +13,15 @@ void UChunkData::BeginDestroy()
 
 void UChunkData::Serialize(FArchive& Ar)
 {
+	FReadScopeLock ReadLock(Lock);
 	UObject::Serialize(Ar);
 	Ar << Columns;
 }
 
-FPiece UChunkData::GetPieceCopy(const int32 X, const int32 Y, const int32 Z) const
+FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)
 {
+	FReadScopeLock ReadLock(Lock);
+	
 	const auto ColIndex = GetIndex(X, Y);
 	if (!Columns.IsValidIndex(ColIndex))
 	{
@@ -42,8 +45,10 @@ FPiece UChunkData::GetPieceCopy(const int32 X, const int32 Y, const int32 Z) con
 	return FPiece();
 }
 
-void UChunkData::SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece)
+void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece)
 {
+	FWriteScopeLock WriteLock(Lock);
+	
 	const auto ColIndex = GetIndex(X, Y);
 	if (!Columns.IsValidIndex(ColIndex))
 	{
@@ -139,4 +144,6 @@ void UChunkData::SetPiece(const int32 X, const int32 Y, const int32 Z, const FPi
 			++i;
 		}
 	}
+
+	Changes++;
 }

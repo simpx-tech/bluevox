@@ -9,6 +9,9 @@
 #include "Bluevox/Game/GameManager.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
+#include "Position/LocalPosition.h"
+#include "VirtualMap/VirtualMap.h"
+#include "VirtualMap/VirtualMapTaskManager.h"
 
 UChunkRegistry* UChunkRegistry::Init(AGameManager* InGameManager)
 {
@@ -87,6 +90,28 @@ FChunkColumn& UChunkRegistry::Th_GetColumn(const FColumnPosition& GlobalColPosit
 		   TEXT("Chunk column not found for position %s"), *GlobalColPosition.ToString());
 
 	return ChunksData[ChunkPos]->GetColumn(LocalColPosition);
+}
+
+void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& Piece)
+{
+	const auto ChunkPosition = FChunkPosition::FromGlobalPosition(GlobalPosition);
+	const auto LocalPosition = FLocalPosition::FromGlobalPosition(GlobalPosition);
+	Th_GetChunkData(ChunkPosition)->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(Piece));
+	GameManager->VirtualMap->TaskManager->ScheduleRender({ ChunkPosition });
+
+	TArray<FChunkPosition> NeighborsToRender;
+	GlobalPosition.GetBorderChunks(NeighborsToRender);
+	if (NeighborsToRender.Num() > 0)
+	{
+		const TSet<FChunkPosition> UniqueNeighborsToRender = TSet(NeighborsToRender);
+		GameManager->VirtualMap->TaskManager->ScheduleRender(UniqueNeighborsToRender);
+	}
+}
+
+void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, const FPiece& Piece)
+{
+	auto PieceCopy = Piece;
+	SetPiece(GlobalPosition, MoveTemp(PieceCopy));
 }
 
 void UChunkRegistry::Th_UnregisterChunk(const FChunkPosition& Position)

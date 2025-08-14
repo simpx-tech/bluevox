@@ -21,7 +21,7 @@ struct FPiece
 	uint16 Id = 0;
 
 	UPROPERTY()
-	uint16 Size = 0;
+	uint16 Size = 1;
 
 	friend FArchive& operator<<(FArchive& Ar, FPiece& Piece)
 	{

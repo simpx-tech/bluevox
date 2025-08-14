@@ -27,9 +27,6 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	UPROPERTY()
 	TMap<FChunkPosition, FVirtualChunk> VirtualChunks;
 
-	UPROPERTY()
-	UVirtualMapTaskManager* TaskManager;
-
 	UFUNCTION()
 	void RemovePlayerFromChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToRemoveLoad, const TSet<FChunkPosition>& ToRemoveLive);
 
@@ -49,6 +46,9 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	bool bServer = false;
 	
 public:
+	UPROPERTY()
+	UVirtualMapTaskManager* TaskManager;
+	
 	UVirtualMap* Init(AGameManager* InGameManager);
 
 	void RegisterPlayer(const AMainController* Player);

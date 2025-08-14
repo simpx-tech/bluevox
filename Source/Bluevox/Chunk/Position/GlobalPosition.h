@@ -4,6 +4,8 @@
 #include "Bluevox/Game/GameRules.h"
 #include "GlobalPosition.generated.h"
 
+struct FChunkPosition;
+
 USTRUCT(BlueprintType)
 struct FGlobalPosition
 {
@@ -26,6 +28,10 @@ struct FGlobalPosition
 		GlobalPosition.Z = FMath::FloorToInt(Location.Z / GameRules::Scaling::ZSize);
 		return GlobalPosition;
 	}
+
+	bool IsBorderBlock() const;
+
+	void GetBorderChunks(TArray<FChunkPosition>& OutPositions) const;
 	
 	UPROPERTY()
 	int X = 0;

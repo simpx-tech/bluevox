@@ -7,6 +7,7 @@
 #include "GameFramework/PlayerController.h"
 #include "MainController.generated.h"
 
+struct FPiece;
 class UInputAction;
 class AGameManager;
 class UPlayerNetwork;
@@ -83,14 +84,31 @@ public:
 	UInputAction* JumpAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* LeftClickAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* RightClickAction;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputAction* CrouchAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputMappingContext* DefaultInputContext;
 
+	FBlockRaycastResult LastRaycastResult;
+		
 	virtual void BeginPlay() override;
 
 	virtual void OnRep_PlayerState() override;
+
+	UFUNCTION(NetMulticast, Reliable)
+	void Broadcast_ChunkUpdate(const FGlobalPosition Position, const FPiece& Piece);
+
+	UFUNCTION(Reliable, Server)
+	void Sv_LeftClick();
+
+	UFUNCTION(Reliable, Server)
+	void Sv_RightClick();
 	
 	UFUNCTION(BlueprintCallable)
 	void SetServerReady(bool bReady);

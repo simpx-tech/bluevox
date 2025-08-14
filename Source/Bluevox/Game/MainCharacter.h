@@ -52,6 +52,12 @@ public:
 	void HandleLookAction(const FInputActionValue& Value);
 
 	UFUNCTION()
+	void HandleLeftClickAction();
+
+	UFUNCTION()
+	void HandleRightClickAction();
+	
+	UFUNCTION()
 	void HandleJumpAction(const FInputActionValue& Value);
 
 	UFUNCTION()

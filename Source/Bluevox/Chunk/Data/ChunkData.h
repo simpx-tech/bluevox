@@ -9,6 +9,7 @@
 #include "UObject/Object.h"
 #include "ChunkData.generated.h"
 
+class AGameManager;
 /**
  *
  */
@@ -56,8 +57,7 @@ public:
 		return Columns[GetIndex(ColumnPosition)];
 	}
 
-	FPiece GetPieceCopy(const int32 X, const int32 Y, const int32 Z) const;
+	FPiece Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z);
 
-	// DEV if set to a border chunk, also schedule re-render on the neighbor chunks
-	void SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece);
+	void Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece);
 };

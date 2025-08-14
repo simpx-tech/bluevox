@@ -2,6 +2,7 @@
 
 #include "CoreMinimal.h"
 #include "ChunkPosition.h"
+#include "Bluevox/Utils/PositiveMod.h"
 #include "LocalChunkPosition.generated.h"
 
 USTRUCT(BlueprintType)

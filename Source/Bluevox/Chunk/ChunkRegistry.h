@@ -8,6 +8,7 @@
 #include "UObject/Object.h"
 #include "ChunkRegistry.generated.h"
 
+struct FPiece;
 struct FColumnPosition;
 struct FChunkColumn;
 class UWorldSave;
@@ -64,6 +65,10 @@ public:
 	AChunk* SpawnChunk(FChunkPosition Position);
 
 	FChunkColumn& Th_GetColumn(const FColumnPosition& GlobalColPosition);
+
+	void SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& Piece);
+
+	void SetPiece(const FGlobalPosition& GlobalPosition, const FPiece& Piece);
 
 	void Th_UnregisterChunk(const FChunkPosition& Position);
 
