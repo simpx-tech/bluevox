@@ -55,9 +55,9 @@ public:
 	{
 		return Columns[GetIndex(ColumnPosition)];
 	}
-	
-	// DEV if set to a border chunk, also schedule re-render on the neighbor chunks
 
-	// DEV get xyz
-	// DEV set xyz
+	FPiece GetPieceCopy(const int32 X, const int32 Y, const int32 Z) const;
+
+	// DEV if set to a border chunk, also schedule re-render on the neighbor chunks
+	void SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece);
 };

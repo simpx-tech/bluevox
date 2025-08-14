@@ -27,6 +27,77 @@ int32 AMainController::GetFarDistance() const
 	return FarDistance;
 }
 
+FBlockRaycastResult AMainController::BlockRaycast() const
+{
+	FVector ViewLoc; FRotator ViewRot;
+	GetPlayerViewPoint(ViewLoc, ViewRot);
+	const FVector Dir = ViewRot.Vector();
+	const FVector Start = ViewLoc;
+	const FVector End = Start + Dir * GameRules::Distances::InteractionDistance;
+
+	FHitResult Hit;
+	FCollisionQueryParams Params(SCENE_QUERY_STAT(VoxelPick), true);
+	Params.bReturnPhysicalMaterial = false;
+	Params.AddIgnoredActor(GetPawn());
+
+	if (!GetWorld()->LineTraceSingleByChannel(Hit, Start, End, ECC_Visibility, Params))
+		return FBlockRaycastResult();
+
+	// Snap normal to the principal axis
+	const FVector N = Hit.ImpactNormal;
+	const int32 Axis = FMath::Abs(N.X) > FMath::Abs(N.Y)
+		? (FMath::Abs(N.X) > FMath::Abs(N.Z) ? 0 : 2)
+		: FMath::Abs(N.Y) > FMath::Abs(N.Z) ? 1 : 2;
+	FVector Face(0,0,0);
+	if (Axis == 0) Face.X = (N.X >= 0 ? 1 : -1);
+	if (Axis == 1) Face.Y = (N.Y >= 0 ? 1 : -1);
+	if (Axis == 2) Face.Z = (N.Z >= 0 ? 1 : -1);
+
+	DrawDebugLine(
+		GetWorld(), Start, Hit.ImpactPoint, FColor::Yellow, false, -1.0f, 0, 1.0f);
+	DrawDebugLine(
+		GetWorld(), Hit.ImpactPoint, Hit.ImpactPoint + Face * GameRules::Scaling::ZSize, FColor::Red, false, -1.0f, 0);
+	
+	const double Increment = 0.25 * (Axis == 2 ? GameRules::Scaling::ZSize : GameRules::Scaling::XYWorldSize);
+	
+	FBlockRaycastResult Result;
+	Result.bHit = true;
+	Result.Position = FGlobalPosition::FromActorLocation(Hit.ImpactPoint - Face * Increment);
+	Result.PlacePosition = FGlobalPosition::FromActorLocation(Hit.ImpactPoint + Face * Increment);
+
+	return Result;
+}
+
+void AMainController::Tick(float DeltaSeconds)
+{
+	Super::Tick(DeltaSeconds);
+
+	const auto ActorPosition = FGlobalPosition::FromActorLocation(GetPawn() ? GetPawn()->GetActorLocation() : FVector::ZeroVector);
+	GEngine->AddOnScreenDebugMessage(
+		0, 0.0f, FColor::Blue,
+		FString::Printf(TEXT("Position: %s"), *ActorPosition.ToString()));
+	
+	const auto LookingAtBlock = BlockRaycast();
+	if (LookingAtBlock.bHit)
+	{
+		GEngine->AddOnScreenDebugMessage(
+			1, 0.0f, FColor::Green,
+			FString::Printf(TEXT("Looking at block: %s"), *LookingAtBlock.Position.ToString()));
+		GEngine->AddOnScreenDebugMessage(
+			2, 0.0f, FColor::Blue,
+			FString::Printf(TEXT("Place position: %s"), *LookingAtBlock.PlacePosition.ToString()));
+
+		DrawDebugBox(
+			GetWorld(), LookingAtBlock.Position.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			FQuat::Identity, FColor::Green, false, -1.0f);
+		DrawDebugBox(
+			GetWorld(), LookingAtBlock.PlacePosition.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			FQuat::Identity, FColor::Blue, false, -1.0f);
+	}
+}
+
 void AMainController::SetFarDistance_Implementation(const int32 NewFarDistance)
 {
 	const auto OldFarDistance = FarDistance;

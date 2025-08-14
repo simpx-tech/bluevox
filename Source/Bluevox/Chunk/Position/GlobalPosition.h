@@ -43,6 +43,19 @@ struct FGlobalPosition
 		Ar << Pos.Z;
 		return Ar;
 	}
+
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("GlobalPosition(%d, %d, %d)"), X, Y, Z);
+	}
+
+	FVector AsActorLocationCopy() const
+	{
+		return FVector(
+			X * GameRules::Scaling::XYWorldSize,
+			Y * GameRules::Scaling::XYWorldSize,
+			Z * GameRules::Scaling::ZSize);
+	}
 };
 
 FORCEINLINE uint32 GetTypeHash(const FGlobalPosition& Pos)

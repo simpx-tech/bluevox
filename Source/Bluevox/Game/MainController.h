@@ -14,6 +14,13 @@ class UInputMappingContext;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnClientReadyChanged, bool, bReady);
 
+struct FBlockRaycastResult
+{
+	bool bHit = false;
+	FGlobalPosition Position;
+	FGlobalPosition PlacePosition;
+};
+
 /**
  * 
  */
@@ -46,6 +53,10 @@ public:
 	
 	UFUNCTION(Server, Reliable)
 	void SetFarDistance(int32 NewFarDistance);
+
+	FBlockRaycastResult BlockRaycast() const;
+
+	virtual void Tick(float DeltaSeconds) override;
 	
 	UPROPERTY(BlueprintReadWrite)
 	UPlayerNetwork* PlayerNetwork;
