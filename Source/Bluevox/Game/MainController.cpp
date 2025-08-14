@@ -9,6 +9,7 @@
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Network/PlayerNetwork.h"
+#include "Bluevox/Network/UpdateChunkNetworkPacket.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
@@ -134,17 +135,27 @@ void AMainController::OnRep_PlayerState()
 	}
 }
 
-void AMainController::Broadcast_ChunkUpdate_Implementation(const FGlobalPosition Position,
-	const FPiece& Piece)
-{
-	GameManager->ChunkRegistry->SetPiece(Position, Piece);
-}
-
 void AMainController::Sv_LeftClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		Broadcast_ChunkUpdate(LastRaycastResult.Position, FPiece());
+		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.Position, FPiece());
+		
+		// Run locally
+		UpdateChunkPacket->OnReceive(GameManager);
+		
+		// TODO improve this
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PlayerController = It->Get();
+			if (const AMainController* MainController = Cast<AMainController>(PlayerController))
+			{
+				if (MainController != GameManager->LocalController)
+				{
+					MainController->PlayerNetwork->SendToClient(UpdateChunkPacket);
+				}
+			}
+		}
 	}
 }
 
@@ -153,7 +164,24 @@ void AMainController::Sv_RightClick_Implementation()
 	if (LastRaycastResult.bHit)
 	{
 		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
-		GameManager->ChunkRegistry->SetPiece(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
+		
+		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
+		
+		// Run locally
+		UpdateChunkPacket->OnReceive(GameManager);
+		
+		// TODO improve this
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			APlayerController* PlayerController = It->Get();
+			if (const AMainController* MainController = Cast<AMainController>(PlayerController))
+			{
+				if (MainController != GameManager->LocalController)
+				{
+					MainController->PlayerNetwork->SendToClient(UpdateChunkPacket);
+				}
+			}
+		}
 	}
 }
 

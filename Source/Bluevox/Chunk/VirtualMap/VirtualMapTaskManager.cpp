@@ -3,10 +3,10 @@
 
 #include "VirtualMapTaskManager.h"
 
+#include "LogVirtualMapTaskManager.h"
 #include "VirtualMap.h"
 #include "Bluevox/Chunk/Chunk.h"
 #include "Bluevox/Chunk/ChunkRegistry.h"
-#include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/RegionFile.h"
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/Position/LocalChunkPosition.h"
@@ -19,7 +19,7 @@
 
 void UVirtualMapTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunks& PendingNetSend) const
 {
-	UE_LOG(LogChunk, Verbose, TEXT("Processing pending net send for player %s, sending %d chunks"),
+	UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Processing pending net send for player %s, sending %d chunks"),
 		*PendingNetSend.Player->GetName(), PendingNetSend.ToSend.Num());
 	
 	TArray<FChunkDataWithPosition> DataToSend;
@@ -28,7 +28,7 @@ void UVirtualMapTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunk
 	{
 		if (!GameManager->ChunkRegistry->Th_HasChunkData(ChunkPosition))
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Trying to send chunk %s to player %s, but it does not have data!"),
+			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Trying to send chunk %s to player %s, but it does not have data!"),
 				*ChunkPosition.ToString(), *PendingNetSend.Player->GetName());
 			continue;
 		}
@@ -53,7 +53,7 @@ UVirtualMapTaskManager* UVirtualMapTaskManager::Init(AGameManager* InGameManager
 void UVirtualMapTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Packet)
 {
 	const auto ChunkRegistry = GameManager->ChunkRegistry;
-	UE_LOG(LogChunk, Verbose, TEXT("Handling chunk data network packet with %d chunks"), Packet->Data.Num());
+	UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Handling chunk data network packet with %d chunks"), Packet->Data.Num());
 	const auto TickManager = GameManager->TickManager;
 	for (auto& ChunkData : Packet->Data)
 	{
@@ -62,7 +62,7 @@ void UVirtualMapTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacke
 		if (!WaitingToBeSent.Contains(ChunkPosition))
 		{
 			// DEV temp
-			// UE_LOG(LogChunk, Warning, TEXT("Received chunk data for chunk %s, but it was not in the waiting list!"), *ChunkPosition.ToString());
+			// UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Received chunk data for chunk %s, but it was not in the waiting list!"), *ChunkPosition.ToString());
 			// continue;
 		}
 
@@ -70,13 +70,13 @@ void UVirtualMapTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacke
 		
 		if (ChunkRegistry->Th_HasChunkData(ChunkPosition))
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Received chunk data for chunk %s, but it already exists!"), *ChunkPosition.ToString());
+			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Received chunk data for chunk %s, but it already exists!"), *ChunkPosition.ToString());
 			continue;
 		}
 
 		if (ProcessingUnload.Contains(ChunkPosition))
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Received chunk data for chunk %s, but it is being unloaded! Ignoring the data."), *ChunkPosition.ToString());
+			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Received chunk data for chunk %s, but it is being unloaded! Ignoring the data."), *ChunkPosition.ToString());
 			continue;
 		}
 
@@ -99,7 +99,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 {
 	if (!bServer)
 	{
-		UE_LOG(LogChunk, Warning, TEXT("Adding %d chunks to wait queue, waiting them to be sent from the server"), ChunksToLoad.Num());
+		UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Adding %d chunks to wait queue, waiting them to be sent from the server"), ChunksToLoad.Num());
 		// DEV only add if not already exists
 		WaitingToBeSent.Append(ChunksToLoad);
 		return;
@@ -107,7 +107,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 	
 	for (const auto& ChunkPosition : ChunksToLoad)
 	{
-		UE_LOG(LogChunk, Verbose, TEXT("Scheduling load for chunk %s"), *ChunkPosition.ToString());
+		UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Scheduling load for chunk %s"), *ChunkPosition.ToString());
 		if (ProcessingLoad.Contains(ChunkPosition))
 		{
 			ProcessingLoad.Add(ChunkPosition, true);
@@ -129,7 +129,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 				return MoveTemp(LoadResult);
 			}, [ChunkPosition, this] (FLoadResult&& Result)
 			{
-				UE_LOG(LogChunk, Verbose, TEXT("Processing load for chunk %s"), *ChunkPosition.ToString());
+				UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Processing load for chunk %s"), *ChunkPosition.ToString());
 
 				if (ProcessingLoad.FindRef(ChunkPosition) == true)
 				{
@@ -139,7 +139,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 
 					if (PendingPacketsByPosition.Contains(ChunkPosition))
 					{
-						UE_LOG(LogChunk, VeryVerbose, TEXT("Chunk %s has PendingNetSend"), *ChunkPosition.ToString());
+						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Chunk %s has PendingNetSend"), *ChunkPosition.ToString());
 						if (
 							ensureMsgf(GameManager->VirtualMap->VirtualChunks.Contains(ChunkPosition), TEXT("Chunk %s was not registered in VirtualMap when trying to send data to players."), *ChunkPosition.ToString())
 							)
@@ -213,7 +213,7 @@ void UVirtualMapTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
 	
 	if (!bServer)
 	{
-		UE_LOG(LogChunk, Warning, TEXT("Trying to schedule a NetSend from client, ignoring it."));
+		UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Trying to schedule a NetSend from client, ignoring it."));
 		return;
 	}
 	
@@ -233,14 +233,14 @@ void UVirtualMapTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
 #if !UE_BUILD_SHIPPING
 			if (!ProcessingLoad.Contains(ChunkPosition))
 			{
-				UE_LOG(LogChunk, Warning, TEXT("Chunk %s was requested for a NetSend, but it was not scheduled for load. Player: %s"),
+				UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Chunk %s was requested for a NetSend, but it was not scheduled for load. Player: %s"),
 					*ChunkPosition.ToString(), *ToPlayer->GetName());
 			}
 #endif
 
 			if (ProcessingUnload.Contains(ChunkPosition))
 			{
-				UE_LOG(LogChunk, Verbose, TEXT("Chunk %s was requested for a NetSend, but it was scheduled for unload, discarding it. Player: %s"),
+				UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Chunk %s was requested for a NetSend, but it was scheduled for unload, discarding it. Player: %s"),
 					*ChunkPosition.ToString(), *ToPlayer->GetName());
 			} else
 			{
@@ -278,7 +278,7 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 	{
 		if (ProcessingLoad.Contains(ChunkPosition))
 		{
-			UE_LOG(LogChunk, Verbose, TEXT("Cancelling load for chunk %s"), *ChunkPosition.ToString());
+			UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Cancelling load for chunk %s"), *ChunkPosition.ToString());
 			ProcessingLoad.Add(ChunkPosition, false);
 		}
 
@@ -302,7 +302,7 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 
 		if (!Region)
 		{
-			UE_LOG(LogChunk, Warning, TEXT("Failed to unload chunk %s: region %s file not found."), *ChunkPosition.ToString(), *RegionPosition.ToString());
+			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Failed to unload chunk %s: region %s file not found."), *ChunkPosition.ToString(), *RegionPosition.ToString());
 			continue;
 		}
 
@@ -312,14 +312,14 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 			{
 				if (!ChunkData)
 				{
-					UE_LOG(LogChunk, Warning, TEXT("Failed to unload chunk data at local position %s: chunk data not found."), *LocalChunkPosition.ToString());
+					UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Failed to unload chunk data at local position %s: chunk data not found."), *LocalChunkPosition.ToString());
 					return;
 				}
 				Region->Th_SaveChunk(LocalChunkPosition, ChunkData);
 			},
 			[ChunkPosition, this]
 			{
-				UE_LOG(LogChunk, Verbose, TEXT("Processing unload for chunk %s"), *ChunkPosition.ToString());
+				UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Processing unload for chunk %s"), *ChunkPosition.ToString());
 				
 				if (ProcessingUnload.FindRef(ChunkPosition) == true)
 				{

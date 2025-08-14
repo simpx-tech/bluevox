@@ -96,13 +96,10 @@ public:
 	UInputMappingContext* DefaultInputContext;
 
 	FBlockRaycastResult LastRaycastResult;
-		
+	
 	virtual void BeginPlay() override;
 
 	virtual void OnRep_PlayerState() override;
-
-	UFUNCTION(NetMulticast, Reliable)
-	void Broadcast_ChunkUpdate(const FGlobalPosition Position, const FPiece& Piece);
 
 	UFUNCTION(Reliable, Server)
 	void Sv_LeftClick();
