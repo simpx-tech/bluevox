@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Bluevox/Chunk/Generator/FlatWorldGenerator.h"
+#include "Bluevox/Chunk/Position/GlobalPosition.h"
 #include "UObject/Object.h"
 #include "WorldSave.generated.h"
 
@@ -72,6 +73,12 @@ public:
 	bool LoadPlayer(AMainController* PlayerController) const;
 
 	// DEV load network
+
+	UPROPERTY()
+	bool bLoadedFromDisk = false;
+	
+	UPROPERTY()
+	FGlobalPosition SpawnPosition;
 
 	UPROPERTY()
 	FString WorldName;

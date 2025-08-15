@@ -81,7 +81,7 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	uint32 PacketIdCounter = 0;
 
 	UPROPERTY(EditAnywhere)
-	uint32 ChunkSize = 3800; // 3.8 Kb
+	uint32 ChunkSize = 10000; // 3.8 Kb
 
 	// TODO erase this over time, so we don't accumulate too many unknown chunks in memory
 	TMap<uint32, TArray<FPacketChunk>> UnknownChunks;
@@ -90,7 +90,7 @@ class BLUEVOX_API UPlayerNetwork : public UActorComponent
 	uint32 MaxSentBytesPerSecond = 1024 * 512; // 512 kb/s
 
 	UPROPERTY(EditAnywhere)
-	int32 ResendTimeoutSecs = 5;
+	int32 ResendTimeoutSecs = 3;
 	
 	UPROPERTY()
 	uint32 SentThisSecond = 0;

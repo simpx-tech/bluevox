@@ -265,6 +265,11 @@ void UVirtualMap::RegisterPlayer(const AMainController* Player)
 
 	UE_LOG(LogVirtualMap, Verbose, TEXT("Registering player %s at position %s with far distance %d"),
 		*Player->GetName(), *GlobalPosition.ToString(), Player->GetFarDistance());
+
+	// DEV make the as ready/spawn chunks, when finishing loading these = player is ready
+	// DEV when player is ready on the server (all rendered) = calculate it's real position (Z) and store it
+	// DEV when player is ready on the client (all rendered) = set ready client
+	// DEV when both ready in server and client = set ready = true -> allow movement, collision, etc.
 	
 	AddPlayerToChunks(Player, LoadChunks, LiveChunks);
 }

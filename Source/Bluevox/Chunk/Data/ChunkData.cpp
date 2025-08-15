@@ -5,17 +5,73 @@
 
 #include "Bluevox/Chunk/LogChunk.h"
 
-void UChunkData::BeginDestroy()
-{
-	UE_LOG(LogTemp, Verbose, TEXT("UChunkData::BeginDestroy called for ChunkData %p"), this);
-	UObject::BeginDestroy();
-}
-
 void UChunkData::Serialize(FArchive& Ar)
 {
 	FReadScopeLock ReadLock(Lock);
 	UObject::Serialize(Ar);
 	Ar << Columns;
+}
+
+// TODO in future may have to consider potential caves
+int32 UChunkData::GetFirstGapThatFits(const int32 X, const int32 Y, const int32 FitHeightInLayers)
+{
+	const auto Index = GetIndex(X, Y);
+	if (!Columns.IsValidIndex(Index))
+	{
+		UE_LOG(LogChunk, Warning, TEXT("GetSurfacePosition: Invalid column index %d for %d,%d"), Index, X, Y);
+		return GameRules::Chunk::Height;
+	}
+
+	const auto& Column = Columns[Index];
+	if (Column.Pieces.Num() == 0)
+	{
+		return GameRules::Chunk::Height;
+	}
+
+	int32 CurZ = 0;
+	for (const auto& Piece : Column.Pieces)
+	{
+		if (Piece.Id == 0 && Piece.Size >= FitHeightInLayers)
+		{
+			return CurZ;
+		}
+		
+		CurZ += Piece.Size;
+	}
+
+	return CurZ;
+}
+
+bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int32 FitHeight) const
+{
+	if (FitHeight <= 0) return false;
+	if (Z < 0) return false;
+
+	const int32 ColIndex = GetIndex(X, Y);
+	if (!Columns.IsValidIndex(ColIndex))
+	{
+		UE_LOG(LogChunk, Warning, TEXT("DoesFit: Invalid column index %d for %d,%d"), ColIndex, X, Y);
+		return false;
+	}
+
+	const auto& Column = Columns[ColIndex];
+
+	int32 CurZ = 0;
+	for (const auto& Piece : Column.Pieces)
+	{
+		const int32 PieceEnd = CurZ + Piece.Size;
+
+		// Z is inside this piece
+		if (Z < PieceEnd)
+		{
+			if (Piece.Id != GameRules::Constants::GShapeId_Void) return false;
+			const int32 Remaining = PieceEnd - Z;
+			return Remaining >= FitHeight;
+		}
+		CurZ = PieceEnd;
+	}
+
+	return Z + FitHeight <= GameRules::Chunk::Height;
 }
 
 FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)

@@ -44,6 +44,11 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 
 	UPROPERTY()
 	bool bServer = false;
+
+	UPROPERTY()
+	TMap<const AMainController*, int32> WaitingSpawnRenderPerPlayer;
+
+	TMap<FChunkPosition, TArray<const AMainController*>> PlayersWaitingForSpawnRender;
 	
 public:
 	UPROPERTY()

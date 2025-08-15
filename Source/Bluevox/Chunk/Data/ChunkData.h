@@ -24,8 +24,6 @@ public:
 		Columns = MoveTemp(InColumns);
 		return this;
 	}
-
-	virtual void BeginDestroy() override;
 	
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
@@ -39,8 +37,13 @@ public:
 
 	void SerializeForSave(FArchive& Ar)
 	{
+		FReadScopeLock ReadLock(Lock);
 		Ar << Columns;
 	}
+
+	int32 GetFirstGapThatFits(const int32 X, const int32 Y, const int32 FitHeightInLayers);
+
+	bool DoesFit(const int32 X, const int32 Y, const int32 Z, const int32 FitHeightInLayers) const;
 
 	static int32 GetIndex(const int32 X, const int32 Y)
 	{

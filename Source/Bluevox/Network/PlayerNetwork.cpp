@@ -444,7 +444,7 @@ void UPlayerNetwork::NetTick()
 	// Check for resend
 	for (auto& [PacketId, PendingReceive] : PendingReceives)
 	{
-		if (FPlatformTime::Seconds() > PendingReceive.LastPacketTimeSecs + ResendTimeoutSecs)
+		if (FPlatformTime::Seconds() > PendingReceive.LastPacketTimeSecs + ResendTimeoutSecs && PendingReceive.PacketId <= ExpectedPacketId)
 		{
 			TArray<int32> MissingChunkIndexes;
 

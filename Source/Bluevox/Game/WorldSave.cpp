@@ -31,6 +31,7 @@ void UWorldSave::Serialize(FArchive& Ar)
 {
 	Ar << WorldName;
 	Ar << SaveVersion;
+	Ar << SpawnPosition;
 
 	if (!HasAnyFlags(RF_ClassDefaultObject))
 	{
@@ -66,6 +67,7 @@ UWorldSave* UWorldSave::LoadWorldSave(AGameManager* InGameManager, const FString
 	FMemoryReader MemoryReader(ByteArray, true);
 	FObjectAndNameAsStringProxyArchive Ar(MemoryReader, true);
 	WorldSave->Serialize(Ar);
+	WorldSave->bLoadedFromDisk = true;
 	WorldSave->WorldGenerator->Init(InGameManager);
 
 	return WorldSave;
@@ -131,6 +133,7 @@ bool UWorldSave::LoadPlayer(AMainController* PlayerController) const
 
 	if (!FPaths::FileExists(FilePath))
 	{
+		PlayerController->SavedGlobalPosition = SpawnPosition;
 		SavePlayer(PlayerController);
 	}
 	

@@ -3,16 +3,16 @@
 
 #include "NetworkPacket.h"
 
+#include "Compression/OodleDataCompressionUtil.h"
 #include "Serialization/ArchiveLoadCompressedProxy.h"
 #include "Serialization/ArchiveSaveCompressedProxy.h"
 #include "Serialization/BufferArchive.h"
 
 void UNetworkPacket::Compress(TArray<uint8>& OutData)
 {
-	
 	FBufferArchive ChunkArchive;
 	Serialize(ChunkArchive);
-
+	
 	FArchiveSaveCompressedProxy Compressor = FArchiveSaveCompressedProxy(OutData, NAME_Zlib);
 	Compressor << ChunkArchive;
 	Compressor.Flush();

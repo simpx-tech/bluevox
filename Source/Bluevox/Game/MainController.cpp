@@ -120,6 +120,7 @@ void AMainController::BeginPlay()
 	
 	Super::BeginPlay();
 
+	// For remote players (not server)
 	if (GameManager->bServer && GameManager->LocalController != this && GameManager->bInitialized)
 	{
 		GameManager->VirtualMap->RegisterPlayer(this);
