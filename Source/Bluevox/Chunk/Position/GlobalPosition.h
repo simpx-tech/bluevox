@@ -1,7 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "GlobalPosition.generated.h"
 
 struct FChunkPosition;
@@ -23,9 +23,9 @@ struct FGlobalPosition
 	static FGlobalPosition FromActorLocation(const FVector& Location)
 	{
 		FGlobalPosition GlobalPosition;
-		GlobalPosition.X = FMath::FloorToInt(Location.X / GameRules::Scaling::XYWorldSize);
-		GlobalPosition.Y = FMath::FloorToInt(Location.Y / GameRules::Scaling::XYWorldSize);
-		GlobalPosition.Z = FMath::FloorToInt(Location.Z / GameRules::Scaling::ZSize);
+		GlobalPosition.X = FMath::FloorToInt(Location.X / GameConstants::Scaling::XYWorldSize);
+		GlobalPosition.Y = FMath::FloorToInt(Location.Y / GameConstants::Scaling::XYWorldSize);
+		GlobalPosition.Z = FMath::FloorToInt(Location.Z / GameConstants::Scaling::ZSize);
 		return GlobalPosition;
 	}
 
@@ -58,9 +58,9 @@ struct FGlobalPosition
 	FVector AsActorLocationCopy() const
 	{
 		return FVector(
-			X * GameRules::Scaling::XYWorldSize,
-			Y * GameRules::Scaling::XYWorldSize,
-			Z * GameRules::Scaling::ZSize);
+			X * GameConstants::Scaling::XYWorldSize,
+			Y * GameConstants::Scaling::XYWorldSize,
+			Z * GameConstants::Scaling::ZSize);
 	}
 };
 

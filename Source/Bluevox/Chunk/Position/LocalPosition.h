@@ -1,8 +1,11 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Utils/PositiveMod.h"
 #include "LocalPosition.generated.h"
+
+struct FGlobalPosition;
 
 USTRUCT(BlueprintType)
 struct FLocalPosition
@@ -20,27 +23,19 @@ struct FLocalPosition
 
 	static FLocalPosition FromActorLocation(const FVector& Location)
 	{
-		const int32 GlobalX = FMath::FloorToInt(Location.X / GameRules::Scaling::XYWorldSize);
-		const int32 GlobalY = FMath::FloorToInt(Location.Y / GameRules::Scaling::XYWorldSize);
-		const int32 GlobalZ = FMath::FloorToInt(Location.Z / GameRules::Scaling::ZSize);
+		const int32 GlobalX = FMath::FloorToInt(Location.X / GameConstants::Scaling::XYWorldSize);
+		const int32 GlobalY = FMath::FloorToInt(Location.Y / GameConstants::Scaling::XYWorldSize);
+		const int32 GlobalZ = FMath::FloorToInt(Location.Z / GameConstants::Scaling::ZSize);
 
 		FLocalPosition LocalPosition;
-		LocalPosition.X = static_cast<uint8>(PositiveMod(GlobalX, GameRules::Chunk::Size));
-		LocalPosition.Y = static_cast<uint8>(PositiveMod(GlobalY, GameRules::Chunk::Size));
+		LocalPosition.X = static_cast<uint8>(PositiveMod(GlobalX, GameConstants::Chunk::Size));
+		LocalPosition.Y = static_cast<uint8>(PositiveMod(GlobalY, GameConstants::Chunk::Size));
 		LocalPosition.Z = static_cast<uint16>(GlobalZ);
 
 		return LocalPosition;
 	}
 
-	static FLocalPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition)
-	{
-		FLocalPosition LocalPosition;
-		LocalPosition.X = static_cast<uint8>(PositiveMod(GlobalPosition.X, GameRules::Chunk::Size));
-		LocalPosition.Y = static_cast<uint8>(PositiveMod(GlobalPosition.Y, GameRules::Chunk::Size));
-		LocalPosition.Z = static_cast<uint16>(PositiveMod(GlobalPosition.Z, GameRules::Chunk::Height));
-
-		return LocalPosition;
-	}
+	static FLocalPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition);
 
 	UPROPERTY()
 	uint8 X = 0;

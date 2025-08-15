@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-namespace GameRules::Constants
+namespace GameConstants::Constants
 {
 	inline constexpr uint16 GShapeId_Void = 0;
 	
@@ -13,42 +13,42 @@ namespace GameRules::Constants
 
 #if UE_BUILD_SHIPPING
 
-namespace GameRules::Chunk
+namespace GameConstants::Chunk
 {
 	extern inline constexpr int32 Size = 48;
 	extern inline constexpr int32 Height = 1024;
 }
 
-namespace GameRules::Scaling
+namespace GameConstants::Scaling
 {
 	extern inline constexpr float XYWorldSize = 100;
 	extern inline constexpr float ZSize = 25;
 	extern inline constexpr float PlayerHeight = 100;
 }
 
-namespace GameRules::Distances
+namespace GameConstants::Distances
 {
 	extern inline constexpr int32 InteractionDistance = 500;
 }
 
-namespace GameRules::Region
+namespace GameConstants::Region
 {
 	extern inline constexpr int32 Size = 24;
 }
 
-namespace GameRules::Region::File
+namespace GameConstants::Region::File
 {
 	extern inline constexpr int32 SegmentSizeBytes = 10240; // 10 kb
 }
 
-namespace GameRules::Tick
+namespace GameConstants::Tick
 {
 	extern inline constexpr int32 TicksPerSecond = 24;
 	extern inline constexpr float TickBudget = 1'500'000; // 1.5 ms
 }
 
 #else
-namespace GameRules::Chunk
+namespace GameConstants::Chunk
 {
 	extern inline int32 Size = 48;
 	static FAutoConsoleVariableRef CVarChunkSize(
@@ -61,7 +61,7 @@ namespace GameRules::Chunk
 		TEXT("The number of blocks in Z"), ECVF_Default);
 }
 
-namespace GameRules::Scaling
+namespace GameConstants::Scaling
 {
 	extern inline float XYWorldSize = 100;
 	static FAutoConsoleVariableRef CVarBlockWorldSize(
@@ -81,7 +81,7 @@ namespace GameRules::Scaling
 		ECVF_Default);
 }
 
-namespace GameRules::Distances
+namespace GameConstants::Distances
 {
 	extern inline int32 InteractionDistance = 500;
 	static FAutoConsoleVariableRef CVarInteractionDistance(
@@ -89,7 +89,7 @@ namespace GameRules::Distances
 		TEXT("The distance for interaction"), ECVF_Default);
 }
 
-namespace GameRules::Region
+namespace GameConstants::Region
 {
 	extern inline int32 Size = 24;
 	static FAutoConsoleVariableRef CVarRegionSize(
@@ -97,7 +97,7 @@ namespace GameRules::Region
 		TEXT("The number of chunks in X and Y axis"), ECVF_Default);
 }
 
-namespace GameRules::Region::File
+namespace GameConstants::Region::File
 {
 	extern inline int32 SegmentSizeBytes = 10240; // 10 kb
 	static FAutoConsoleVariableRef CVarSegmentSizeBytes(
@@ -105,7 +105,7 @@ namespace GameRules::Region::File
 		TEXT("The size of a region file segment in bytes"), ECVF_Default);
 }
 
-namespace GameRules::Tick
+namespace GameConstants::Tick
 {
 	extern inline int32 TicksPerSecond = 24;
 	static FAutoConsoleVariableRef CVarTicksPerSecond(
@@ -118,18 +118,3 @@ namespace GameRules::Tick
 		TEXT("Maximum time (in nanoseconds) before spreading tasks across frames"), ECVF_Default);
 }
 #endif
-
-// Non constants variables
-
-namespace GameRules::Distances
-{
-	extern inline int32 LiveDistance = 6;
-	static FAutoConsoleVariableRef CVarSegmentSizeBytes(
-		TEXT("game.distances.live_distance"), LiveDistance,
-		TEXT("How far to have live chunks around the player"), ECVF_Default);
-
-	extern inline int32 Sv_MaxLoadDistance = 24;
-	static FAutoConsoleVariableRef CVarServerMaxLoadDistance(
-		TEXT("game.distances.sv_max_load_distance"), LiveDistance,
-		TEXT("How far the server allows the player to load chunks"), ECVF_Default);
-}

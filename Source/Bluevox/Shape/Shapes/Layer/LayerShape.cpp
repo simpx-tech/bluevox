@@ -5,18 +5,18 @@
 
 #include "Bluevox/Chunk/CullingMask.h"
 #include "Bluevox/Chunk/RenderGroup.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "DynamicMesh/DynamicMeshAttributeSet.h"
 
 FName ULayerShape::GetNameId() const
 {
-	return GameRules::Constants::GShape_Layer;
+	return GameConstants::Constants::GShape_Layer;
 }
 
 void ULayerShape::GenerateRenderGroups()
 {
-	const auto BlockSize = GameRules::Scaling::XYWorldSize;
-	const auto LayerSize = GameRules::Scaling::ZSize;
+	const auto BlockSize = GameConstants::Scaling::XYWorldSize;
+	const auto LayerSize = GameConstants::Scaling::ZSize;
 	const auto LayerPercent = LayerSize / BlockSize;
 
 	NorthRenderGroup = new FRenderGroup();

@@ -6,6 +6,8 @@
 #include "GameFramework/Actor.h"
 #include "GameManager.generated.h"
 
+class UChunkTaskManager;
+class UGameRule;
 class UWorldGenerator;
 class UMaterialRegistry;
 class UShapeRegistry;
@@ -15,6 +17,10 @@ class UChunkRegistry;
 class AMainCharacter;
 class AMainController;
 class UVirtualMap;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoin, AMainController*, PlayerController);
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeave, AMainController*, PlayerController);
 
 UCLASS()
 class BLUEVOX_API AGameManager : public AActor
@@ -33,17 +39,14 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
-	UPROPERTY(EditAnywhere, Category = "Development")
-	bool bEraseAllSavesOnStart = false;
+	UPROPERTY()
+	FOnPlayerJoin OnPlayerJoin;
 
-	UPROPERTY(EditAnywhere, Category = "Development")
-	bool bAutomaticallyRegisterPlayer = true;
-
-	UPROPERTY(EditAnywhere, Category = "Development")
-	bool bOverrideWorldGenerator = false;
-
-	UPROPERTY(EditAnywhere, Instanced, Category = "Development", meta = (EditCondition = "bOverrideWorldGenerator", ShowOnlyInnerProperties))
-	TObjectPtr<UWorldGenerator> WorldGeneratorOverride;
+	UPROPERTY()
+	FOnPlayerLeave OnPlayerLeave;
+	
+	UPROPERTY(EditAnywhere, Instanced, meta = (ShowOnlyInnerProperties), Category = "Game Rules")
+	TArray<UGameRule*> GameRules;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
 	UMaterial* ChunkMaterial = nullptr;
@@ -72,6 +75,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	UChunkRegistry* ChunkRegistry = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
+	UChunkTaskManager* ChunkTaskManager = nullptr;
+	
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UTickManager* TickManager = nullptr;
 

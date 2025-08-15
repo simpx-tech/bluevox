@@ -18,7 +18,7 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 {
 	GENERATED_BODY()
 
-	friend class UVirtualMapTaskManager;
+	friend class UChunkTaskManager;
 	friend class UChunkDataNetworkPacket;
 
 	UPROPERTY()
@@ -51,9 +51,6 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	TMap<FChunkPosition, TArray<const AMainController*>> PlayersWaitingForSpawnRender;
 	
 public:
-	UPROPERTY()
-	UVirtualMapTaskManager* TaskManager;
-	
 	UVirtualMap* Init(AGameManager* InGameManager);
 
 	void RegisterPlayer(const AMainController* Player);

@@ -5,7 +5,7 @@
 
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "FastNoiseWrapper.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
@@ -18,23 +18,23 @@ UNoiseWorldGenerator::UNoiseWorldGenerator()
 
 void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const
 {
-	OutColumns.SetNum(GameRules::Chunk::Size * GameRules::Chunk::Size);
+	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
-	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
-	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Grass);
-	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Stone);
+	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Dirt);
+	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Grass);
+	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Stone);
 
-	const auto MaxHeight = FMath::FloorToInt(GameRules::Chunk::Height * 0.75f);
+	const auto MaxHeight = FMath::FloorToInt(GameConstants::Chunk::Height * 0.75f);
 	
-	for (int X = 0; X < GameRules::Chunk::Size; ++X)
+	for (int X = 0; X < GameConstants::Chunk::Size; ++X)
 	{
-		for (int Y = 0; Y < GameRules::Chunk::Size; ++Y)
+		for (int Y = 0; Y < GameConstants::Chunk::Size; ++Y)
 		{
 			const auto Index = UChunkData::GetIndex(X, Y);
 			auto& Column = OutColumns[Index];
 
-			const auto WorldX = X + Position.X * GameRules::Chunk::Size;
-			const auto WorldY = Y + Position.Y * GameRules::Chunk::Size;
+			const auto WorldX = X + Position.X * GameConstants::Chunk::Size;
+			const auto WorldY = Y + Position.Y * GameConstants::Chunk::Size;
 
 			const float NoiseValue = Noise->GetNoise2D(WorldX * 0.5f, WorldY * 0.5f);
 
@@ -44,12 +44,12 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 			const auto GrassHeight = FMath::RandRange(1, 2);
 			const auto DirtHeight = FMath::RandRange(1, 6);
 			const auto StoneHeight = Height - GrassHeight - DirtHeight;
-			const auto VoidHeight = GameRules::Chunk::Height - Height;
+			const auto VoidHeight = GameConstants::Chunk::Height - Height;
 			
 			Column.Pieces.Emplace(StoneId, StoneHeight);
 			Column.Pieces.Emplace(DirtId, DirtHeight);
 			Column.Pieces.Emplace(GrassId, GrassHeight);
-			Column.Pieces.Emplace(GameRules::Constants::GShapeId_Void, VoidHeight);
+			Column.Pieces.Emplace(GameConstants::Constants::GShapeId_Void, VoidHeight);
 		}
 	}
 }

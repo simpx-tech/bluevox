@@ -19,13 +19,13 @@ int32 UChunkData::GetFirstGapThatFits(const int32 X, const int32 Y, const int32 
 	if (!Columns.IsValidIndex(Index))
 	{
 		UE_LOG(LogChunk, Warning, TEXT("GetSurfacePosition: Invalid column index %d for %d,%d"), Index, X, Y);
-		return GameRules::Chunk::Height;
+		return GameConstants::Chunk::Height;
 	}
 
 	const auto& Column = Columns[Index];
 	if (Column.Pieces.Num() == 0)
 	{
-		return GameRules::Chunk::Height;
+		return GameConstants::Chunk::Height;
 	}
 
 	int32 CurZ = 0;
@@ -64,14 +64,14 @@ bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int3
 		// Z is inside this piece
 		if (Z < PieceEnd)
 		{
-			if (Piece.Id != GameRules::Constants::GShapeId_Void) return false;
+			if (Piece.Id != GameConstants::Constants::GShapeId_Void) return false;
 			const int32 Remaining = PieceEnd - Z;
 			return Remaining >= FitHeight;
 		}
 		CurZ = PieceEnd;
 	}
 
-	return Z + FitHeight <= GameRules::Chunk::Height;
+	return Z + FitHeight <= GameConstants::Chunk::Height;
 }
 
 FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)

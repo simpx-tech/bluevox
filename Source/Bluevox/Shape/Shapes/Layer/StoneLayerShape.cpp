@@ -3,7 +3,7 @@
 
 #include "StoneLayerShape.h"
 
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 
 uint16 UStoneLayerShape::GetMaterialId() const
 {
@@ -12,5 +12,5 @@ uint16 UStoneLayerShape::GetMaterialId() const
 
 FName UStoneLayerShape::GetNameId() const
 {
-	return GameRules::Constants::GShape_Layer_Stone;
+	return GameConstants::Constants::GShape_Layer_Stone;
 }

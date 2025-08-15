@@ -7,7 +7,7 @@
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "UObject/Object.h"
-#include "VirtualMapTaskManager.generated.h"
+#include "ChunkTaskManager.generated.h"
 
 class UWorldSave;
 class UTickManager;
@@ -16,6 +16,8 @@ class UChunkRegistry;
 class UChunkData;
 class UVirtualMap;
 class AMainController;
+
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAllRenderTasksFinishedForChunk, FChunkPosition, Position);
 
 struct FLoadResult
 {
@@ -49,12 +51,18 @@ struct FProcessingRender
 	int32 PendingTasks = 0;
 };
 
+USTRUCT(BlueprintType)
 struct FPendingNetSendChunks
 {
+	GENERATED_BODY()
+
+	UPROPERTY()
 	TArray<FChunkPosition> ToSend;
 
+	UPROPERTY()
 	TSet<FChunkPosition> WaitingFor;
 
+	UPROPERTY()
 	const AMainController* Player = nullptr;
 };
 
@@ -62,7 +70,7 @@ struct FPendingNetSendChunks
  *
  */
 UCLASS()
-class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameObject
+class BLUEVOX_API UChunkTaskManager : public UObject, public FTickableGameObject
 {
 	GENERATED_BODY()
 
@@ -106,7 +114,10 @@ class BLUEVOX_API UVirtualMapTaskManager : public UObject, public FTickableGameO
 	void Sv_ProcessPendingNetSend(const FPendingNetSendChunks& PendingNetSend) const;
 	
 public:
-	UVirtualMapTaskManager* Init(AGameManager* InGameManager);
+	UPROPERTY(BlueprintAssignable)
+	FOnAllRenderTasksFinishedForChunk OnAllRenderTasksFinishedForChunk;
+	
+	UChunkTaskManager* Init(AGameManager* InGameManager);
 
 	UFUNCTION()
 	void HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Packet);

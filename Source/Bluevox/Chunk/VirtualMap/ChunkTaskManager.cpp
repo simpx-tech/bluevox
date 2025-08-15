@@ -1,7 +1,7 @@
 ﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
-#include "VirtualMapTaskManager.h"
+#include "ChunkTaskManager.h"
 
 #include "LogVirtualMapTaskManager.h"
 #include "VirtualMap.h"
@@ -15,9 +15,8 @@
 #include "Bluevox/Network/ChunkDataNetworkPacket.h"
 #include "Bluevox/Network/PlayerNetwork.h"
 #include "Bluevox/Tick/TickManager.h"
-#include "DynamicMesh/DynamicMesh3.h"
 
-void UVirtualMapTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunks& PendingNetSend) const
+void UChunkTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunks& PendingNetSend) const
 {
 	UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Processing pending net send for player %s, sending %d chunks"),
 		*PendingNetSend.Player->GetName(), PendingNetSend.ToSend.Num());
@@ -43,14 +42,14 @@ void UVirtualMapTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunk
 	PendingNetSend.Player->PlayerNetwork->SendToClient(Packet);
 }
 
-UVirtualMapTaskManager* UVirtualMapTaskManager::Init(AGameManager* InGameManager)
+UChunkTaskManager* UChunkTaskManager::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
 	bServer = InGameManager->bServer;
 	return this;
 }
 
-void UVirtualMapTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Packet)
+void UChunkTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Packet)
 {
 	const auto ChunkRegistry = GameManager->ChunkRegistry;
 	UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Handling chunk data network packet with %d chunks"), Packet->Data.Num());
@@ -95,7 +94,7 @@ void UVirtualMapTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacke
 	}
 }
 
-void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
+void UChunkTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 {
 	if (!bServer)
 	{
@@ -140,25 +139,20 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 					if (PendingPacketsByPosition.Contains(ChunkPosition))
 					{
 						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Chunk %s has PendingNetSend"), *ChunkPosition.ToString());
-						if (
-							ensureMsgf(GameManager->VirtualMap->VirtualChunks.Contains(ChunkPosition), TEXT("Chunk %s was not registered in VirtualMap when trying to send data to players."), *ChunkPosition.ToString())
-							)
+						TArray<int32> ToRemove;
+						for (const auto& PackageIndex : PendingPacketsByPosition[ChunkPosition])
 						{
-							TArray<int32> ToRemove;
-							for (const auto& PackageIndex : PendingPacketsByPosition[ChunkPosition])
+							auto& PendingPacket = PendingPackets[PackageIndex];
+							PendingPacket.WaitingFor.Remove(ChunkPosition);
+							
+							if (PendingPacket.WaitingFor.Num() == 0)
 							{
-								auto& PendingPacket = PendingPackets[PackageIndex];
-								PendingPacket.WaitingFor.Remove(ChunkPosition);
-								
-								if (PendingPacket.WaitingFor.Num() == 0)
-								{
-									Sv_ProcessPendingNetSend(PendingPacket);
-									PendingPackets.RemoveAt(PackageIndex);
-								}
+								Sv_ProcessPendingNetSend(PendingPacket);
+								PendingPackets.RemoveAt(PackageIndex);
 							}
-
-							PendingPacketsByPosition.Remove(ChunkPosition);
 						}
+
+						PendingPacketsByPosition.Remove(ChunkPosition);
 					}
 
 					// Prevent spawn from stuttering game
@@ -189,7 +183,7 @@ void UVirtualMapTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLo
 	}
 }
 
-void UVirtualMapTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksToRender)
+void UChunkTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksToRender)
 {
 	for (const auto& ChunkPosition : ChunksToRender)
 	{
@@ -203,7 +197,7 @@ void UVirtualMapTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksTo
 	}
 }
 
-void UVirtualMapTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
+void UChunkTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
 	const TSet<FChunkPosition>& ChunksToSend)
 {
 	if (ChunksToSend.Num() == 0)
@@ -256,7 +250,7 @@ void UVirtualMapTaskManager::Sv_ScheduleNetSend(const AMainController* ToPlayer,
 	}
 }
 
-void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksToUnload)
+void UChunkTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksToUnload)
 {
 	if (!bServer)
 	{
@@ -332,12 +326,12 @@ void UVirtualMapTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksTo
 	}
 }
 
-TStatId UVirtualMapTaskManager::GetStatId() const
+TStatId UChunkTaskManager::GetStatId() const
 {
 	RETURN_QUICK_DECLARE_CYCLE_STAT(UVirtualMapTaskManager, STATGROUP_Tickables);
 }
 
-void UVirtualMapTaskManager::Tick(float DeltaTime)
+void UChunkTaskManager::Tick(float DeltaTime)
 {
 	if (ProcessingLoad.Num() == 0 && WaitingToBeSent.Num() == 0 && PendingRender.Num() != 0)
 	{

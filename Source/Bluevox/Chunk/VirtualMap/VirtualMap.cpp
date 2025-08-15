@@ -3,9 +3,9 @@
 
 #include "VirtualMap.h"
 
+#include "ChunkTaskManager.h"
 #include "LogVirtualMap.h"
 #include "VirtualMapStats.h"
-#include "VirtualMapTaskManager.h"
 #include "Bluevox/Chunk/ChunkHelper.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
@@ -80,7 +80,7 @@ void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, cons
 		}
 	}
 	
-	TaskManager->ScheduleUnload(ToUnload);
+	GameManager->ChunkTaskManager->ScheduleUnload(ToUnload);
 }
 
 void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
@@ -162,9 +162,9 @@ void UVirtualMap::AddPlayerToChunks(const AMainController* Controller,
 		}
 	}
 
-	TaskManager->ScheduleLoad(ScheduleLoad);
-	TaskManager->ScheduleRender(ScheduleRender);
-	TaskManager->Sv_ScheduleNetSend(Controller, ScheduleSend);
+	GameManager->ChunkTaskManager->ScheduleLoad(ScheduleLoad);
+	GameManager->ChunkTaskManager->ScheduleRender(ScheduleRender);
+	GameManager->ChunkTaskManager->Sv_ScheduleNetSend(Controller, ScheduleSend);
 }
 
 void UVirtualMap::HandleStateUpdate(const AMainController* Controller, const TSet<FChunkPosition>& LoadToLive, const TSet<FChunkPosition>& LiveToLoad)
@@ -208,7 +208,7 @@ void UVirtualMap::HandleStateUpdate(const AMainController* Controller, const TSe
 		}
 	}
 
-	TaskManager->ScheduleRender(LoadToLive.Union(LiveToLoad));
+	GameManager->ChunkTaskManager->ScheduleRender(LoadToLive.Union(LiveToLoad));
 }
 
 void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
@@ -248,8 +248,6 @@ void UVirtualMap::HandlePlayerMovement(const AMainController* Controller,
 UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
-	TaskManager = NewObject<UVirtualMapTaskManager>(this);
-	TaskManager->Init(InGameManager);
 	bServer = InGameManager->bServer;
 	return this;
 }

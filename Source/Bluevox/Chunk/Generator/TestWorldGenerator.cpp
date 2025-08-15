@@ -7,7 +7,7 @@
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
 
 UTestWorldGenerator::UTestWorldGenerator()
@@ -19,28 +19,28 @@ UTestWorldGenerator::UTestWorldGenerator()
 void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                         TArray<FChunkColumn>& OutColumns) const
 {
-	OutColumns.SetNum(GameRules::Chunk::Size * GameRules::Chunk::Size);
+	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
-	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
-	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Grass);
-	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Stone);
+	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Dirt);
+	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Grass);
+	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Stone);
 
-	const auto MaxHeight = FMath::FloorToInt(GameRules::Chunk::Height * 0.75f);
+	const auto MaxHeight = FMath::FloorToInt(GameConstants::Chunk::Height * 0.75f);
 	FRandomStream RandomStream(123);
 	
 	if (Position.X == 0 && Position.Y == 0)
 	{
-		for (int X = 0; X < GameRules::Chunk::Size; ++X)
+		for (int X = 0; X < GameConstants::Chunk::Size; ++X)
 		{
-			for (int Y = 0; Y < GameRules::Chunk::Size; ++Y)
+			for (int Y = 0; Y < GameConstants::Chunk::Size; ++Y)
 			{
 				if (X < 4 && Y < 4)
 				{
 					const auto Index = UChunkData::GetIndex(X, Y);
 					auto& Column = OutColumns[Index];
 
-					const auto WorldX = X + Position.X * GameRules::Chunk::Size;
-					const auto WorldY = Y + Position.Y * GameRules::Chunk::Size;
+					const auto WorldX = X + Position.X * GameConstants::Chunk::Size;
+					const auto WorldY = Y + Position.Y * GameConstants::Chunk::Size;
 
 					const float NoiseValue = Noise->GetNoise2D(WorldX * 0.5f, WorldY * 0.5f);
 
@@ -50,18 +50,18 @@ void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 					const auto GrassHeight = RandomStream.RandRange(1, 2);
 					const auto DirtHeight = RandomStream.RandRange(1, 6);
 					const auto StoneHeight = Height - GrassHeight - DirtHeight;
-					const auto VoidHeight = GameRules::Chunk::Height - Height;
+					const auto VoidHeight = GameConstants::Chunk::Height - Height;
 			
 					Column.Pieces.Emplace(StoneId, StoneHeight);
 					Column.Pieces.Emplace(DirtId, DirtHeight);
 					Column.Pieces.Emplace(GrassId, GrassHeight);
-					Column.Pieces.Emplace(GameRules::Constants::GShapeId_Void, VoidHeight);
+					Column.Pieces.Emplace(GameConstants::Constants::GShapeId_Void, VoidHeight);
 				} else
 				{
 					const int Index = UChunkData::GetIndex(X, Y);
 					OutColumns[Index] = FChunkColumn{
 						{
-							FPiece{0, static_cast<unsigned short>(GameRules::Chunk::Height)},
+							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 						}
 					};
 				}
@@ -69,14 +69,14 @@ void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 		}
 	} else
 	{
-		for (int X = 0; X < GameRules::Chunk::Size; ++X)
+		for (int X = 0; X < GameConstants::Chunk::Size; ++X)
 		{
-			for (int Y = 0; Y < GameRules::Chunk::Size; ++Y)
+			for (int Y = 0; Y < GameConstants::Chunk::Size; ++Y)
 			{
 				const int Index = UChunkData::GetIndex(X, Y);
 				OutColumns[Index] = FChunkColumn{
 					{
-						FPiece{0, static_cast<unsigned short>(GameRules::Chunk::Height)},
+						FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 					}
 				};
 			}

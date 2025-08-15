@@ -3,11 +3,11 @@
 
 #include "GrassLayerShape.h"
 
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 
 FName UGrassLayerShape::GetNameId() const
 {
-	return GameRules::Constants::GShape_Layer_Grass;
+	return GameConstants::Constants::GShape_Layer_Grass;
 }
 
 uint16 UGrassLayerShape::GetMaterialId() const

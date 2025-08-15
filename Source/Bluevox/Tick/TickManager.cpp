@@ -3,7 +3,7 @@
 
 #include "TickManager.h"
 
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 
 void UTickManager::RemoveTickableByIndexes(TArray<int32>& Indexes)
 {
@@ -139,10 +139,10 @@ void UTickManager::RecalculateBudget()
 {
 	const double SecondsPerCycle = FPlatformTime::GetSecondsPerCycle();
 	
-	const auto TickRate = 1.0f / GameRules::Tick::TicksPerSecond;
+	const auto TickRate = 1.0f / GameConstants::Tick::TicksPerSecond;
 	CalculatedCyclesNeededToTick = static_cast<uint64>(SecondsPerCycle / TickRate);
 
-	const double BudgetSeconds = GameRules::Tick::TickBudget * 1e-9;
+	const double BudgetSeconds = GameConstants::Tick::TickBudget * 1e-9;
 	CalculatedTickBudget = static_cast<uint64>(BudgetSeconds / SecondsPerCycle);
 }
 

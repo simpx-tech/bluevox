@@ -36,7 +36,7 @@ FBlockRaycastResult AMainController::BlockRaycast() const
 	GetPlayerViewPoint(ViewLoc, ViewRot);
 	const FVector Dir = ViewRot.Vector();
 	const FVector Start = ViewLoc;
-	const FVector End = Start + Dir * GameRules::Distances::InteractionDistance;
+	const FVector End = Start + Dir * GameConstants::Distances::InteractionDistance;
 
 	FHitResult Hit;
 	FCollisionQueryParams Params(SCENE_QUERY_STAT(VoxelPick), true);
@@ -61,7 +61,7 @@ FBlockRaycastResult AMainController::BlockRaycast() const
 	// DrawDebugLine(
 	// 	GetWorld(), Hit.ImpactPoint, Hit.ImpactPoint + Face * GameRules::Scaling::ZSize, FColor::Red, false, -1.0f, 0);
 	
-	const double Increment = 0.25 * (Axis == 2 ? GameRules::Scaling::ZSize : GameRules::Scaling::XYWorldSize);
+	const double Increment = 0.25 * (Axis == 2 ? GameConstants::Scaling::ZSize : GameConstants::Scaling::XYWorldSize);
 	
 	FBlockRaycastResult Result;
 	Result.bHit = true;
@@ -91,12 +91,12 @@ void AMainController::Tick(float DeltaSeconds)
 			FString::Printf(TEXT("Place position: %s"), *LastRaycastResult.PlacePosition.ToString()));
 
 		DrawDebugBox(
-			GetWorld(), LastRaycastResult.Position.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
-			FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			GetWorld(), LastRaycastResult.Position.AsActorLocationCopy() + FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
+			FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
 			FQuat::Identity, FColor::Green, false, -1.0f);
 		DrawDebugBox(
-			GetWorld(), LastRaycastResult.PlacePosition.AsActorLocationCopy() + FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
-			FVector(GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::XYWorldSize * 0.5f, GameRules::Scaling::ZSize * 0.5f),
+			GetWorld(), LastRaycastResult.PlacePosition.AsActorLocationCopy() + FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
+			FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
 			FQuat::Identity, FColor::Blue, false, -1.0f);
 	}
 }
@@ -120,11 +120,7 @@ void AMainController::BeginPlay()
 	
 	Super::BeginPlay();
 
-	// For remote players (not server)
-	if (GameManager->bServer && GameManager->LocalController != this && GameManager->bInitialized)
-	{
-		GameManager->VirtualMap->RegisterPlayer(this);
-	}
+	GameManager->OnPlayerJoin.Broadcast(this);
 }
 
 void AMainController::OnRep_PlayerState()
@@ -164,7 +160,7 @@ void AMainController::Sv_RightClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameRules::Constants::GShape_Layer_Dirt);
+		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Dirt);
 		
 		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
 		

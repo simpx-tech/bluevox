@@ -11,7 +11,7 @@
 #include "Position/LocalChunkPosition.h"
 #include "Position/LocalPosition.h"
 #include "VirtualMap/VirtualMap.h"
-#include "VirtualMap/VirtualMapTaskManager.h"
+#include "VirtualMap/ChunkTaskManager.h"
 
 UChunkRegistry* UChunkRegistry::Init(AGameManager* InGameManager)
 {
@@ -67,8 +67,8 @@ AChunk* UChunkRegistry::SpawnChunk(const FChunkPosition Position)
 	const auto Chunk = GetWorld()->SpawnActor<AChunk>(
 		AChunk::StaticClass(),
 		FVector(
-			Position.X * GameRules::Chunk::Size * GameRules::Scaling::XYWorldSize,
-			Position.Y * GameRules::Chunk::Size * GameRules::Scaling::XYWorldSize,
+			Position.X * GameConstants::Chunk::Size * GameConstants::Scaling::XYWorldSize,
+			Position.Y * GameConstants::Chunk::Size * GameConstants::Scaling::XYWorldSize,
 			0.0f),
 		FRotator::ZeroRotator);
 
@@ -97,14 +97,14 @@ void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& Pi
 	const auto ChunkPosition = FChunkPosition::FromGlobalPosition(GlobalPosition);
 	const auto LocalPosition = FLocalPosition::FromGlobalPosition(GlobalPosition);
 	Th_GetChunkData(ChunkPosition)->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(Piece));
-	GameManager->VirtualMap->TaskManager->ScheduleRender({ ChunkPosition });
+	GameManager->ChunkTaskManager->ScheduleRender({ ChunkPosition });
 
 	TArray<FChunkPosition> NeighborsToRender;
 	GlobalPosition.GetBorderChunks(NeighborsToRender);
 	if (NeighborsToRender.Num() > 0)
 	{
 		const TSet<FChunkPosition> UniqueNeighborsToRender = TSet(NeighborsToRender);
-		GameManager->VirtualMap->TaskManager->ScheduleRender(UniqueNeighborsToRender);
+		GameManager->ChunkTaskManager->ScheduleRender(UniqueNeighborsToRender);
 	}
 }
 

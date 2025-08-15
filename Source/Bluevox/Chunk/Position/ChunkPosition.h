@@ -3,7 +3,7 @@
 #include "CoreMinimal.h"
 #include "ColumnPosition.h"
 #include "GlobalPosition.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Utils/FloorDiv.h"
 #include "ChunkPosition.generated.h"
 
@@ -23,8 +23,8 @@ struct FChunkPosition
 
 	static FChunkPosition FromActorLocation(const FVector& Location)
 	{
-		const float ChunkWorldSize = GameRules::Chunk::Size
-							   * GameRules::Scaling::XYWorldSize;
+		const float ChunkWorldSize = GameConstants::Chunk::Size
+							   * GameConstants::Scaling::XYWorldSize;
 		
 		FChunkPosition ChunkPosition;
 		ChunkPosition.X = FMath::FloorToInt(Location.X / ChunkWorldSize);
@@ -35,8 +35,8 @@ struct FChunkPosition
 	static FChunkPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition)
 	{
 		FChunkPosition ChunkPosition;
-		ChunkPosition.X = FloorDiv(GlobalPosition.X, GameRules::Chunk::Size);
-		ChunkPosition.Y = FloorDiv(GlobalPosition.Y, GameRules::Chunk::Size);
+		ChunkPosition.X = FloorDiv(GlobalPosition.X, GameConstants::Chunk::Size);
+		ChunkPosition.Y = FloorDiv(GlobalPosition.Y, GameConstants::Chunk::Size);
 		return ChunkPosition;
 	}
 
@@ -51,8 +51,8 @@ struct FChunkPosition
 	static FChunkPosition FromColumnPosition(const FColumnPosition& ColumnPosition)
 	{
 		FChunkPosition ChunkPosition;
-		ChunkPosition.X = FloorDiv(ColumnPosition.X, GameRules::Chunk::Size);
-		ChunkPosition.Y = FloorDiv(ColumnPosition.Y, GameRules::Chunk::Size);
+		ChunkPosition.X = FloorDiv(ColumnPosition.X, GameConstants::Chunk::Size);
+		ChunkPosition.Y = FloorDiv(ColumnPosition.Y, GameConstants::Chunk::Size);
 		return ChunkPosition;
 	}
 

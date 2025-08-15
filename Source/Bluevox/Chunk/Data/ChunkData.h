@@ -5,7 +5,7 @@
 #include "CoreMinimal.h"
 #include "ChunkColumn.h"
 #include "Bluevox/Chunk/Position/LocalColumnPosition.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "UObject/Object.h"
 #include "ChunkData.generated.h"
 
@@ -47,12 +47,12 @@ public:
 
 	static int32 GetIndex(const int32 X, const int32 Y)
 	{
-		return X + Y * GameRules::Chunk::Size;
+		return X + Y * GameConstants::Chunk::Size;
 	}
 	
 	static int32 GetIndex(const FLocalColumnPosition ColumnPosition)
 	{
-		return ColumnPosition.X + ColumnPosition.Y * GameRules::Chunk::Size;
+		return ColumnPosition.X + ColumnPosition.Y * GameConstants::Chunk::Size;
 	}
 	
 	FChunkColumn& GetColumn(const FLocalColumnPosition ColumnPosition)

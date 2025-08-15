@@ -22,8 +22,8 @@ struct FLocalChunkPosition
 	static FLocalChunkPosition FromChunkPosition(const FChunkPosition& ChunkPosition)
 	{
 		return {
-			static_cast<uint8>(PositiveMod(ChunkPosition.X, GameRules::Region::Size)),
-			static_cast<uint8>(PositiveMod(ChunkPosition.X, GameRules::Region::Size)),
+			static_cast<uint8>(PositiveMod(ChunkPosition.X, GameConstants::Region::Size)),
+			static_cast<uint8>(PositiveMod(ChunkPosition.X, GameConstants::Region::Size)),
 		};
 	}
 

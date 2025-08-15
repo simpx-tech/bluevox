@@ -6,8 +6,8 @@ FRegionPosition FRegionPosition::FromChunkPosition(const FChunkPosition& ChunkPo
 {
 	FRegionPosition RegionPosition;
 
-	RegionPosition.X = FloorDiv(ChunkPosition.X, GameRules::Region::Size);
-	RegionPosition.Y = FloorDiv(ChunkPosition.Y, GameRules::Region::Size);
+	RegionPosition.X = FloorDiv(ChunkPosition.X, GameConstants::Region::Size);
+	RegionPosition.Y = FloorDiv(ChunkPosition.Y, GameConstants::Region::Size);
 	
 	return RegionPosition;
 }

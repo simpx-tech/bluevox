@@ -58,7 +58,6 @@ void AMainGameMode::Logout(AController* Exiting)
 		MainController->SavedGlobalPosition = FGlobalPosition{0,0,0};
 	}
 
-	GameManager->WorldSave->SavePlayer(MainController);
-	GameManager->VirtualMap->UnregisterPlayer(MainController);
+	GameManager->OnPlayerLeave.Broadcast(MainController);
 }
 

@@ -6,7 +6,7 @@
 #include "Bluevox/Chunk/ChunkStats.h"
 #include "Bluevox/Chunk/RenderGroup.h"
 #include "Bluevox/Chunk/Position/LocalPosition.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "Components/BaseDynamicMeshComponent.h"
 
 FName UShape::GetNameId() const
@@ -123,9 +123,9 @@ void UShape::Render(FDynamicMesh3& Mesh, const EFace Face,
 	
 	const auto SizeVector = FVector{1, 1, static_cast<double>(Size)};
 	const auto PositionVector = FVector{
-		Position.X * GameRules::Scaling::XYWorldSize,
-		Position.Y * GameRules::Scaling::XYWorldSize,
-		Position.Z * GameRules::Scaling::ZSize
+		Position.X * GameConstants::Scaling::XYWorldSize,
+		Position.Y * GameConstants::Scaling::XYWorldSize,
+		Position.Z * GameConstants::Scaling::ZSize
 	};
 
 	const auto NormalsOverlay = Mesh.Attributes()->PrimaryNormals();

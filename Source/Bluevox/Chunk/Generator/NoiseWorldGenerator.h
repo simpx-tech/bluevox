@@ -4,7 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "WorldGenerator.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "NoiseWorldGenerator.generated.h"
 
 class UFastNoiseWrapper;

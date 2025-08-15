@@ -8,10 +8,12 @@
 #include "WorldSave.h"
 #include "Bluevox/Chunk/ChunkRegistry.h"
 #include "Bluevox/Chunk/Generator/WorldGenerator.h"
+#include "Bluevox/Chunk/VirtualMap/ChunkTaskManager.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Network/PlayerNetwork.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
 #include "Bluevox/Tick/TickManager.h"
+#include "GameRules/GameRule.h"
 #include "Kismet/GameplayStatics.h"
 
 
@@ -41,6 +43,7 @@ void AGameManager::BeginPlay()
 	bStandalone = GetNetMode() == NM_Standalone;
 
 	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
+	ChunkTaskManager = NewObject<UChunkTaskManager>(this)->Init(this);
 	
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"))->Init(this);
 
@@ -59,37 +62,14 @@ void AGameManager::BeginPlay()
 	const auto Character = UGameplayStatics::GetPlayerCharacter(GetWorld(), 0);
 	LocalCharacter = Cast<AMainCharacter>(Character);
 
-	if (bEraseAllSavesOnStart)
+	for (const auto& Rule : GameRules)
 	{
-		IFileManager::Get().DeleteDirectory(*UWorldSave::GetWorldsDir(), false, true);
-	}
-	
-	// TODO temp
-	WorldSave = UWorldSave::CreateOrLoadWorldSave(this, "TestWorld", UFlatWorldGenerator::StaticClass());
-	
-	if (bOverrideWorldGenerator && WorldSave && WorldGeneratorOverride)
-	{
-		WorldSave->WorldGenerator = WorldGeneratorOverride->Init(this);
+		Rule->OnSetup(this);
 	}
 
-	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
+	for (const auto& Rule : GameRules)
 	{
-		AMainController* PC = Cast<AMainController>(Iterator->Get());
-		if (PC)
-		{
-			PC->GameManager = this;
-			PC->PlayerNetwork->Init(this, PC, LocalPlayerState);
-
-			if (bServer)
-			{
-				WorldSave->LoadPlayer(PC);
-			}
-			
-			if (bAutomaticallyRegisterPlayer)
-			{
-				VirtualMap->RegisterPlayer(PC);			
-			}
-		}
+		Rule->PostSetup(this);
 	}
 
 	bInitialized = true;

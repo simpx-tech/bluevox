@@ -3,11 +3,11 @@
 
 #include "DirtLayerShape.h"
 
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 
 FName UDirtLayerShape::GetNameId() const
 {
-	return GameRules::Constants::GShape_Layer_Dirt;
+	return GameConstants::Constants::GShape_Layer_Dirt;
 }
 
 uint16 UDirtLayerShape::GetMaterialId() const

@@ -1,7 +1,7 @@
 #include "RegionFile.h"
 
 #include "LogChunk.h"
-#include "Bluevox/Game/GameRules.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
 #include "Position/RegionPosition.h"
@@ -19,7 +19,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 		return;
 	}
 	
-	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
+	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	FBufferArchive Uncompressed;
 	Uncompressed << ChunkData->Columns;
@@ -43,7 +43,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 
 bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns)
 {
-	const uint32 Index = Position.X + Position.Y * GameRules::Region::Size;
+	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	TArray<uint8> Compressed;
 	if (!Th_ReadSegment(Index, Compressed)) return false;
@@ -80,8 +80,8 @@ TSharedPtr<FRegionFile> FRegionFile::NewFromDisk(const FString& WorldName,
 	{
 		const auto File = CreateOnDisk(
 			RegionFilePath,
-			GameRules::Region::File::SegmentSizeBytes,
-			GameRules::Region::Size * GameRules::Region::Size
+			GameConstants::Region::File::SegmentSizeBytes,
+			GameConstants::Region::Size * GameConstants::Region::Size
 		);
 
 		if (!File)

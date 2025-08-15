@@ -67,12 +67,12 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	
 	TStaticArray<FRenderNeighbor, 4> Neighbors;
 
-	const auto BaseChunkPosX = Position.X * GameRules::Chunk::Size;
-	const auto BaseChunkPosY = Position.Y * GameRules::Chunk::Size;
+	const auto BaseChunkPosX = Position.X * GameConstants::Chunk::Size;
+	const auto BaseChunkPosY = Position.Y * GameConstants::Chunk::Size;
 	
-	for (int32 LocalX = 0; LocalX < GameRules::Chunk::Size; ++LocalX)
+	for (int32 LocalX = 0; LocalX < GameConstants::Chunk::Size; ++LocalX)
 	{
-		for (int32 LocalY = 0; LocalY < GameRules::Chunk::Size; ++LocalY)
+		for (int32 LocalY = 0; LocalY < GameConstants::Chunk::Size; ++LocalY)
 		{
 			if (Position.X == 0 && Position.Y == 0 && LocalX == 2 && LocalY == 2)
 			{
@@ -110,7 +110,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 
 				// Quick path, skip void
-				if (Piece.Id == GameRules::Constants::GShapeId_Void)
+				if (Piece.Id == GameConstants::Constants::GShapeId_Void)
 				{
 					for (const EFace Face : FaceUtils::AllHorizontalFaces)
 					{
