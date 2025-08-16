@@ -17,7 +17,7 @@ void UChunkLoadingGameRule::OnSetup(AGameManager* InGameManager)
 
 	for (FConstPlayerControllerIterator Iterator = GetWorld()->GetPlayerControllerIterator(); Iterator; ++Iterator)
 	{
-		const AMainController* PC = Cast<AMainController>(Iterator->Get());
+		AMainController* PC = Cast<AMainController>(Iterator->Get());
 		if (PC)
 		{
 			GameManager->VirtualMap->RegisterPlayer(PC);

@@ -21,9 +21,9 @@ void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
-	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Dirt);
-	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Grass);
-	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Stone);
+	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
+	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Grass);
+	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Stone);
 
 	const auto MaxHeight = FMath::FloorToInt(GameConstants::Chunk::Height * 0.75f);
 	FRandomStream RandomStream(123);
@@ -55,7 +55,7 @@ void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 					Column.Pieces.Emplace(StoneId, StoneHeight);
 					Column.Pieces.Emplace(DirtId, DirtHeight);
 					Column.Pieces.Emplace(GrassId, GrassHeight);
-					Column.Pieces.Emplace(GameConstants::Constants::GShapeId_Void, VoidHeight);
+					Column.Pieces.Emplace(GameConstants::Shapes::GShapeId_Void, VoidHeight);
 				} else
 				{
 					const int Index = UChunkData::GetIndex(X, Y);

@@ -1,6 +1,6 @@
 ﻿#pragma once
 
-namespace GameConstants::Constants
+namespace GameConstants::Shapes
 {
 	inline constexpr uint16 GShapeId_Void = 0;
 	
@@ -11,43 +11,6 @@ namespace GameConstants::Constants
 	inline const FName GShape_Layer_Stone(TEXT("core:shape:layer_stone"));
 }
 
-#if UE_BUILD_SHIPPING
-
-namespace GameConstants::Chunk
-{
-	extern inline constexpr int32 Size = 48;
-	extern inline constexpr int32 Height = 1024;
-}
-
-namespace GameConstants::Scaling
-{
-	extern inline constexpr float XYWorldSize = 100;
-	extern inline constexpr float ZSize = 25;
-	extern inline constexpr float PlayerHeight = 100;
-}
-
-namespace GameConstants::Distances
-{
-	extern inline constexpr int32 InteractionDistance = 500;
-}
-
-namespace GameConstants::Region
-{
-	extern inline constexpr int32 Size = 24;
-}
-
-namespace GameConstants::Region::File
-{
-	extern inline constexpr int32 SegmentSizeBytes = 10240; // 10 kb
-}
-
-namespace GameConstants::Tick
-{
-	extern inline constexpr int32 TicksPerSecond = 24;
-	extern inline constexpr float TickBudget = 1'500'000; // 1.5 ms
-}
-
-#else
 namespace GameConstants::Chunk
 {
 	extern inline int32 Size = 48;
@@ -87,6 +50,11 @@ namespace GameConstants::Distances
 	static FAutoConsoleVariableRef CVarInteractionDistance(
 		TEXT("game.rules.distances.interaction_distance"), InteractionDistance,
 		TEXT("The distance for interaction"), ECVF_Default);
+
+	extern inline int32 PlayerHeightInLayers = 8;
+	static FAutoConsoleVariableRef CVarPlayerSizeInLayers(
+		TEXT("game.rules.distances.player_height_in_layers"), PlayerHeightInLayers,
+		TEXT("The height of the player in layers"), ECVF_Default);
 }
 
 namespace GameConstants::Region
@@ -117,4 +85,3 @@ namespace GameConstants::Tick
 		TEXT("game.ticks.budget_ns"), TickBudget,
 		TEXT("Maximum time (in nanoseconds) before spreading tasks across frames"), ECVF_Default);
 }
-#endif

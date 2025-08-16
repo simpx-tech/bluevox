@@ -4,12 +4,19 @@
 #include "ChunkData.h"
 
 #include "Bluevox/Chunk/LogChunk.h"
+#include "Bluevox/Chunk/Position/GlobalPosition.h"
 
 void UChunkData::Serialize(FArchive& Ar)
 {
 	FReadScopeLock ReadLock(Lock);
 	UObject::Serialize(Ar);
 	Ar << Columns;
+}
+
+int32 UChunkData::GetFirstGapThatFits(const FGlobalPosition& GlobalPosition,
+	const int32 FitHeightInLayers)
+{
+	return GetFirstGapThatFits(GlobalPosition.X, GlobalPosition.Y, FitHeightInLayers);
 }
 
 // TODO in future may have to consider potential caves
@@ -42,9 +49,14 @@ int32 UChunkData::GetFirstGapThatFits(const int32 X, const int32 Y, const int32 
 	return CurZ;
 }
 
-bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int32 FitHeight) const
+bool UChunkData::DoesFit(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers) const
 {
-	if (FitHeight <= 0) return false;
+	return DoesFit(GlobalPosition.X, GlobalPosition.Y, GlobalPosition.Z, FitHeightInLayers);
+}
+
+bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int32 FitHeightInLayers) const
+{
+	if (FitHeightInLayers <= 0) return false;
 	if (Z < 0) return false;
 
 	const int32 ColIndex = GetIndex(X, Y);
@@ -64,14 +76,14 @@ bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int3
 		// Z is inside this piece
 		if (Z < PieceEnd)
 		{
-			if (Piece.Id != GameConstants::Constants::GShapeId_Void) return false;
+			if (Piece.Id != GameConstants::Shapes::GShapeId_Void) return false;
 			const int32 Remaining = PieceEnd - Z;
-			return Remaining >= FitHeight;
+			return Remaining >= FitHeightInLayers;
 		}
 		CurZ = PieceEnd;
 	}
 
-	return Z + FitHeight <= GameConstants::Chunk::Height;
+	return Z + FitHeightInLayers <= GameConstants::Chunk::Height;
 }
 
 FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)

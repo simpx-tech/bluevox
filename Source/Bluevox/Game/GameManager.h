@@ -22,7 +22,7 @@ DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoin, AMainController*, Pla
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerLeave, AMainController*, PlayerController);
 
-UCLASS()
+UCLASS(BlueprintType)
 class BLUEVOX_API AGameManager : public AActor
 {
 	GENERATED_BODY()
@@ -39,10 +39,10 @@ protected:
 	virtual void BeginPlay() override;
 	
 public:
-	UPROPERTY()
+	UPROPERTY(BlueprintAssignable)
 	FOnPlayerJoin OnPlayerJoin;
 
-	UPROPERTY()
+	UPROPERTY(BlueprintAssignable)
 	FOnPlayerLeave OnPlayerLeave;
 	
 	UPROPERTY(EditAnywhere, Instanced, meta = (ShowOnlyInnerProperties), Category = "Game Rules")

@@ -10,7 +10,7 @@
 
 FName ULayerShape::GetNameId() const
 {
-	return GameConstants::Constants::GShape_Layer;
+	return GameConstants::Shapes::GShape_Layer;
 }
 
 void ULayerShape::GenerateRenderGroups()

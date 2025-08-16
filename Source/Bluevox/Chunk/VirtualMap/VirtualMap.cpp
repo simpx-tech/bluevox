@@ -7,9 +7,13 @@
 #include "LogVirtualMap.h"
 #include "VirtualMapStats.h"
 #include "Bluevox/Chunk/ChunkHelper.h"
+#include "Bluevox/Chunk/ChunkRegistry.h"
+#include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/MainController.h"
+#include "Components/CapsuleComponent.h"
+#include "GameFramework/Character.h"
 
 void UVirtualMap::RemovePlayerFromChunks(const AMainController* Controller, const TSet<FChunkPosition>& ToRemoveLoad, const TSet<FChunkPosition>& ToRemoveLive)
 {
@@ -249,10 +253,14 @@ UVirtualMap* UVirtualMap::Init(AGameManager* InGameManager)
 {
 	GameManager = InGameManager;
 	bServer = InGameManager->bServer;
+	bClient = InGameManager->bClient;
+	
+	InGameManager->ChunkTaskManager->OnAllRenderTasksFinishedForChunk.AddDynamic(this, &UVirtualMap::Handle_OnAllRenderTasksFinishedForChunk);
+	
 	return this;
 }
 
-void UVirtualMap::RegisterPlayer(const AMainController* Player)
+void UVirtualMap::RegisterPlayer(AMainController* Player)
 {
 	const auto GlobalPosition = FChunkPosition::FromGlobalPosition(Player->SavedGlobalPosition);
 	ChunkPositionByPlayer.Add(Player, GlobalPosition);
@@ -264,10 +272,11 @@ void UVirtualMap::RegisterPlayer(const AMainController* Player)
 	UE_LOG(LogVirtualMap, Verbose, TEXT("Registering player %s at position %s with far distance %d"),
 		*Player->GetName(), *GlobalPosition.ToString(), Player->GetFarDistance());
 
-	// DEV make the as ready/spawn chunks, when finishing loading these = player is ready
-	// DEV when player is ready on the server (all rendered) = calculate it's real position (Z) and store it
-	// DEV when player is ready on the client (all rendered) = set ready client
-	// DEV when both ready in server and client = set ready = true -> allow movement, collision, etc.
+	WaitingSpawnRenderPerPlayer.Add(Player, LiveChunks.Num());
+	for (const auto& Position : LiveChunks)
+	{
+		PlayersWaitingForSpawnRender.FindOrAdd(Position).Add(Player);
+	}
 	
 	AddPlayerToChunks(Player, LoadChunks, LiveChunks);
 }
@@ -284,8 +293,58 @@ void UVirtualMap::UnregisterPlayer(const AMainController* Player)
 	RemovePlayerFromChunks(Player, LoadChunks, LiveChunks);
 }
 
+void UVirtualMap::Handle_OnAllRenderTasksFinishedForChunk(const FChunkPosition Position)
+{
+	UE_LOG(LogVirtualMap, Verbose, TEXT("All render tasks finished for chunk %s"), *Position.ToString());
+	if (PlayersWaitingForSpawnRender.Contains(Position))
+	{
+		for (auto Player : PlayersWaitingForSpawnRender[Position])
+		{
+			WaitingSpawnRenderPerPlayer.FindOrAdd(Player)--;
+			if (WaitingSpawnRenderPerPlayer[Player] <= 0)
+			{
+				WaitingSpawnRenderPerPlayer.Remove(Player);
+
+				if (bServer)
+				{
+					UE_LOG(LogVirtualMap, Verbose, TEXT("[Sv] Player %s is ready to spawn"), *Player->GetName());
+
+					const auto ChunkPosition = FChunkPosition::FromGlobalPosition(Player->SavedGlobalPosition);
+					const auto Chunk = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition);
+					const auto DoesFit = Chunk->DoesFit(Player->SavedGlobalPosition, GameConstants::Distances::PlayerHeightInLayers);
+
+					if (!DoesFit)
+					{
+						const auto NewZPosition = Chunk->GetFirstGapThatFits(Player->SavedGlobalPosition, GameConstants::Distances::PlayerHeightInLayers);
+						Player->SavedGlobalPosition.Z = NewZPosition;
+
+						const auto WorldPosition = Player->SavedGlobalPosition.AsActorLocationCopy();
+						const auto Capsule = Player->GetCharacter()->GetCapsuleComponent();
+						
+						Player->GetPawn()->SetActorLocation(WorldPosition + FVector(
+							GameConstants::Scaling::XYWorldSize / 2,
+							GameConstants::Scaling::XYWorldSize / 2,
+							Capsule->GetScaledCapsuleHalfHeight()
+						));
+					}
+					
+					Player->Sv_SetServerReady(true);
+				}
+
+				// Player can be both client and server
+				if (bClient && Player == GameManager->LocalController) {
+					UE_LOG(LogVirtualMap, Verbose, TEXT("[Cl] Client %s is ready to spawn"), *Player->GetName());
+					Player->Cl_SetClientReady(true);
+				}
+			}
+		}
+	}
+
+	PlayersWaitingForSpawnRender.Remove(Position);
+}
+
 void UVirtualMap::Sv_UpdateFarDistanceForPlayer(const AMainController* Player,
-	const int32 OldFarDistance, const int32 NewFarDistance)
+                                                const int32 OldFarDistance, const int32 NewFarDistance)
 {
 	// DEV
 }

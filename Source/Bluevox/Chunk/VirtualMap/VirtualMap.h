@@ -46,16 +46,22 @@ class BLUEVOX_API UVirtualMap : public UObject, public FTickableGameObject
 	bool bServer = false;
 
 	UPROPERTY()
+	bool bClient = false;
+
+	UPROPERTY()
 	TMap<const AMainController*, int32> WaitingSpawnRenderPerPlayer;
 
-	TMap<FChunkPosition, TArray<const AMainController*>> PlayersWaitingForSpawnRender;
+	TMap<FChunkPosition, TArray<AMainController*>> PlayersWaitingForSpawnRender;
 	
 public:
 	UVirtualMap* Init(AGameManager* InGameManager);
 
-	void RegisterPlayer(const AMainController* Player);
+	void RegisterPlayer(AMainController* Player);
 
 	void UnregisterPlayer(const AMainController* Player);
+
+	UFUNCTION()
+	void Handle_OnAllRenderTasksFinishedForChunk(FChunkPosition Position);
 
 	void Sv_UpdateFarDistanceForPlayer(const AMainController* Player, const int32 OldFarDistance, const int32 NewFarDistance);
 

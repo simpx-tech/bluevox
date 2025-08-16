@@ -9,6 +9,7 @@
 #include "UObject/Object.h"
 #include "ChunkData.generated.h"
 
+struct FGlobalPosition;
 class AGameManager;
 /**
  *
@@ -41,8 +42,12 @@ public:
 		Ar << Columns;
 	}
 
+	int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);
+	
 	int32 GetFirstGapThatFits(const int32 X, const int32 Y, const int32 FitHeightInLayers);
 
+	bool DoesFit(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers) const;
+	
 	bool DoesFit(const int32 X, const int32 Y, const int32 Z, const int32 FitHeightInLayers) const;
 
 	static int32 GetIndex(const int32 X, const int32 Y)

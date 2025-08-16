@@ -20,6 +20,7 @@ void UPlayerSetupGameRule::OnSetup(AGameManager* InGameManager)
 
 			if (InGameManager->bServer)
 			{
+				PC->SetActorEnableCollision(false);
 				InGameManager->WorldSave->LoadPlayer(PC);
 			}
 		}

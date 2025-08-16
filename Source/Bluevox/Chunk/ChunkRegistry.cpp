@@ -72,6 +72,12 @@ AChunk* UChunkRegistry::SpawnChunk(const FChunkPosition Position)
 			0.0f),
 		FRotator::ZeroRotator);
 
+	if (!Chunk)
+	{
+		UE_LOG(LogChunk, Error, TEXT("Failed to spawn chunk actor for position %s"), *Position.ToString());
+		return nullptr;
+	}
+	
 	const auto ChunkData = Th_GetChunkData(Position);
 	Chunk->Init(Position, GameManager, ChunkData);
 

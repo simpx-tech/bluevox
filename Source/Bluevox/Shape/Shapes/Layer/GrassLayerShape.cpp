@@ -7,7 +7,7 @@
 
 FName UGrassLayerShape::GetNameId() const
 {
-	return GameConstants::Constants::GShape_Layer_Grass;
+	return GameConstants::Shapes::GShape_Layer_Grass;
 }
 
 uint16 UGrassLayerShape::GetMaterialId() const

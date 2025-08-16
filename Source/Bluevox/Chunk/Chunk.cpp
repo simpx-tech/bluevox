@@ -110,7 +110,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 
 				// Quick path, skip void
-				if (Piece.Id == GameConstants::Constants::GShapeId_Void)
+				if (Piece.Id == GameConstants::Shapes::GShapeId_Void)
 				{
 					for (const EFace Face : FaceUtils::AllHorizontalFaces)
 					{

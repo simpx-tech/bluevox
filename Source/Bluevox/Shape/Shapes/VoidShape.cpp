@@ -7,7 +7,7 @@
 
 FName UVoidShape::GetNameId() const
 {
-	return GameConstants::Constants::GShape_Void;
+	return GameConstants::Shapes::GShape_Void;
 }
 
 int32 UVoidShape::GetMaterialCost() const

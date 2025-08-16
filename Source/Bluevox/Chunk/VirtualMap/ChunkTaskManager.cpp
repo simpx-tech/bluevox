@@ -60,7 +60,7 @@ void UChunkTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Pa
 
 		if (!WaitingToBeSent.Contains(ChunkPosition))
 		{
-			// DEV temp
+			// TODO temp
 			// UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Received chunk data for chunk %s, but it was not in the waiting list!"), *ChunkPosition.ToString());
 			// continue;
 		}
@@ -379,6 +379,7 @@ void UChunkTaskManager::Tick(float DeltaTime)
 						}
 
 						if (Processing->PendingTasks == 0) {
+							OnAllRenderTasksFinishedForChunk.Broadcast(ChunkPosition);
 							ProcessingRender.Remove(ChunkPosition);
 						}
 

@@ -13,7 +13,7 @@ class AGameManager;
 class UPlayerNetwork;
 class UInputMappingContext;
 
-DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnClientReadyChanged, bool, bReady);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FOnClientReady);
 
 struct FBlockRaycastResult
 {
@@ -32,14 +32,17 @@ class BLUEVOX_API AMainController : public APlayerController
 
 	AMainController();
 
-	UFUNCTION(Client, Reliable)
-	void Sv_SetClientReady(bool bReady);
-
-	UFUNCTION(BlueprintCallable, Category = "Game")
-	void HandleOnClientReadyChanged() const;
+	UFUNCTION(Server, Reliable)
+	void RSv_SetClientReady(bool bReady);
 
 	UPROPERTY(EditAnywhere, Replicated)
 	int32 FarDistance = 12;
+
+	UFUNCTION()
+	void Sv_CheckReady();
+	
+	UFUNCTION(NetMulticast, Reliable)
+	void Multicast_OnFullReady();
 	
 public:
 	UPROPERTY()
@@ -53,7 +56,7 @@ public:
 	int32 GetFarDistance() const;
 	
 	UFUNCTION(Server, Reliable)
-	void SetFarDistance(int32 NewFarDistance);
+	void RSv_SetFarDistance(int32 NewFarDistance);
 
 	FBlockRaycastResult BlockRaycast() const;
 
@@ -66,12 +69,12 @@ public:
 	AGameManager* GameManager;
 	
 	UPROPERTY(BlueprintAssignable, Category = "Events")
-	FOnClientReadyChanged OnClientReadyChanged;
+	FOnClientReady OnPlayerReady;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated)
 	bool bServerReady = false;
 
-	UPROPERTY(EditAnywhere, BlueprintReadWrite, ReplicatedUsing = HandleOnClientReadyChanged)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated)
 	bool bClientReady = false;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
@@ -102,18 +105,18 @@ public:
 	virtual void OnRep_PlayerState() override;
 
 	UFUNCTION(Reliable, Server)
-	void Sv_LeftClick();
+	void RSv_LeftClick();
 
 	UFUNCTION(Reliable, Server)
-	void Sv_RightClick();
+	void RSv_RightClick();
 	
 	UFUNCTION(BlueprintCallable)
-	void SetServerReady(bool bReady);
+	void Sv_SetServerReady(bool bReady);
 
 	UFUNCTION(BlueprintCallable)
-	void SetClientReady(bool bReady);
+	void Cl_SetClientReady(bool bReady);
 	
-	virtual void GetLifetimeReplicatedProps(TArray<class FLifetimeProperty>& OutLifetimeProps) const override;
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 	virtual void Serialize(FArchive& Ar) override;
 

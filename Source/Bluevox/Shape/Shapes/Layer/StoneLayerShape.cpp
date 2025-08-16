@@ -12,5 +12,5 @@ uint16 UStoneLayerShape::GetMaterialId() const
 
 FName UStoneLayerShape::GetNameId() const
 {
-	return GameConstants::Constants::GShape_Layer_Stone;
+	return GameConstants::Shapes::GShape_Layer_Stone;
 }

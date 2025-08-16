@@ -7,7 +7,7 @@
 
 FName UDirtLayerShape::GetNameId() const
 {
-	return GameConstants::Constants::GShape_Layer_Dirt;
+	return GameConstants::Shapes::GShape_Layer_Dirt;
 }
 
 uint16 UDirtLayerShape::GetMaterialId() const

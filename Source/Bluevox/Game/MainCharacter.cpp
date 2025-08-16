@@ -6,9 +6,9 @@
 #include "EnhancedInputSubsystems.h"  
 #include "EnhancedInputComponent.h"
 #include "GameManager.h"
-#include "Bluevox/Network/PlayerNetwork.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
+#include "Net/UnrealNetwork.h"
 
 
 // Sets default values
@@ -23,7 +23,7 @@ AMainCharacter::AMainCharacter()
 	MovementComponent->MaxFlySpeed = 1200.f;
 	MovementComponent->BrakingDecelerationFlying = 4096.0f;
 	MovementComponent->MaxAcceleration = 10'000.f;
-	MovementComponent->DefaultLandMovementMode = MOVE_Flying;
+	MovementComponent->DefaultLandMovementMode = MOVE_None;
 }
 
 // Called when the game starts or when spawned
@@ -43,30 +43,12 @@ void AMainCharacter::BeginPlay()
 	}
 
 	GameManager = Cast<AGameManager>(UGameplayStatics::GetActorOfClass(GetWorld(), AGameManager::StaticClass()));
-
-	GetCharacterMovement()->SetMovementMode(MOVE_Flying);
-
-	// TODO temp
-	// if (GameManager->bServer)
-	// {
-	// 	GameManager->LocalController->SetServerReady(true);	
-	// } else if (GameManager->bClient)
-	// {
-	// 	GameManager->LocalController->SetClientReady(true);
-	// }
 }
 
 // Called every frame
 void AMainCharacter::Tick(float DeltaTime)
 {
 	Super::Tick(DeltaTime);
-}
-
-void AMainCharacter::PossessedBy(AController* NewController)
-{
-	Super::PossessedBy(NewController);
-
-	UE_LOG(LogTemp, Warning, TEXT("Pawn possessed by controller: %s"), *NewController->GetName());
 }
 
 // Called to bind functionality to input
@@ -128,12 +110,12 @@ void AMainCharacter::HandleLookAction(const FInputActionValue& Value)
 
 void AMainCharacter::HandleLeftClickAction()
 {
-	GameManager->LocalController->Sv_LeftClick();
+	GameManager->LocalController->RSv_LeftClick();
 }
 
 void AMainCharacter::HandleRightClickAction()
 {
-	GameManager->LocalController->Sv_RightClick();
+	GameManager->LocalController->RSv_RightClick();
 }
 
 void AMainCharacter::HandleJumpAction(const FInputActionValue& Value)
@@ -146,5 +128,12 @@ void AMainCharacter::HandleCrouchAction(const FInputActionValue& Value)
 {
 	// AddMovementInput(FVector::DownVector, VerticalSpeed);
 	AddMovementInput(FVector::DownVector, 1.0f);
+}
+
+void AMainCharacter::GetLifetimeReplicatedProps(
+	TArray<FLifetimeProperty>& OutLifetimeProps) const
+{
+	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(AMainCharacter, bReady);
 }
 

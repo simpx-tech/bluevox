@@ -31,8 +31,6 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
-	virtual void PossessedBy(AController* NewController) override;
-
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -44,6 +42,9 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite)
 	float VerticalSpeed = 300.0f;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Replicated)
+	bool bReady = false;
 	
 	UFUNCTION()
 	void HandleMoveAction(const FInputActionValue& Value);
@@ -62,4 +63,6 @@ public:
 
 	UFUNCTION()
 	void HandleCrouchAction(const FInputActionValue& Value);
+
+	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 };

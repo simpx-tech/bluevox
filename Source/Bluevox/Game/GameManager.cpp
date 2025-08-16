@@ -42,8 +42,8 @@ void AGameManager::BeginPlay()
 	bDedicatedServer = GetNetMode() == NM_DedicatedServer;
 	bStandalone = GetNetMode() == NM_Standalone;
 
-	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
 	ChunkTaskManager = NewObject<UChunkTaskManager>(this)->Init(this);
+	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
 	
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"))->Init(this);
 

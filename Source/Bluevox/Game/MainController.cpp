@@ -4,8 +4,8 @@
 #include "MainController.h"
 
 #include "GameManager.h"
+#include "LogMainController.h"
 #include "MainCharacter.h"
-#include "Bluevox/Chunk/ChunkRegistry.h"
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Network/PlayerNetwork.h"
@@ -20,9 +20,33 @@ AMainController::AMainController()
 	PlayerNetwork = CreateDefaultSubobject<UPlayerNetwork>(TEXT("PlayerNetwork"));
 }
 
-void AMainController::HandleOnClientReadyChanged() const
+void AMainController::Sv_CheckReady()
 {
-	OnClientReadyChanged.Broadcast(bClientReady);
+	if (bServerReady && bClientReady)
+	{
+		Multicast_OnFullReady();
+	}
+}
+
+void AMainController::Multicast_OnFullReady_Implementation()
+{
+	UE_LOG(LogMainController, Log, TEXT("Player %s is fully ready"), *GetName());
+
+	if (GameManager->bServer)
+	{
+		GetCharacter()->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+		SetActorEnableCollision(true);
+
+		if (GameManager->bClient)
+		{
+			OnPlayerReady.Broadcast();
+		}
+	} else
+	{
+		GetCharacter()->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+		SetActorEnableCollision(true);
+		OnPlayerReady.Broadcast();
+	}
 }
 
 int32 AMainController::GetFarDistance() const
@@ -101,16 +125,18 @@ void AMainController::Tick(float DeltaSeconds)
 	}
 }
 
-void AMainController::SetFarDistance_Implementation(const int32 NewFarDistance)
+void AMainController::RSv_SetFarDistance_Implementation(const int32 NewFarDistance)
 {
 	const auto OldFarDistance = FarDistance;
 	FarDistance = NewFarDistance;
 	GameManager->VirtualMap->Sv_UpdateFarDistanceForPlayer(this, OldFarDistance, FarDistance);
 }
 
-void AMainController::Sv_SetClientReady_Implementation(bool bReady)
+void AMainController::RSv_SetClientReady_Implementation(const bool bReady)
 {
+	UE_LOG(LogMainController, Log, TEXT("Client set to %d for player %s"), bReady, *GetName());
 	bClientReady = bReady;
+	Sv_CheckReady();
 }
 
 void AMainController::BeginPlay()
@@ -132,7 +158,7 @@ void AMainController::OnRep_PlayerState()
 	}
 }
 
-void AMainController::Sv_LeftClick_Implementation()
+void AMainController::RSv_LeftClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
@@ -141,7 +167,7 @@ void AMainController::Sv_LeftClick_Implementation()
 		// Run locally
 		UpdateChunkPacket->OnReceive(GameManager);
 		
-		// TODO improve this
+		// TODO improve this, have a global network relay
 		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
 		{
 			APlayerController* PlayerController = It->Get();
@@ -156,11 +182,11 @@ void AMainController::Sv_LeftClick_Implementation()
 	}
 }
 
-void AMainController::Sv_RightClick_Implementation()
+void AMainController::RSv_RightClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Constants::GShape_Layer_Dirt);
+		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
 		
 		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
 		
@@ -182,16 +208,17 @@ void AMainController::Sv_RightClick_Implementation()
 	}
 }
 
-void AMainController::SetServerReady(const bool bReady)
+void AMainController::Sv_SetServerReady(const bool bReady)
 {
+	UE_LOG(LogMainController, Log, TEXT("Server ready set to %d for player %s"), bReady, *GetName());
 	bServerReady = bReady;
 	GameManager->LocalCharacter->GetCharacterMovement()->SetMovementMode(MOVE_Flying);
+	Sv_CheckReady();
 }
 
-void AMainController::SetClientReady(const bool bReady)
+void AMainController::Cl_SetClientReady(const bool bReady)
 {
-	Sv_SetClientReady(bReady);
-	// EnableInput(this);
+	RSv_SetClientReady(bReady);
 }
 
 void AMainController::GetLifetimeReplicatedProps(
