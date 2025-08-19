@@ -17,6 +17,9 @@ struct FSectionHeader
 
 	UPROPERTY()
 	uint16 SegmentsUsed = 0;
+
+	UPROPERTY()
+	int32 Version = 1;
 };
 
 USTRUCT(BlueprintType)

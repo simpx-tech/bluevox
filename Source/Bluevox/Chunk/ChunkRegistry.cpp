@@ -10,7 +10,6 @@
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
 #include "Position/LocalPosition.h"
-#include "VirtualMap/VirtualMap.h"
 #include "VirtualMap/ChunkTaskManager.h"
 
 UChunkRegistry* UChunkRegistry::Init(AGameManager* InGameManager)

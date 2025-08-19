@@ -39,6 +39,9 @@ public:
 	void SerializeForSave(FArchive& Ar)
 	{
 		FReadScopeLock ReadLock(Lock);
+		int32 FileVersion = GameConstants::Chunk::File::FileVersion;
+		
+		Ar << FileVersion;
 		Ar << Columns;
 	}
 

@@ -26,7 +26,7 @@ class BLUEVOX_API UChunkRegistry : public UObject
 {
 	GENERATED_BODY()
 
-	friend class UVirtualMapTaskManager;
+	friend class UChunkTaskManager;
 	
 	TMap<FRegionPosition, TSharedPtr<FRegionFile>> Regions;
 
@@ -50,19 +50,28 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	TMap<FChunkPosition, AChunk*> ChunkActors;
 
 	UPROPERTY()
-	TMap<FChunkPosition, uint16> ChunksMarkedForUse;  
+	TMap<FChunkPosition, uint16> ChunksMarkedForUse;
   
 	UPROPERTY()
 	TSet<FChunkPosition> ChunksScheduledToRemove;
+
+	UFUNCTION()
+	void Th_RegisterChunk(const FChunkPosition& Position, UChunkData* Data);
+
+	TSharedPtr<FRegionFile> Th_LoadRegionFile(const FRegionPosition& Position);
+	
+	void Th_UnregisterChunk(const FChunkPosition& Position);
+
+	AChunk* SpawnChunk(FChunkPosition Position);
+
+	void LockForRender(const FChunkPosition& Position);
+
+	void UnlockForRender(const FChunkPosition& Position);
 	
 public:
 	UChunkRegistry* Init(AGameManager* InGameManager);
-	
-	TSharedPtr<FRegionFile> Th_LoadRegionFile(const FRegionPosition& Position);
 
 	TSharedPtr<FRegionFile> Th_GetRegionFile(const FRegionPosition& Position);
-
-	AChunk* SpawnChunk(FChunkPosition Position);
 
 	FChunkColumn& Th_GetColumn(const FColumnPosition& GlobalColPosition);
 
@@ -70,18 +79,10 @@ public:
 
 	void SetPiece(const FGlobalPosition& GlobalPosition, const FPiece& Piece);
 
-	void Th_UnregisterChunk(const FChunkPosition& Position);
-
-	void LockForRender(const FChunkPosition& Position);
-
-	void UnlockForRender(const FChunkPosition& Position);
-	
 	UFUNCTION()
 	UChunkData* Th_GetChunkData(const FChunkPosition& Position);
 
-	UFUNCTION()
-	void Th_RegisterChunk(const FChunkPosition& Position, UChunkData* Data);
-	
+	// TODO should not use Th_LoadRegionFile, instead use a Th_GetRegionFile and discard immediately
 	UFUNCTION()
 	bool Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns);
 	

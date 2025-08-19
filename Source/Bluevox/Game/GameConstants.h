@@ -24,6 +24,11 @@ namespace GameConstants::Chunk
 		TEXT("The number of blocks in Z"), ECVF_Default);
 }
 
+namespace GameConstants::Chunk::File
+{
+	extern inline constexpr int32 FileVersion = 1;
+}
+
 namespace GameConstants::Scaling
 {
 	extern inline float XYWorldSize = 100;

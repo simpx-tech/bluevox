@@ -24,7 +24,6 @@ AChunk::AChunk()
 	MeshComponent->bEnableComplexCollision = true;
 	MeshComponent->bCastShadowAsTwoSided = true;
 	MeshComponent->CollisionType = CTF_UseComplexAsSimple;
-	// MeshComponent->bDeferCollisionUpdates = true;
 	MeshComponent->bUseAsyncCooking = true;
 
 	MeshComponent->SetMobility(EComponentMobility::Type::Static);

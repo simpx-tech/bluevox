@@ -120,6 +120,7 @@ void UTickManager::GameTick()
 
 void UTickManager::OnWorldBeginTearDown(UWorld* World)
 {
+	UE_LOG(LogTemp, Log, TEXT("UTickManager::OnWorldBeginTearDown called. Running scheduled functions and waiting for async ones."));
 	while (PendingTasks > 0)
 	{
 		while (!ScheduledFns.IsEmpty())
@@ -133,6 +134,8 @@ void UTickManager::OnWorldBeginTearDown(UWorld* World)
 
 		FPlatformProcess::Sleep(0.01f);
 	}
+
+	UE_LOG(LogTemp, Log, TEXT("UTickManager::OnWorldBeginTearDown finished. All tasks completed."));
 }
 
 void UTickManager::RecalculateBudget()
