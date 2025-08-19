@@ -13,7 +13,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Saving chunk data for position %s in disk."), *Position.ToString());
 
-	if (!ChunkData)
+	if (!IsValid(ChunkData))
 	{
 		UE_LOG(LogChunk, Error, TEXT("Chunk data is null for position %s."), *Position.ToString());
 		return;

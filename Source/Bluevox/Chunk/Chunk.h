@@ -3,7 +3,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Tick/GameTickable.h"
 #include "Position/ChunkPosition.h"
+#include "Position/LocalPosition.h"
 #include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
@@ -32,14 +34,12 @@ struct FRenderNeighbor {
 };
 
 UCLASS()
-class BLUEVOX_API AChunk : public AActor
+class BLUEVOX_API AChunk : public AActor, public IGameTickable
 {
 	GENERATED_BODY()
 
-public:
-	// Sets default values for this actor's properties
-	AChunk();
-
+	friend class UChunkRegistry;
+	
 protected:
 	UPROPERTY(EditAnywhere)
 	UDynamicMeshComponent* MeshComponent = nullptr;
@@ -52,17 +52,24 @@ protected:
 	UPROPERTY(EditAnywhere)
 	FChunkPosition Position;
 
+	UPROPERTY()
+	TArray<FLocalPosition> AlwaysTick;
+
+	UPROPERTY()
+	TArray<FLocalPosition> ScheduledToTick;
+
 public:
-	AChunk* Init(const FChunkPosition InPosition, AGameManager* InGameManager, UChunkData* InData)
-	{
-		Position = InPosition;
-		GameManager = InGameManager;
-		Data = InData;
-		return this;
-	}
+	virtual void BeginDestroy() override;
+	
+	// Sets default values for this actor's properties
+	AChunk();
+	
+	AChunk* Init(const FChunkPosition InPosition, AGameManager* InGameManager, UChunkData* InData);
 	
 	UPROPERTY()
-	UChunkData* Data;
+	UChunkData* ChunkData;
+
+	virtual void GameTick(float DeltaTime) override;
 
 	void SetRenderState(EChunkState State) const;
 	

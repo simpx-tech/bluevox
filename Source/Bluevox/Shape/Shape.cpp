@@ -9,6 +9,11 @@
 #include "Bluevox/Game/GameConstants.h"
 #include "Components/BaseDynamicMeshComponent.h"
 
+void UShape::GameTick(AGameManager* AGameManager, const FLocalPosition& Position,
+	UChunkData* WhereData, float DeltaTime) const
+{
+}
+
 FName UShape::GetNameId() const
 {
 	UE_LOG(LogTemp, Fatal, TEXT("UShape::GetNameId not implemented for %s"), *GetName());
@@ -18,37 +23,22 @@ FName UShape::GetNameId() const
 UShape* UShape::InitializeData()
 {
 	GenerateRenderGroups();
-
-	if (NorthRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(NorthRenderGroup);
-	}
-	if (SouthRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(SouthRenderGroup);
-	}
-	if (WestRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(WestRenderGroup);
-	}
-	if (EastRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(EastRenderGroup);
-	}
-	if (TopRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(TopRenderGroup);
-	}
-	if (BottomRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(BottomRenderGroup);
-	}
-	if (EverywhereRenderGroup != nullptr)
-	{
-		RenderGroups.Emplace(EverywhereRenderGroup);
-	}
-
 	return this;
+}
+
+bool UShape::ShouldAlwaysTick() const
+{
+	return false;
+}
+
+bool UShape::ShouldTickOnLoad() const
+{
+	return false;
+}
+
+bool UShape::ShouldTickOnNeighborUpdate() const
+{
+	return false;
 }
 
 FRenderGroup* UShape::GetRenderGroup(const EFace Direction) const

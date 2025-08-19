@@ -2,10 +2,11 @@
 
 #include "CoreMinimal.h"
 #include "ColumnPosition.h"
-#include "GlobalPosition.h"
 #include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Utils/FloorDiv.h"
 #include "ChunkPosition.generated.h"
+
+struct FGlobalPosition;
 
 USTRUCT(BlueprintType)
 struct FChunkPosition
@@ -32,13 +33,7 @@ struct FChunkPosition
 		return ChunkPosition;
 	}
 
-	static FChunkPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition)
-	{
-		FChunkPosition ChunkPosition;
-		ChunkPosition.X = FloorDiv(GlobalPosition.X, GameConstants::Chunk::Size);
-		ChunkPosition.Y = FloorDiv(GlobalPosition.Y, GameConstants::Chunk::Size);
-		return ChunkPosition;
-	}
+	static FChunkPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition);
 
 	static FChunkPosition FromIntVector2(const FIntVector2& IntVector)
 	{

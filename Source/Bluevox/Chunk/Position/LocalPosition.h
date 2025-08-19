@@ -37,6 +37,11 @@ struct FLocalPosition
 
 	static FLocalPosition FromGlobalPosition(const FGlobalPosition& GlobalPosition);
 
+	FString ToString() const
+	{
+		return FString::Printf(TEXT("LocalPosition(X: %d, Y: %d, Z: %d)"), X, Y, Z);
+	}
+
 	UPROPERTY()
 	uint8 X = 0;
 

@@ -28,6 +28,20 @@ namespace FaceUtils
 		}
 	}
 
+	static constexpr FIntVector3 GetOffsetByFace(const EFace Face)
+	{
+		switch (Face)
+		{
+		case EFace::North: return FIntVector3(0, 1, 0);
+		case EFace::South: return FIntVector3(0, -1, 0);
+		case EFace::East: return FIntVector3(1, 0, 0);
+		case EFace::West: return FIntVector3(-1, 0, 0);
+		case EFace::Top: return FIntVector3(0, 0, 1);
+		case EFace::Bottom: return FIntVector3(0, 0, -1);
+		default: return FIntVector3::ZeroValue;
+		}
+	}
+
 	static constexpr FIntVector2 GetHorizontalOffsetByFace(const EFace Face)
 	{
 		switch (Face)

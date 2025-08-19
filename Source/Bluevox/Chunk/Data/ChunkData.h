@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "ChunkColumn.h"
 #include "Bluevox/Chunk/Position/LocalColumnPosition.h"
+#include "Bluevox/Chunk/Position/LocalPosition.h"
 #include "Bluevox/Game/GameConstants.h"
 #include "UObject/Object.h"
 #include "ChunkData.generated.h"
@@ -45,7 +46,7 @@ public:
 		Ar << Columns;
 	}
 
-	int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);
+	inline int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);
 	
 	int32 GetFirstGapThatFits(const int32 X, const int32 Y, const int32 FitHeightInLayers);
 
@@ -68,6 +69,8 @@ public:
 		return Columns[GetIndex(ColumnPosition)];
 	}
 
+	inline FPiece Th_GetPieceCopy(FLocalPosition LocalPosition);
+	
 	FPiece Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z);
 
 	void Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece);

@@ -165,8 +165,15 @@ void UTickManager::RegisterUObjectTickable(const TScriptInterface<IGameTickable>
 
 	const UObject* Obj = TickableObject.GetObject();
 	const UClass* ClassKey = Obj->GetClass();
-	TArray<TScriptInterface<IGameTickable>>& Bucket = TickablesByClass.FindOrAdd(ClassKey);
-	Bucket.AddUnique(TickableObject);
+
+	if (!TickablesByClass.Contains(ClassKey))
+	{
+		TickableClasses.Add(ClassKey);
+		TickablesByClass.Add(ClassKey, {});
+	}
+
+	const auto Bucket = TickablesByClass.Find(ClassKey);
+	Bucket->AddUnique(TickableObject);
 }
 
 void UTickManager::UnregisterUObjectTickable(const TScriptInterface<IGameTickable>& TickableObject)

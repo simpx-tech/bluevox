@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "ChunkPosition.h"
 #include "Bluevox/Game/GameConstants.h"
 #include "GlobalPosition.generated.h"
 
@@ -48,6 +49,11 @@ struct FGlobalPosition
 		Ar << Pos.Y;
 		Ar << Pos.Z;
 		return Ar;
+	}
+
+	FGlobalPosition operator+(const FIntVector3& Other) const
+	{
+		return FGlobalPosition(X + Other.X, Y + Other.Y, Z + Other.Z);
 	}
 
 	FString ToString() const

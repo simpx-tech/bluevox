@@ -21,5 +21,5 @@ class BLUEVOX_API IGameTickable
 	GENERATED_BODY()
 
 public:
-	void GameTick(float DeltaTime);
+	virtual void GameTick(float DeltaTime);
 };

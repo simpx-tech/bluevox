@@ -7,6 +7,8 @@
 #include "UObject/Object.h"
 #include "Shape.generated.h"
 
+class UChunkData;
+class AGameManager;
 struct FRenderGroup;
 class UMaterialRegistry;
 
@@ -39,8 +41,6 @@ protected:
 	FRenderGroup* BottomRenderGroup;
 	FRenderGroup* EverywhereRenderGroup;
 
-	TArray<FRenderGroup*> RenderGroups;
-
 	virtual uint16 GetMaterialId() const
 	{
 		return 0;
@@ -56,12 +56,20 @@ protected:
 	bool CanExpand = true;
 	
 public:
+	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, UChunkData* WhereData, float DeltaTime) const;
+	
 	virtual FName GetNameId() const;
 	
 	// TODO cache result instead of call this every time (?)
 	virtual void Render(UE::Geometry::FDynamicMesh3& Mesh, const EFace Face, const FLocalPosition& Position, int32 Size) const;
 
 	UShape* InitializeData();
+
+	virtual bool ShouldAlwaysTick() const;
+
+	virtual bool ShouldTickOnLoad() const;
+
+	virtual bool ShouldTickOnNeighborUpdate() const;
 
 	FRenderGroup* GetRenderGroup(EFace Direction) const;
 

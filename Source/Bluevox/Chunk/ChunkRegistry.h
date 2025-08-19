@@ -75,7 +75,7 @@ public:
 
 	FChunkColumn& Th_GetColumn(const FColumnPosition& GlobalColPosition);
 
-	void SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& Piece);
+	void SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& InPiece);
 
 	void SetPiece(const FGlobalPosition& GlobalPosition, const FPiece& Piece);
 

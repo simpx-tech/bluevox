@@ -15,6 +15,11 @@ struct FLocalColumnPosition
 	{
 	}
 
+	FLocalColumnPosition(const uint16 InX, const uint16 InY)
+		: X(InX), Y(InY)
+	{
+	}
+	
 	static FLocalColumnPosition FromColumnPosition(const FColumnPosition& ColumnPosition)
 	{
 		FLocalColumnPosition LocalPosition;

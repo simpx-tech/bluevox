@@ -9,6 +9,10 @@ namespace GameConstants::Shapes
 	inline const FName GShape_Layer_Dirt(TEXT("core:shape:layer_dirt"));
 	inline const FName GShape_Layer_Grass(TEXT("core:shape:layer_grass"));
 	inline const FName GShape_Layer_Stone(TEXT("core:shape:layer_stone"));
+
+	inline const FName GShape_Test_AlwaysTick(TEXT("core:shape:test_always_tick"));
+	inline const FName GShape_Test_TickOnLoad(TEXT("core:shape:test_tick_on_load"));
+	inline const FName GShape_Test_TickOnNeighborUpdate(TEXT("core:shape:test_tick_on_neighbor_update"));
 }
 
 namespace GameConstants::Chunk

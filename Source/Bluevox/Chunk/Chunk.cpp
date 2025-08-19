@@ -9,11 +9,21 @@
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Shape/Shape.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
+#include "Bluevox/Tick/TickManager.h"
 #include "Bluevox/Utils/Face.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalPosition.h"
 #include "Runtime/GeometryFramework/Public/Components/DynamicMeshComponent.h"
 
+void AChunk::BeginDestroy()
+{
+	if (GameManager)
+	{
+		GameManager->TickManager->UnregisterUObjectTickable(this);	
+	}
+	
+	Super::BeginDestroy();
+}
 
 // Sets default values
 AChunk::AChunk()
@@ -31,6 +41,74 @@ AChunk::AChunk()
 	MeshComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 
 	RootComponent = MeshComponent;
+}
+
+AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManager,
+	UChunkData* InData)
+{
+	Position = InPosition;
+	GameManager = InGameManager;
+	ChunkData = InData;
+
+	const auto ShapeRegistry = GameManager->ShapeRegistry;
+
+	for (int32 LocalX = 0; LocalX < GameConstants::Chunk::Size; ++LocalX)
+	{
+		for (int32 LocalY = 0; LocalY < GameConstants::Chunk::Size; ++LocalY)
+		{
+			const auto ColumnPos = FLocalColumnPosition(LocalX, LocalY);
+			const auto& Column = ChunkData->GetColumn(ColumnPos);
+
+			int32 CurZ = 0;
+			for (const auto& Piece : Column.Pieces)
+			{
+				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
+				if (Shape->ShouldAlwaysTick())
+				{
+					AlwaysTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
+				} else if (Shape->ShouldTickOnLoad())
+				{
+					ScheduledToTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
+				}
+
+				CurZ += Piece.Size;
+			}
+		}
+	}
+
+	GameManager->TickManager->RegisterUObjectTickable(this);
+	
+	return this;
+}
+
+void AChunk::GameTick(float DeltaTime)
+{
+	for (const auto& ScheduledToTickPos : ScheduledToTick)
+	{
+		const auto Piece = ChunkData->Th_GetPieceCopy(ScheduledToTickPos);
+		const auto Shape = GameManager->ShapeRegistry->GetShapeById(Piece.Id);
+		if (Shape)
+		{
+			Shape->GameTick(GameManager, ScheduledToTickPos, ChunkData, DeltaTime);
+		} else
+		{
+			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *ScheduledToTickPos.ToString(), *Position.ToString());
+		}
+	}
+	ScheduledToTick.Reset();
+	
+	for (const auto& AlwaysTickPos : AlwaysTick)
+	{
+		const auto Piece = ChunkData->Th_GetPieceCopy(AlwaysTickPos);
+		const auto Shape = GameManager->ShapeRegistry->GetShapeById(Piece.Id);
+		if (Shape)
+		{
+			Shape->GameTick(GameManager, AlwaysTickPos, ChunkData, DeltaTime);
+		} else
+		{
+			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *AlwaysTickPos.ToString(), *Position.ToString());
+		}
+	}
 }
 
 void AChunk::SetRenderState(const EChunkState State) const
@@ -53,7 +131,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	const auto ChunkRegistry = GameManager->ChunkRegistry;
 	const auto ShapeRegistry = GameManager->ShapeRegistry;
 	
-	if (RenderedAtDirtyChanges.GetValue() == Data->Changes)
+	if (RenderedAtDirtyChanges.GetValue() == ChunkData->Changes)
 	{
 		return false;
 	}
@@ -81,7 +159,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 			SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessColumn)
 
 			const int32 ColumnIndex = UChunkData::GetIndex(LocalX, LocalY);
-			const int32 PiecesCount = Data->Columns[ColumnIndex].Pieces.Num();
+			const int32 PiecesCount = ChunkData->Columns[ColumnIndex].Pieces.Num();
 			GlobalPos.X = BaseChunkPosX + LocalX;
 			GlobalPos.Y = BaseChunkPosY + LocalY;
 			int32 CurZ = 0;
@@ -104,7 +182,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 			{
 				SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece)
 				
-				const auto& Piece = Data->Columns[ColumnIndex].Pieces[PieceIdx];
+				const auto& Piece = ChunkData->Columns[ColumnIndex].Pieces[PieceIdx];
 				const int32 PieceSize = Piece.Size;
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 
@@ -198,7 +276,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				bool bShouldRenderTop = true;
 				if (PieceIdx < PiecesCount - 1)
 				{
-					const auto NeighborShape = ShapeRegistry->GetShapeById(Data->Columns[ColumnIndex].Pieces[PieceIdx + 1].Id);
+					const auto NeighborShape = ShapeRegistry->GetShapeById(ChunkData->Columns[ColumnIndex].Pieces[PieceIdx + 1].Id);
 					bShouldRenderTop = !NeighborShape->IsOpaque(EFace::Bottom);
 				}
 				if (bShouldRenderTop)
@@ -209,7 +287,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				// Bottom, only render if we are not on the first piece
 				if (PieceIdx > 0)
 				{
-					const auto NeighborShape = ShapeRegistry->GetShapeById(Data->Columns[ColumnIndex].Pieces[PieceIdx - 1].Id);
+					const auto NeighborShape = ShapeRegistry->GetShapeById(ChunkData->Columns[ColumnIndex].Pieces[PieceIdx - 1].Id);
 					if (!NeighborShape->IsOpaque(EFace::Top))
 					{
 						Shape->Render(OutMesh, EFace::Bottom, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
@@ -221,7 +299,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 		}
 	}
 
-	RenderedAtDirtyChanges.Set(Data->Changes);
+	RenderedAtDirtyChanges.Set(ChunkData->Changes);
 	
 	const auto End = FPlatformTime::Cycles64();
 	UE_LOG(LogChunk, Verbose, TEXT("Chunk %s rendered in %f ms"), *Position.ToString(),

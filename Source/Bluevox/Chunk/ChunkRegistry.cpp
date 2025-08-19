@@ -7,6 +7,9 @@
 #include "LogChunk.h"
 #include "RegionFile.h"
 #include "Bluevox/Game/GameManager.h"
+#include "Bluevox/Shape/Shape.h"
+#include "Bluevox/Shape/ShapeRegistry.h"
+#include "Bluevox/Utils/Face.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
 #include "Position/LocalPosition.h"
@@ -97,11 +100,44 @@ FChunkColumn& UChunkRegistry::Th_GetColumn(const FColumnPosition& GlobalColPosit
 	return ChunksData[ChunkPos]->GetColumn(LocalColPosition);
 }
 
-void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& Piece)
+void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& InPiece)
 {
 	const auto ChunkPosition = FChunkPosition::FromGlobalPosition(GlobalPosition);
 	const auto LocalPosition = FLocalPosition::FromGlobalPosition(GlobalPosition);
-	Th_GetChunkData(ChunkPosition)->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(Piece));
+
+	const auto ChunkData = Th_GetChunkData(ChunkPosition);
+	ChunkData->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(InPiece));
+	const auto ShapeRegistry = GameManager->ShapeRegistry;
+
+	// Notify neighbors about the piece change
+	for (const auto Face : FaceUtils::AllFaces)
+	{
+		const auto Offset = FaceUtils::GetOffsetByFace(Face);
+		const auto Piece = ChunkData->Th_GetPieceCopy(LocalPosition.X + Offset.X, LocalPosition.Y + Offset.Y, LocalPosition.Z + Offset.Z);
+
+		const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
+		if (Shape)
+		{
+			if (Shape->ShouldTickOnNeighborUpdate())
+			{
+				const auto NeighborPosition = GlobalPosition + Offset;
+				const auto ChunkPos = FChunkPosition::FromGlobalPosition(GlobalPosition + Offset);
+				const auto Chunk = GetChunkActor(ChunkPos);
+
+				if (Chunk)
+				{
+					Chunk->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(NeighborPosition));
+				} else
+				{
+					UE_LOG(LogChunk, Warning, TEXT("SetPiece:FaceLoop: Chunk actor not found for position %s"), *ChunkPos.ToString());
+				}
+			}
+		} else
+		{
+			UE_LOG(LogChunk, Warning, TEXT("SetPiece:FaceLoop: Shape not found for piece ID %d at position %s"), Piece.Id, *GlobalPosition.ToString());
+		}
+	}
+	
 	GameManager->ChunkTaskManager->ScheduleRender({ ChunkPosition });
 
 	TArray<FChunkPosition> NeighborsToRender;

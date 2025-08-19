@@ -86,6 +86,11 @@ bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int3
 	return Z + FitHeightInLayers <= GameConstants::Chunk::Height;
 }
 
+FPiece UChunkData::Th_GetPieceCopy(const FLocalPosition LocalPosition)
+{
+	return Th_GetPieceCopy(LocalPosition.X, LocalPosition.Y, LocalPosition.Z);
+}
+
 FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)
 {
 	FReadScopeLock ReadLock(Lock);
