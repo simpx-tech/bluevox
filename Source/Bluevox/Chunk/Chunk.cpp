@@ -94,8 +94,10 @@ AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManage
 
 void AChunk::GameTick(float DeltaTime)
 {
-	// DEV error here, can't modify the ScheduledToTick while iterating over it
-	for (const auto& ScheduledToTickPos : ChunkData->ScheduledToTick)
+	const auto CurrentlyScheduledToTick = ChunkData->ScheduledToTick;
+	ChunkData->ScheduledToTick.Reset();
+	
+	for (const auto& ScheduledToTickPos : CurrentlyScheduledToTick)
 	{
 		const auto Piece = ChunkData->Th_GetPieceCopy(ScheduledToTickPos);
 		const auto Shape = GameManager->ShapeRegistry->GetShapeById(Piece.Id);
@@ -107,7 +109,7 @@ void AChunk::GameTick(float DeltaTime)
 			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *ScheduledToTickPos.ToString(), *Position.ToString());
 		}
 	}
-	ChunkData->ScheduledToTick.Reset();
+	
 	
 	for (const auto& AlwaysTickPos : AlwaysTick)
 	{
