@@ -5,6 +5,7 @@
 #include "Bluevox/Game/GameConstants.h"
 #include "GlobalPosition.generated.h"
 
+struct FLocalPosition;
 struct FChunkPosition;
 
 USTRUCT(BlueprintType)
@@ -30,6 +31,8 @@ struct FGlobalPosition
 		return GlobalPosition;
 	}
 
+	static FGlobalPosition FromLocalPosition(const FChunkPosition& ChunkPosition, const FLocalPosition& LocalPosition);
+
 	bool IsBorderBlock() const;
 
 	void GetBorderChunks(TArray<FChunkPosition>& OutPositions) const;
@@ -54,6 +57,29 @@ struct FGlobalPosition
 	FGlobalPosition operator+(const FIntVector3& Other) const
 	{
 		return FGlobalPosition(X + Other.X, Y + Other.Y, Z + Other.Z);
+	}
+
+	FGlobalPosition operator-(const FIntVector3& Other) const
+	{
+		return FGlobalPosition(X - Other.X, Y - Other.Y, Z - Other.Z);
+	}
+
+	FGlobalPosition operator+(const FGlobalPosition& Other) const
+	{
+		return FGlobalPosition(X + Other.X, Y + Other.Y, Z + Other.Z);
+	}
+
+	FGlobalPosition& operator+=(const FGlobalPosition& Other)
+	{
+		X += Other.X;
+		Y += Other.Y;
+		Z += Other.Z;
+		return *this;
+	}
+
+	FGlobalPosition operator-(const FGlobalPosition& Other) const
+	{
+		return FGlobalPosition(X - Other.X, Y - Other.Y, Z - Other.Z);
 	}
 
 	FString ToString() const

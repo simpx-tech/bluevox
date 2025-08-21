@@ -162,7 +162,9 @@ void AMainController::RSv_LeftClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.Position, FPiece());
+		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
+		
+		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
 		
 		// Run locally
 		UpdateChunkPacket->OnReceive(GameManager);
@@ -186,9 +188,9 @@ void AMainController::RSv_RightClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
+		const auto WaterShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Water);
 		
-		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
+		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(WaterShapeId, 4));
 		
 		// Run locally
 		UpdateChunkPacket->OnReceive(GameManager);

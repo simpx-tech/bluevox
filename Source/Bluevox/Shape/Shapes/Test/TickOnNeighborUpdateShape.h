@@ -25,5 +25,5 @@ class BLUEVOX_API UTickOnNeighborUpdateShape : public UShape
 		return GameConstants::Shapes::GShape_Test_TickOnNeighborUpdate;
 	}
 
-	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, UChunkData* WhereData, float DeltaTime) const override;
+	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, uint16 Height, UChunkData* WhereData, float DeltaTime) const override;
 };

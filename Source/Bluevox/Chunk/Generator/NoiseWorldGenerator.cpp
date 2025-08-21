@@ -23,7 +23,8 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
 	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Grass);
 	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Stone);
-
+	const auto WaterId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Water);
+	
 	const auto MaxHeight = FMath::FloorToInt(GameConstants::Chunk::Height * 0.75f);
 	
 	for (int X = 0; X < GameConstants::Chunk::Size; ++X)
@@ -49,7 +50,14 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 			Column.Pieces.Emplace(StoneId, StoneHeight);
 			Column.Pieces.Emplace(DirtId, DirtHeight);
 			Column.Pieces.Emplace(GrassId, GrassHeight);
-			Column.Pieces.Emplace(GameConstants::Shapes::GShapeId_Void, VoidHeight);
+
+			const auto WaterAmount = FMath::Max(WaterLevel - (GrassHeight + DirtHeight + StoneHeight), 0);
+			if (WaterAmount > 0)
+			{
+				Column.Pieces.Emplace(WaterId, WaterAmount);
+			}
+			
+			Column.Pieces.Emplace(GameConstants::Shapes::GShapeId_Void, VoidHeight - WaterAmount);
 		}
 	}
 }

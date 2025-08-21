@@ -80,7 +80,7 @@ void UChunkTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Pa
 		}
 
 		auto* ChunkDataObject = NewObject<UChunkData>(ChunkRegistry);
-		ChunkDataObject->Init(MoveTemp(ChunkData.Columns));
+		ChunkDataObject->Init(GameManager, ChunkPosition, MoveTemp(ChunkData.Columns));
 		ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkDataObject);
 
 		// Prevent stuttering the game
@@ -132,8 +132,7 @@ void UChunkTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 
 				if (ProcessingLoad.FindRef(ChunkPosition) == true)
 				{
-					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry);
-					ChunkData->Columns = MoveTemp(Result.Columns);
+					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry)->Init(GameManager, ChunkPosition,MoveTemp(Result.Columns));
 					GameManager->ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkData);
 
 					if (PendingPacketsByPosition.Contains(ChunkPosition))
@@ -365,7 +364,7 @@ void UChunkTaskManager::Tick(float DeltaTime)
 					[Chunk]
 					{
 						FRenderResult Result;
-						Result.bSuccess = Chunk->Th_BeginRender(Result.Mesh);
+						Result.bSuccess = Chunk->BeginRender(Result.Mesh, Result.WaterMesh);
 						return MoveTemp(Result);
 					},
 					[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
@@ -375,7 +374,7 @@ void UChunkTaskManager::Tick(float DeltaTime)
 						// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
 						if (Processing->LastRenderIndex == RenderId && Result.bSuccess && Chunk)
 						{
-							Chunk->CommitRender(MoveTemp(Result.Mesh));
+							Chunk->CommitRender(MoveTemp(Result));
 						}
 
 						if (Processing->PendingTasks == 0) {

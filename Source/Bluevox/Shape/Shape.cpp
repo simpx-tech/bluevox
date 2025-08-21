@@ -10,7 +10,7 @@
 #include "Components/BaseDynamicMeshComponent.h"
 
 void UShape::GameTick(AGameManager* AGameManager, const FLocalPosition& Position,
-	UChunkData* WhereData, float DeltaTime) const
+                      uint16 Height, UChunkData* WhereData, float DeltaTime) const
 {
 }
 
@@ -24,6 +24,16 @@ UShape* UShape::InitializeData()
 {
 	GenerateRenderGroups();
 	return this;
+}
+
+bool UShape::ShouldMerge() const
+{
+	return true;
+}
+
+bool UShape::ShouldTickOnPlace() const
+{
+	return false;
 }
 
 bool UShape::ShouldAlwaysTick() const

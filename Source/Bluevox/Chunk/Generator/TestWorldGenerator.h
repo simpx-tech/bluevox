@@ -18,7 +18,9 @@ class BLUEVOX_API UTestWorldGenerator : public UWorldGenerator
 	UPROPERTY()
 	UFastNoiseWrapper* Noise;
 
-	void GenerateOneColumn(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
+	void GenerateThreeColumns(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
+
+	void GenerateOneColumnTick(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
 
 	void GenerateNoise4X4(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
 

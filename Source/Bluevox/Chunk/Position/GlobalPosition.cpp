@@ -3,6 +3,15 @@
 #include "LocalChunkPosition.h"
 #include "LocalPosition.h"
 
+FGlobalPosition FGlobalPosition::FromLocalPosition(const FChunkPosition& ChunkPosition, const FLocalPosition& LocalPosition)
+{
+	FGlobalPosition GlobalPosition;
+	GlobalPosition.X = LocalPosition.X + GameConstants::Chunk::Size * ChunkPosition.X;
+	GlobalPosition.Y = LocalPosition.Y + GameConstants::Chunk::Size * ChunkPosition.Y;
+	GlobalPosition.Z = LocalPosition.Z;
+	return GlobalPosition;
+}
+
 bool FGlobalPosition::IsBorderBlock() const
 {
 	const auto [LocalX, LocalY, LocalZ] = FLocalPosition::FromGlobalPosition(*this);

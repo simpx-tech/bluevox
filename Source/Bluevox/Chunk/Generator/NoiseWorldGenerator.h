@@ -22,6 +22,9 @@ class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 	UPROPERTY()
 	UFastNoiseWrapper* Noise;
 
+	UPROPERTY(EditAnywhere)
+	int32 WaterLevel = 100;
+
 public:
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 };

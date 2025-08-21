@@ -42,6 +42,43 @@ struct FLocalPosition
 		return FString::Printf(TEXT("LocalPosition(X: %d, Y: %d, Z: %d)"), X, Y, Z);
 	}
 
+	FLocalPosition operator+(const FIntVector3& Other) const
+	{
+		return FLocalPosition(
+			static_cast<uint8>(PositiveMod(X + Other.X, GameConstants::Chunk::Size)),
+			static_cast<uint8>(PositiveMod(Y + Other.Y, GameConstants::Chunk::Size)),
+			static_cast<uint16>(Z + Other.Z));
+	}
+
+	bool operator==(const FLocalPosition& Other) const
+	{
+		return X == Other.X && Y == Other.Y && Z == Other.Z;
+	}
+
+	FLocalPosition operator+(const FLocalPosition& Other) const
+	{
+		return FLocalPosition(
+			static_cast<uint8>(PositiveMod(X + Other.X, GameConstants::Chunk::Size)),
+			static_cast<uint8>(PositiveMod(Y + Other.Y, GameConstants::Chunk::Size)),
+			static_cast<uint16>(Z + Other.Z));
+	}
+
+	FLocalPosition operator-(const FLocalPosition& Other) const
+	{
+		return FLocalPosition(
+			static_cast<uint8>(PositiveMod(X - Other.X, GameConstants::Chunk::Size)),
+			static_cast<uint8>(PositiveMod(Y - Other.Y, GameConstants::Chunk::Size)),
+			static_cast<uint16>(Z - Other.Z));
+	}
+
+	friend FArchive& operator<<(FArchive& Ar, FLocalPosition& Pos)
+	{
+		Ar << Pos.X;
+		Ar << Pos.Y;
+		Ar << Pos.Z;
+		return Ar;
+	}
+
 	UPROPERTY()
 	uint8 X = 0;
 

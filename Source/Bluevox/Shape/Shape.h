@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "FaceVisibility.h"
 #include "Bluevox/Utils/Face.h"
 #include "UObject/Object.h"
 #include "Shape.generated.h"
@@ -56,7 +57,7 @@ protected:
 	bool CanExpand = true;
 	
 public:
-	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, UChunkData* WhereData, float DeltaTime) const;
+	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, uint16 Height, UChunkData* WhereData, float DeltaTime) const;
 	
 	virtual FName GetNameId() const;
 	
@@ -65,6 +66,10 @@ public:
 
 	UShape* InitializeData();
 
+	virtual bool ShouldMerge() const;
+	
+	virtual bool ShouldTickOnPlace() const;
+	
 	virtual bool ShouldAlwaysTick() const;
 
 	virtual bool ShouldTickOnLoad() const;
@@ -72,10 +77,10 @@ public:
 	virtual bool ShouldTickOnNeighborUpdate() const;
 
 	FRenderGroup* GetRenderGroup(EFace Direction) const;
-
-	virtual bool IsOpaque(EFace Face) const
+	
+	virtual EFaceVisibility GetVisibility(EFace Face) const
 	{
-		return true;
+		return EFaceVisibility::Opaque;
 	}
 	
 	virtual int32 GetMaterialCost() const

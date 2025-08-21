@@ -19,8 +19,8 @@ public:
 
 	virtual int32 GetMaterialCost() const override;
 
-	virtual bool IsOpaque(EFace Face) const override
+	virtual EFaceVisibility GetVisibility(EFace Face) const override
 	{
-		return false;
+		return EFaceVisibility::None;
 	}
 };

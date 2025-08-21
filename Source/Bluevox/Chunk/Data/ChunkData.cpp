@@ -3,8 +3,24 @@
 
 #include "ChunkData.h"
 
+#include "PieceWithStart.h"
 #include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/Position/GlobalPosition.h"
+#include "Bluevox/Shape/Shape.h"
+#include "Bluevox/Shape/ShapeRegistry.h"
+#include "Bluevox/Tick/TickManager.h"
+
+UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition InPosition,
+	TArray<FChunkColumn>&& InColumns)
+{
+	GameManager = InGameManager;
+	Position = InPosition;
+	Columns = MoveTemp(InColumns);
+
+	GameManager->TickManager->RegisterUObjectTickable(this);
+	
+	return this;
+}
 
 void UChunkData::Serialize(FArchive& Ar)
 {
@@ -86,12 +102,12 @@ bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int3
 	return Z + FitHeightInLayers <= GameConstants::Chunk::Height;
 }
 
-FPiece UChunkData::Th_GetPieceCopy(const FLocalPosition LocalPosition)
+FPieceWithStart UChunkData::Th_GetPieceCopy(const FLocalPosition LocalPosition)
 {
 	return Th_GetPieceCopy(LocalPosition.X, LocalPosition.Y, LocalPosition.Z);
 }
 
-FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)
+FPieceWithStart UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)
 {
 	FReadScopeLock ReadLock(Lock);
 	
@@ -99,7 +115,7 @@ FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)
 	if (!Columns.IsValidIndex(ColIndex))
 	{
 		UE_LOG(LogChunk, Warning, TEXT("GetPieceCopy: Invalid column index %d for %d,%d"), ColIndex, X, Y);
-		return FPiece();
+		return FPieceWithStart();
 	}
 
 	const auto& Column = Columns[ColIndex];
@@ -108,17 +124,18 @@ FPiece UChunkData::Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z)
 	{
 		if (CurZ + Piece.Size >= Z)
 		{
-			return Piece;
+			return FPieceWithStart(Piece, CurZ);
 		}
 
 		CurZ += Piece.Size;
 	}
 
 	UE_LOG(LogChunk, Warning, TEXT("GetPieceCopy: No piece found at %d,%d,%d"), X, Y, Z);
-	return FPiece();
+	return FPieceWithStart();
 }
 
-void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece)
+void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece,
+	TArray<uint16>& OutRemovedPiecesZ, TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>>& OutChangedPieces)
 {
 	FWriteScopeLock WriteLock(Lock);
 	
@@ -159,6 +176,8 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 		{
 			// keep the bottom of the first overlapped piece
 			Insert.Emplace(Column.Pieces[Idx].Id, AmountBeforeStart);
+			
+			OutChangedPieces.Key.Emplace(CurZ, Column.Pieces[Idx].Size - AmountBeforeStart, 0);
 		}
 	}
 
@@ -166,6 +185,7 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 	while (Idx < Column.Pieces.Num() &&
 		   CurZ + Column.Pieces[Idx].Size < NewEnd)
 	{
+		OutRemovedPiecesZ.Add(CurZ);
 		CurZ += Column.Pieces[Idx].Size;
 		++Idx;
 	}
@@ -179,7 +199,11 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 		const int32 AmountAfterEnd = FMath::Max<int32>(0, PieceEndZ - static_cast<int32>(NewEnd));
 		if (AmountAfterEnd > 0)
 		{
+			OutChangedPieces.Value.Emplace(CurZ, Column.Pieces[Idx].Size - AmountAfterEnd, AmountAfterEnd);
 			Insert.Emplace(Column.Pieces[Idx].Id, AmountAfterEnd);
+		} else if (CurZ < NewEnd) {
+			// Fully covered terminal piece whose end == NewEnd
+			OutRemovedPiecesZ.Add(CurZ);
 		}
 	}
 
@@ -209,14 +233,27 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 	{
 		if (Column.Pieces[i - 1].Id == Column.Pieces[i].Id)
 		{
-			Column.Pieces[i - 1].Size += Column.Pieces[i].Size;
-			Column.Pieces.RemoveAt(i);
-		}
-		else
-		{
+			const auto Shape = GameManager->ShapeRegistry->GetShapeById(Column.Pieces[i].Id);
+			if (Shape->ShouldMerge())
+			{
+				Column.Pieces[i - 1].Size += Column.Pieces[i].Size;
+				Column.Pieces.RemoveAt(i);
+				continue;
+			}
+
 			++i;
+			continue;
 		}
+
+		++i;
 	}
 
 	Changes++;
+}
+
+void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece)
+{
+	TArray<uint16> Tmp;
+	TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>> Tmp2;
+	Th_SetPiece(X, Y, Z, Piece, Tmp, Tmp2);
 }

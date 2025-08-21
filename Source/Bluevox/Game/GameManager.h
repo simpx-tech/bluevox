@@ -51,6 +51,9 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
 	UMaterial* ChunkMaterial = nullptr;
 
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
+	UMaterial* ChunkMaterialTransparent = nullptr;
+	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bInitialized = false;
 	

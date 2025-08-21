@@ -36,7 +36,10 @@ struct FRenderResult
 	}
 	
 	bool bSuccess = false;
+
 	UE::Geometry::FDynamicMesh3 Mesh;
+
+	UE::Geometry::FDynamicMesh3 WaterMesh;
 };
 
 USTRUCT(BlueprintType)

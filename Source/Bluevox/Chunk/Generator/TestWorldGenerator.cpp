@@ -10,7 +10,7 @@
 #include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Shape/ShapeRegistry.h"
 
-void UTestWorldGenerator::GenerateOneColumn(const FChunkPosition& Position,
+void UTestWorldGenerator::GenerateThreeColumns(const FChunkPosition& Position,
 	TArray<FChunkColumn>& OutColumns) const
 {
 	for (int X = 0; X < GameConstants::Chunk::Size; ++X)
@@ -46,6 +46,33 @@ void UTestWorldGenerator::GenerateOneColumn(const FChunkPosition& Position,
 				{
 					FPiece{1, 1024},
 				}
+		};
+	}
+}
+
+void UTestWorldGenerator::GenerateOneColumnTick(const FChunkPosition& Position,
+	TArray<FChunkColumn>& OutColumns) const
+{
+	for (int X = 0; X < GameConstants::Chunk::Size; ++X)
+	{
+		for (int Y = 0; Y < GameConstants::Chunk::Size; ++Y)
+		{
+			const int Index = UChunkData::GetIndex(X, Y);
+			OutColumns[Index] = FChunkColumn{
+								{
+									FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+								}
+			};
+		}
+	}
+
+	if (Position.X == 0 && Position.Y == 0)
+	{
+		OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
+						{
+							FPiece{1, 100},
+							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 100)}
+						}
 		};
 	}
 }

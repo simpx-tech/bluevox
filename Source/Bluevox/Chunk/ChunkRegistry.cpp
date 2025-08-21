@@ -106,9 +106,19 @@ void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& In
 	const auto LocalPosition = FLocalPosition::FromGlobalPosition(GlobalPosition);
 
 	const auto ChunkData = Th_GetChunkData(ChunkPosition);
-	ChunkData->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(InPiece));
+	TArray<uint16> RemovedPiecesZ;
+	TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>> ChangedPieces;
+	ChunkData->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(InPiece), RemovedPiecesZ, ChangedPieces);
 	const auto ShapeRegistry = GameManager->ShapeRegistry;
 
+	if (ShapeRegistry->GetShapeById(InPiece.Id)->ShouldTickOnPlace())
+	{
+		ChunkData->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(GlobalPosition));	
+	}
+
+	// DEV if it was already scheduled/all tick, we should update it too here (from changed)
+	// DEV 2 cases -> both, add tick OR top -> move tick
+	
 	// Notify neighbors about the piece change
 	for (const auto Face : FaceUtils::AllFaces)
 	{
@@ -126,7 +136,7 @@ void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& In
 
 				if (Chunk)
 				{
-					Chunk->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(NeighborPosition));
+					Chunk->ChunkData->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(NeighborPosition));
 				} else
 				{
 					UE_LOG(LogChunk, Warning, TEXT("SetPiece:FaceLoop: Chunk actor not found for position %s"), *ChunkPos.ToString());

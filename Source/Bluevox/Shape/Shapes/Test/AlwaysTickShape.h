@@ -25,5 +25,5 @@ class BLUEVOX_API UAlwaysTickShape : public UShape
 		return GameConstants::Shapes::GShape_Test_AlwaysTick;
 	}
 
-	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, UChunkData* WhereData, float DeltaTime) const override;
+	virtual void GameTick(AGameManager* AGameManager, const FLocalPosition& Position, uint16 Height, UChunkData* WhereData, float DeltaTime) const override;
 };

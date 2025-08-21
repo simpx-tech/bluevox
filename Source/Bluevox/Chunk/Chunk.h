@@ -4,11 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "Bluevox/Tick/GameTickable.h"
+#include "Data/Piece.h"
 #include "Position/ChunkPosition.h"
 #include "Position/LocalPosition.h"
 #include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
+struct FRenderResult;
 struct FRenderGroup;
 struct FChunkColumn;
 class UShape;
@@ -44,6 +46,9 @@ protected:
 	UPROPERTY(EditAnywhere)
 	UDynamicMeshComponent* MeshComponent = nullptr;
 
+	UPROPERTY(EditAnywhere)
+	UDynamicMeshComponent* WaterMeshComponent = nullptr;
+
 	FThreadSafeCounter RenderedAtDirtyChanges = -1;
 
 	UPROPERTY()
@@ -54,9 +59,6 @@ protected:
 
 	UPROPERTY()
 	TArray<FLocalPosition> AlwaysTick;
-
-	UPROPERTY()
-	TArray<FLocalPosition> ScheduledToTick;
 
 public:
 	virtual void BeginDestroy() override;
@@ -73,7 +75,7 @@ public:
 
 	void SetRenderState(EChunkState State) const;
 	
-	bool Th_BeginRender(UE::Geometry::FDynamicMesh3& OutMesh);
+	bool BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, UE::Geometry::FDynamicMesh3& OutWaterMesh);
 
-	void CommitRender(UE::Geometry::FDynamicMesh3&& Mesh) const;
+	void CommitRender(FRenderResult&& RenderResult) const;
 };

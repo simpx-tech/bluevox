@@ -14,6 +14,7 @@
 #include "Data/ChunkData.h"
 #include "Position/LocalPosition.h"
 #include "Runtime/GeometryFramework/Public/Components/DynamicMeshComponent.h"
+#include "VirtualMap/ChunkTaskManager.h"
 
 void AChunk::BeginDestroy()
 {
@@ -35,14 +36,24 @@ AChunk::AChunk()
 	MeshComponent->bCastShadowAsTwoSided = true;
 	MeshComponent->CollisionType = CTF_UseComplexAsSimple;
 	MeshComponent->bUseAsyncCooking = true;
-
 	MeshComponent->SetMobility(EComponentMobility::Type::Static);
 	MeshComponent->SetGenerateOverlapEvents(false);
 	MeshComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 
 	RootComponent = MeshComponent;
+
+	WaterMeshComponent = CreateDefaultSubobject<UDynamicMeshComponent>(TEXT("WaterMeshComponent"));
+	WaterMeshComponent->bCastShadowAsTwoSided = true;
+	WaterMeshComponent->SetGenerateOverlapEvents(false);
+	WaterMeshComponent->SetCollisionProfileName(UCollisionProfile::NoCollision_ProfileName);
+	WaterMeshComponent->SetMobility(EComponentMobility::Type::Static);
+	WaterMeshComponent->SetCollisionResponseToAllChannels(ECR_Ignore);
+	WaterMeshComponent->CollisionType = CTF_UseDefault;
+	
+	WaterMeshComponent->SetupAttachment(RootComponent);
 }
 
+// TODO also pass render state, so know if should tick or not (in case of live x lod chunks)
 AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManager,
 	UChunkData* InData)
 {
@@ -68,7 +79,7 @@ AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManage
 					AlwaysTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
 				} else if (Shape->ShouldTickOnLoad())
 				{
-					ScheduledToTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
+					ChunkData->ScheduledToTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
 				}
 
 				CurZ += Piece.Size;
@@ -83,19 +94,20 @@ AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManage
 
 void AChunk::GameTick(float DeltaTime)
 {
-	for (const auto& ScheduledToTickPos : ScheduledToTick)
+	// DEV error here, can't modify the ScheduledToTick while iterating over it
+	for (const auto& ScheduledToTickPos : ChunkData->ScheduledToTick)
 	{
 		const auto Piece = ChunkData->Th_GetPieceCopy(ScheduledToTickPos);
 		const auto Shape = GameManager->ShapeRegistry->GetShapeById(Piece.Id);
 		if (Shape)
 		{
-			Shape->GameTick(GameManager, ScheduledToTickPos, ChunkData, DeltaTime);
+			Shape->GameTick(GameManager, ScheduledToTickPos, Piece.Size, ChunkData, DeltaTime);
 		} else
 		{
 			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *ScheduledToTickPos.ToString(), *Position.ToString());
 		}
 	}
-	ScheduledToTick.Reset();
+	ChunkData->ScheduledToTick.Reset();
 	
 	for (const auto& AlwaysTickPos : AlwaysTick)
 	{
@@ -103,7 +115,7 @@ void AChunk::GameTick(float DeltaTime)
 		const auto Shape = GameManager->ShapeRegistry->GetShapeById(Piece.Id);
 		if (Shape)
 		{
-			Shape->GameTick(GameManager, AlwaysTickPos, ChunkData, DeltaTime);
+			Shape->GameTick(GameManager, AlwaysTickPos, Piece.Size, ChunkData, DeltaTime);
 		} else
 		{
 			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *AlwaysTickPos.ToString(), *Position.ToString());
@@ -116,12 +128,13 @@ void AChunk::SetRenderState(const EChunkState State) const
 	UE_LOG(LogChunk, Verbose, TEXT("SetRenderState for chunk %s to %s"), *Position.ToString(), *UEnum::GetValueAsString(State));
 	const auto Visible = EnumHasAllFlags(State, EChunkState::Visible);
 	MeshComponent->SetVisibility(Visible);
+	WaterMeshComponent->SetVisibility(Visible);
 
 	// const auto Collision = EnumHasAllFlags(State, EChunkState::Collision);
 	// MeshComponent->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 }
 
-bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
+bool AChunk::BeginRender(FDynamicMesh3& OutMesh, FDynamicMesh3& OutWaterMesh)
 {
 	SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender)
 	UE_LOG(LogChunk, Verbose, TEXT("Th_BeginRender for chunk %s"), *Position.ToString());
@@ -138,7 +151,11 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	
 	OutMesh.EnableAttributes();
 	OutMesh.Attributes()->SetNumUVLayers(2);
-	OutMesh.Attributes()->EnablePrimaryColors();
+	OutMesh.Attributes()->DisablePrimaryColors();
+
+	OutWaterMesh.EnableAttributes();
+	OutWaterMesh.Attributes()->SetNumUVLayers(2);
+	OutMesh.Attributes()->DisablePrimaryColors();
 	
 	FColumnPosition GlobalPos;
 	
@@ -212,8 +229,11 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 					int32 AccumulatedZ = -1;
 					int32 InternalZ = 0;
 					SCOPE_CYCLE_COUNTER(STAT_Chunk_BeginRender_ProcessPiece_AllHorizontalFaces)
+
+					const auto ShapeVisibility = Shape->GetVisibility(Face);
 					
-					if (!Shape->IsOpaque(Face))
+					// Nothing to render on this face
+					if (ShapeVisibility == EFaceVisibility::None)
 					{
 						continue;
 					}
@@ -225,13 +245,15 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 
 					do
 					{
-						const auto NeighborIsOpaque = Neighbor.Shape->IsOpaque(OppositeFace);
+						const auto NeighborIsOpaque = Neighbor.Shape->GetVisibility(OppositeFace) == EFaceVisibility::Opaque;
 
-						if (NeighborIsOpaque)
+						const auto ShouldNotAccumulate = NeighborIsOpaque || (Piece.Id == Neighbor.Piece->Id && ShapeVisibility == EFaceVisibility::Transparent); 
+
+						if (ShouldNotAccumulate)
 						{
 							if (AccumulatedSize > 0)
 							{
-								Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize);
+								Shape->Render(ShapeVisibility == EFaceVisibility::Transparent ? OutWaterMesh : OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize);
 								
 								AccumulatedSize = 0;
 								AccumulatedZ = -1;
@@ -268,7 +290,7 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 
 					if (AccumulatedSize > 0)
 					{
-						Shape->Render(OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize);
+						Shape->Render(ShapeVisibility == EFaceVisibility::Transparent ? OutWaterMesh : OutMesh, Face, FLocalPosition(LocalX, LocalY, AccumulatedZ), AccumulatedSize);
 					}
 				}
 
@@ -277,20 +299,20 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 				if (PieceIdx < PiecesCount - 1)
 				{
 					const auto NeighborShape = ShapeRegistry->GetShapeById(ChunkData->Columns[ColumnIndex].Pieces[PieceIdx + 1].Id);
-					bShouldRenderTop = !NeighborShape->IsOpaque(EFace::Bottom);
+					bShouldRenderTop = NeighborShape->GetVisibility(EFace::Bottom) != EFaceVisibility::Opaque;
 				}
 				if (bShouldRenderTop)
 				{
-					Shape->Render(OutMesh, EFace::Top, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
+					Shape->Render( Shape->GetVisibility(EFace::Bottom) == EFaceVisibility::Transparent ? OutWaterMesh : OutMesh, EFace::Top, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
 				}
 				
 				// Bottom, only render if we are not on the first piece
 				if (PieceIdx > 0)
 				{
 					const auto NeighborShape = ShapeRegistry->GetShapeById(ChunkData->Columns[ColumnIndex].Pieces[PieceIdx - 1].Id);
-					if (!NeighborShape->IsOpaque(EFace::Top))
+					if (NeighborShape->GetVisibility(EFace::Top) != EFaceVisibility::Opaque)
 					{
-						Shape->Render(OutMesh, EFace::Bottom, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
+						Shape->Render(Shape->GetVisibility(EFace::Bottom) == EFaceVisibility::Transparent ? OutWaterMesh : OutMesh, EFace::Bottom, FLocalPosition(LocalX, LocalY, CurZ), PieceSize);
 					}
 				}
 				
@@ -308,9 +330,12 @@ bool AChunk::Th_BeginRender(FDynamicMesh3& OutMesh)
 	return true;
 }
 
-void AChunk::CommitRender(FDynamicMesh3&& Mesh) const
+void AChunk::CommitRender(FRenderResult&& RenderResult) const
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Committing render for chunk %s"), *Position.ToString());
 	MeshComponent->SetMaterial(0, GameManager->ChunkMaterial);
-	MeshComponent->SetMesh(MoveTemp(Mesh));
+	MeshComponent->SetMesh(MoveTemp(RenderResult.Mesh));
+
+	WaterMeshComponent->SetMaterial(0, GameManager->ChunkMaterialTransparent);
+	WaterMeshComponent->SetMesh(MoveTemp(RenderResult.WaterMesh));
 }

@@ -6,7 +6,7 @@
 #include "Bluevox/Chunk/Position/LocalPosition.h"
 
 void UTickOnLoadShape::GameTick(AGameManager* AGameManager, const FLocalPosition& Position,
-                                UChunkData* WhereData, float DeltaTime) const
+                                uint16 Height, UChunkData* WhereData, float DeltaTime) const
 {
 	UE_LOG(LogTemp, Log, TEXT("UTickOnLoadShape::GameTick called at position %s."), *Position.ToString());
 }
