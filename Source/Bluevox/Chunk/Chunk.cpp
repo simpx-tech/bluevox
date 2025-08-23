@@ -74,10 +74,7 @@ AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManage
 			for (const auto& Piece : Column.Pieces)
 			{
 				const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
-				if (Shape->ShouldAlwaysTick())
-				{
-					AlwaysTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
-				} else if (Shape->ShouldTickOnLoad())
+				if (Shape->ShouldTickOnLoad())
 				{
 					ChunkData->ScheduledToTick.Add(FLocalPosition(LocalX, LocalY, CurZ));
 				}
@@ -107,20 +104,6 @@ void AChunk::GameTick(float DeltaTime)
 		} else
 		{
 			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *ScheduledToTickPos.ToString(), *Position.ToString());
-		}
-	}
-	
-	
-	for (const auto& AlwaysTickPos : AlwaysTick)
-	{
-		const auto Piece = ChunkData->Th_GetPieceCopy(AlwaysTickPos);
-		const auto Shape = GameManager->ShapeRegistry->GetShapeById(Piece.Id);
-		if (Shape)
-		{
-			Shape->GameTick(GameManager, AlwaysTickPos, Piece.Size, ChunkData, DeltaTime);
-		} else
-		{
-			UE_LOG(LogChunk, Warning, TEXT("Shape %d not found for piece at %s in chunk %s"), Piece.Id, *AlwaysTickPos.ToString(), *Position.ToString());
 		}
 	}
 }

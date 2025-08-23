@@ -186,12 +186,17 @@ void UChunkTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksToRende
 {
 	for (const auto& ChunkPosition : ChunksToRender)
 	{
+		UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Scheduling render for chunk %s"), *ChunkPosition.ToString());
+		
 		// Only add the ones that are not being unloaded
 		if (ProcessingUnload.FindRef(ChunkPosition) == false)
 		{
 			// Not render here, only render when all chunks are loaded
 			// TODO probably there's a better way to handle this
 			PendingRender.Add(ChunkPosition);
+		} else
+		{
+			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Chunk %s is being unloaded, not scheduling render."), *ChunkPosition.ToString());
 		}
 	}
 }
@@ -278,11 +283,13 @@ void UChunkTaskManager::ScheduleUnload(const TSet<FChunkPosition>& ChunksToUnloa
 		PendingRender.Remove(ChunkPosition);
 		if (ProcessingRender.Contains(ChunkPosition))
 		{
+			UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Cancelling render for chunk %s"), *ChunkPosition.ToString());
 			ProcessingRender.Find(ChunkPosition)->LastRenderIndex = -1;
 		}
 		
 		if (ProcessingUnload.Contains(ChunkPosition))
 		{
+			UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Chunk %s is already being unloaded, skipping."), *ChunkPosition.ToString());
 			ProcessingUnload.Add(ChunkPosition, true);			
 			continue;
 		}
@@ -352,37 +359,42 @@ void UChunkTaskManager::Tick(float DeltaTime)
 			
 			ToRemove.Add(ChunkPosition);
 
+			UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Confirming schedule render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
+
 			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
 			Chunk->SetRenderState(State);
 			
 			// If state = none = border, so we can't render it (as it will have no neighbors)
 			if (State != EChunkState::None)
 			{
-				GameManager->ChunkRegistry->LockForRender(ChunkPosition);
-
 				GameManager->TickManager->RunAsyncThen(
-					[Chunk]
+					[Chunk, this, ChunkPosition]
 					{
+						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Starting render for chunk %s"), *ChunkPosition.ToString());
 						FRenderResult Result;
+						GameManager->ChunkRegistry->LockForRender(ChunkPosition);
 						Result.bSuccess = Chunk->BeginRender(Result.Mesh, Result.WaterMesh);
+						GameManager->ChunkRegistry->UnlockForRender(ChunkPosition);
 						return MoveTemp(Result);
 					},
 					[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
 					{
+						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Finishing render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
 						const auto Processing = ProcessingRender.Find(ChunkPosition);
 						Processing->PendingTasks--;
 						// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
-						if (Processing->LastRenderIndex == RenderId && Result.bSuccess && Chunk)
+						if (RenderId > Processing->LastCommitedRenderIndex && Result.bSuccess && Chunk)
 						{
+							UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Committing render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
 							Chunk->CommitRender(MoveTemp(Result));
+							Processing->LastCommitedRenderIndex = RenderId;
 						}
 
 						if (Processing->PendingTasks == 0) {
+							UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("All render tasks finished for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
 							OnAllRenderTasksFinishedForChunk.Broadcast(ChunkPosition);
 							ProcessingRender.Remove(ChunkPosition);
 						}
-
-						GameManager->ChunkRegistry->UnlockForRender(ChunkPosition);
 					}
 				);
 			}

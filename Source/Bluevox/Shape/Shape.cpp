@@ -36,11 +36,6 @@ bool UShape::ShouldTickOnPlace() const
 	return false;
 }
 
-bool UShape::ShouldAlwaysTick() const
-{
-	return false;
-}
-
 bool UShape::ShouldTickOnLoad() const
 {
 	return false;

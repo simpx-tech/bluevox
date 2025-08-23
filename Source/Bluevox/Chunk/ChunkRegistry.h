@@ -49,6 +49,8 @@ class BLUEVOX_API UChunkRegistry : public UObject
 	UPROPERTY()
 	TMap<FChunkPosition, AChunk*> ChunkActors;
 
+	FCriticalSection ChunksMarkedForUseLock;
+	
 	UPROPERTY()
 	TMap<FChunkPosition, uint16> ChunksMarkedForUse;
   

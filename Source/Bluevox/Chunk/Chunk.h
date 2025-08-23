@@ -57,9 +57,6 @@ protected:
 	UPROPERTY(EditAnywhere)
 	FChunkPosition Position;
 
-	UPROPERTY()
-	TArray<FLocalPosition> AlwaysTick;
-
 public:
 	virtual void BeginDestroy() override;
 	

@@ -51,6 +51,9 @@ struct FProcessingRender
 	int32 LastRenderIndex = -1;
 
 	UPROPERTY()
+	int32 LastCommitedRenderIndex = -1;
+	
+	UPROPERTY()
 	int32 PendingTasks = 0;
 };
 

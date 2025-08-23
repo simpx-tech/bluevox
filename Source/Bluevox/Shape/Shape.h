@@ -69,8 +69,6 @@ public:
 	virtual bool ShouldMerge() const;
 	
 	virtual bool ShouldTickOnPlace() const;
-	
-	virtual bool ShouldAlwaysTick() const;
 
 	virtual bool ShouldTickOnLoad() const;
 

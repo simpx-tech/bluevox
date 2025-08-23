@@ -21,6 +21,9 @@ USTRUCT()
 struct FChangeFromSet
 {
 	GENERATED_BODY()
+
+	UPROPERTY()
+	uint16 PieceId;
 	
 	UPROPERTY()
 	uint16 PositionZ;

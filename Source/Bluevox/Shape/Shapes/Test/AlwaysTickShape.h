@@ -15,11 +15,6 @@ class BLUEVOX_API UAlwaysTickShape : public UShape
 {
 	GENERATED_BODY()
 
-	virtual bool ShouldAlwaysTick() const override
-	{
-		return true;
-	}
-
 	virtual FName GetNameId() const override
 	{
 		return GameConstants::Shapes::GShape_Test_AlwaysTick;

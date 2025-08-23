@@ -177,7 +177,7 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 			// keep the bottom of the first overlapped piece
 			Insert.Emplace(Column.Pieces[Idx].Id, AmountBeforeStart);
 			
-			OutChangedPieces.Key.Emplace(CurZ, Column.Pieces[Idx].Size - AmountBeforeStart, 0);
+			OutChangedPieces.Key.Emplace(Column.Pieces[Idx].Id, CurZ, Column.Pieces[Idx].Size - AmountBeforeStart, 0);
 		}
 	}
 
@@ -199,7 +199,7 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 		const int32 AmountAfterEnd = FMath::Max<int32>(0, PieceEndZ - static_cast<int32>(NewEnd));
 		if (AmountAfterEnd > 0)
 		{
-			OutChangedPieces.Value.Emplace(CurZ, Column.Pieces[Idx].Size - AmountAfterEnd, AmountAfterEnd);
+			OutChangedPieces.Value.Emplace(Column.Pieces[Idx].Id, CurZ, Column.Pieces[Idx].Size - AmountAfterEnd, AmountAfterEnd);
 			Insert.Emplace(Column.Pieces[Idx].Id, AmountAfterEnd);
 		} else if (CurZ < NewEnd) {
 			// Fully covered terminal piece whose end == NewEnd

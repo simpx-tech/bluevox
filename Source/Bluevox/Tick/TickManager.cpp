@@ -106,7 +106,8 @@ void UTickManager::GameTick()
 			const auto EndTime = FPlatformTime::Cycles();
 			CurrentBudget -= EndTime - StartTime;
 
-			if (CurrentBudget <= 0)
+			// No budget and has more
+			if (CurrentBudget <= 0 && i < TickableClasses.Num() - 1 && j < Len - 1)
 			{
 				return;
 			}

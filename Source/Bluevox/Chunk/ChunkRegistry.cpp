@@ -116,14 +116,39 @@ void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& In
 		ChunkData->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(GlobalPosition));	
 	}
 
-	// DEV if it was already scheduled/all tick, we should update it too here (from changed)
-	// DEV 2 cases -> both, add tick OR top -> move tick
+	for (const auto RemovedZ : RemovedPiecesZ)
+	{
+		ChunkData->ScheduledToTick.Remove(FLocalPosition(LocalPosition.X, LocalPosition.Y, RemovedZ));
+	}
+
+	// Special case, place in the middle of another piece, which split it in two, needs to duplicate the tick
+	if (ChangedPieces.Value.IsSet() && ChangedPieces.Key.IsSet() && ChangedPieces.Value->PositionZ == ChangedPieces.Key->PositionZ)
+	{
+		const auto InitialChangedPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Key->PositionZ);
+		const auto ChangedLocalPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Key->PositionZ + ChangedPieces.Value->StartChange);
+		if (ChunkData->ScheduledToTick.Contains(InitialChangedPosition))
+		{
+			ChunkData->ScheduledToTick.Add(ChangedLocalPosition);	
+		}
+	} else if (ChangedPieces.Value.IsSet())
+	{
+		const auto InitialChangedPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Value->PositionZ);
+		if (ChunkData->ScheduledToTick.Contains(InitialChangedPosition))
+		{
+			ChunkData->ScheduledToTick.Remove(FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Value->PositionZ));
+
+			const auto ChangedLocalPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Value->PositionZ + ChangedPieces.Value->StartChange);
+			ChunkData->ScheduledToTick.Add(ChangedLocalPosition);
+		}
+	}
 	
 	// Notify neighbors about the piece change
 	for (const auto Face : FaceUtils::AllFaces)
 	{
+		// DEV should loop until we reach the end of this piece (if size > 1 can have many neighbors)
 		const auto Offset = FaceUtils::GetOffsetByFace(Face);
-		const auto Piece = ChunkData->Th_GetPieceCopy(LocalPosition.X + Offset.X, LocalPosition.Y + Offset.Y, LocalPosition.Z + Offset.Z);
+		const auto LocalPosWithOffset = LocalPosition + Offset;
+		const auto Piece = ChunkData->Th_GetPieceCopy(LocalPosWithOffset.X, LocalPosWithOffset.Y, LocalPosWithOffset.Z);
 
 		const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
 		if (Shape)
@@ -169,11 +194,14 @@ void UChunkRegistry::Th_UnregisterChunk(const FChunkPosition& Position)
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Unregistering chunk at position %s"), *Position.ToString());
 
-	if (ChunksMarkedForUse.Contains(Position))
 	{
-		UE_LOG(LogChunk, Verbose, TEXT("Chunk %s is marked for use, scheduling removal later."), *Position.ToString());
-		ChunksScheduledToRemove.Add(Position);
-		return;
+		FScopeLock ScopeLock(&ChunksMarkedForUseLock);
+		if (ChunksMarkedForUse.Contains(Position))
+		{
+			UE_LOG(LogChunk, Verbose, TEXT("Chunk %s is marked for use, scheduling removal later."), *Position.ToString());
+			ChunksScheduledToRemove.Add(Position);
+			return;
+		}
 	}
 	
 	if (ChunkActors.Contains(Position))
@@ -227,7 +255,7 @@ void UChunkRegistry::LockForRender(const FChunkPosition& Position)
 	}
 
 	{
-		FWriteScopeLock WriteLock(ChunksDataLock);
+		FScopeLock ScopeLock(&ChunksMarkedForUseLock);
 		for (const auto& Offset : Offsets)
 		{
 			ChunksMarkedForUse.FindOrAdd(Position + Offset) += 1;
@@ -249,7 +277,8 @@ void UChunkRegistry::UnlockForRender(const FChunkPosition& Position)
 			FChunkPosition{1, 0},
 			FChunkPosition{-1, 0}
 		};
-		
+
+		FScopeLock ScopeLock(&ChunksMarkedForUseLock);
 		for (const auto& Offset : Offsets)
 		{
 			ChunksData.FindRef(Position + Offset)->Lock.ReadUnlock();
@@ -266,6 +295,7 @@ void UChunkRegistry::UnlockForRender(const FChunkPosition& Position)
 		}
 	}
 
+	FScopeLock ScopeLock(&ChunksMarkedForUseLock);
 	for (const auto& ChunkPosition : RemoveChunksMarkedForUse)
 	{
 		UE_LOG(LogChunk, Verbose, TEXT("Chunk %s is no longer marked for use."), *ChunkPosition.ToString());
@@ -295,7 +325,10 @@ void UChunkRegistry::Th_RegisterChunk(const FChunkPosition& Position, UChunkData
 		LoadedByRegion.FindOrAdd(FRegionPosition::FromChunkPosition(Position)) += 1;
 	}
 
-	ChunksScheduledToRemove.Remove(Position);
+	{
+		FScopeLock ScopeLock(&ChunksMarkedForUseLock);
+		ChunksScheduledToRemove.Remove(Position);
+	}
 	ChunksData.Add(Position, Data);
 }
 

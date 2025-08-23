@@ -16,9 +16,10 @@ struct FLocalPosition
 	{
 	}
 
-	FLocalPosition(const uint8 InX, const uint8 InY, const uint16 InZ)
-		: X(InX), Y(InY), Z(InZ)
-	{
+	FLocalPosition(const uint8 InX, const uint8 InY, const uint16 InZ) {
+		X = static_cast<uint8>(PositiveMod(InX, GameConstants::Chunk::Size));
+		Y = static_cast<uint8>(PositiveMod(InY, GameConstants::Chunk::Size));
+		Z = static_cast<uint16>(InZ);
 	}
 
 	static FLocalPosition FromActorLocation(const FVector& Location)

@@ -41,51 +41,51 @@ void UWaterShape::GameTick(AGameManager* GameManager, const FLocalPosition& Posi
 		return;
 	}
 
-	FGlobalPosition CurrentPosition = GlobalPos;
-	const auto EndZ = Position.Z + Height;
-
-	while (CurrentPosition.Z < EndZ)
-	{
-		TArray<FGlobalPosition> PossibleSpreadNeighbors;
-		for (const auto& Direction : FaceUtils::AllHorizontalFaces)
-		{
-			const auto NeighborPos = CurrentPosition + FaceUtils::GetOffsetByFace(Direction);
-			const auto ChunkPos = FChunkPosition::FromGlobalPosition(NeighborPos);
-			const auto NeighborLocalPos = FLocalPosition::FromGlobalPosition(NeighborPos);
-			const auto Neighbor = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPos)->Th_GetPieceCopy(NeighborLocalPos);
-			if (Neighbor.Start <= CurrentPosition.Z && Neighbor.Id == GameConstants::Shapes::GShapeId_Void)
-			{
-				PossibleSpreadNeighbors.Add(NeighborPos);
-			}
-		}
-		
-		if (PossibleSpreadNeighbors.Num() > 0)
-		{
-			Algo::RandomShuffle(PossibleSpreadNeighbors);
-			const auto HowMuchCanSpread = EndZ - CurrentPosition.Z;
-			const int WaterToSpreadCount = FMath::Min(HowMuchCanSpread, PossibleSpreadNeighbors.Num());
-
-			for (int i = 0; i < HowMuchCanSpread && i < PossibleSpreadNeighbors.Num(); i++)
-			{
-				GameManager->ChunkRegistry->SetPiece(PossibleSpreadNeighbors[i], FPiece{WaterId, 1});
-			}
-
-			// Remove from the source
-			GameManager->ChunkRegistry->SetPiece(CurrentPosition + FGlobalPosition(0, 0, Height - WaterToSpreadCount),
-				FPiece{GameConstants::Shapes::GShapeId_Void, static_cast<unsigned short>(WaterToSpreadCount)});
-			
-			// Can't spread anymore, don't tick
-			if (PossibleSpreadNeighbors.Num() >= HowMuchCanSpread)
-			{
-				return;
-			}
-
-			// We have more to spread and haven't reached the end, so schedule another tick
-			OriginChunkData->ScheduledToTick.Add(Position);
-			
-			return;
-		}
-		
-		CurrentPosition.Z++;
-	}
+	// FGlobalPosition CurrentPosition = GlobalPos;
+	// const auto EndZ = Position.Z + Height;
+	//
+	// while (CurrentPosition.Z < EndZ)
+	// {
+	// 	TArray<FGlobalPosition> PossibleSpreadNeighbors;
+	// 	for (const auto& Direction : FaceUtils::AllHorizontalFaces)
+	// 	{
+	// 		const auto NeighborPos = CurrentPosition + FaceUtils::GetOffsetByFace(Direction);
+	// 		const auto ChunkPos = FChunkPosition::FromGlobalPosition(NeighborPos);
+	// 		const auto NeighborLocalPos = FLocalPosition::FromGlobalPosition(NeighborPos);
+	// 		const auto Neighbor = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPos)->Th_GetPieceCopy(NeighborLocalPos);
+	// 		if (Neighbor.Start <= CurrentPosition.Z && Neighbor.Id == GameConstants::Shapes::GShapeId_Void)
+	// 		{
+	// 			PossibleSpreadNeighbors.Add(NeighborPos);
+	// 		}
+	// 	}
+	// 	
+	// 	if (PossibleSpreadNeighbors.Num() > 0)
+	// 	{
+	// 		Algo::RandomShuffle(PossibleSpreadNeighbors);
+	// 		const auto HowMuchCanSpread = EndZ - CurrentPosition.Z;
+	// 		const int WaterToSpreadCount = FMath::Min(HowMuchCanSpread, PossibleSpreadNeighbors.Num());
+	//
+	// 		for (int i = 0; i < HowMuchCanSpread && i < PossibleSpreadNeighbors.Num(); i++)
+	// 		{
+	// 			GameManager->ChunkRegistry->SetPiece(PossibleSpreadNeighbors[i], FPiece{WaterId, 1});
+	// 		}
+	//
+	// 		// Remove from the source
+	// 		GameManager->ChunkRegistry->SetPiece(CurrentPosition + FGlobalPosition(0, 0, Height - WaterToSpreadCount),
+	// 			FPiece{GameConstants::Shapes::GShapeId_Void, static_cast<unsigned short>(WaterToSpreadCount)});
+	// 		
+	// 		// Can't spread anymore, don't tick
+	// 		if (PossibleSpreadNeighbors.Num() >= HowMuchCanSpread)
+	// 		{
+	// 			return;
+	// 		}
+	//
+	// 		// We have more to spread and haven't reached the end, so schedule another tick
+	// 		OriginChunkData->ScheduledToTick.Add(Position);
+	// 		
+	// 		return;
+	// 	}
+	// 	
+	// 	CurrentPosition.Z++;
+	// }
 }
