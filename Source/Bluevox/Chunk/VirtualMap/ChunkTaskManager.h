@@ -38,8 +38,6 @@ struct FRenderResult
 	bool bSuccess = false;
 
 	UE::Geometry::FDynamicMesh3 Mesh;
-
-	UE::Geometry::FDynamicMesh3 WaterMesh;
 };
 
 USTRUCT(BlueprintType)
@@ -88,6 +86,10 @@ class BLUEVOX_API UChunkTaskManager : public UObject, public FTickableGameObject
 	UPROPERTY()
 	TSet<FChunkPosition> PendingRender;
 
+	// Chunks in this set should bypass the usual dirty-check during mesh build
+	UPROPERTY()
+	TSet<FChunkPosition> ForcedRender;
+
 	UPROPERTY()
 	TMap<FChunkPosition, FProcessingRender> ProcessingRender;
 
@@ -133,6 +135,9 @@ public:
 	
 	UFUNCTION()
 	void ScheduleRender(const TSet<FChunkPosition>& ChunksToRender);
+
+	UFUNCTION()
+	void ScheduleRenderForced(const TSet<FChunkPosition>& ChunksToRender);
 
 	UFUNCTION()
 	void Sv_ScheduleNetSend(const AMainController* ToPlayer, const TSet<FChunkPosition>& ChunksToSend);

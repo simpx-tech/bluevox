@@ -13,8 +13,8 @@ struct FPieceWithStart : public FPiece
 	{
 	}
 
-	FPieceWithStart(const uint16 InId, const uint16 InSize, const uint16 InStart)
-		: FPiece(InId, InSize), Start(InStart)
+	FPieceWithStart(const EMaterial InMaterialId, const uint16 InSize, const uint16 InStart)
+		: FPiece(InMaterialId, InSize), Start(InStart)
 	{
 	}
 

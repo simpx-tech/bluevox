@@ -1,5 +1,7 @@
 ﻿#pragma once
 
+#include "CoreMinimal.h"
+
 UENUM(BlueprintType)
 enum class EFace : uint8
 {

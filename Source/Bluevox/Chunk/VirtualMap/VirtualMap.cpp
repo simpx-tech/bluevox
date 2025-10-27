@@ -311,11 +311,11 @@ void UVirtualMap::Handle_OnAllRenderTasksFinishedForChunk(const FChunkPosition P
 
 					const auto ChunkPosition = FChunkPosition::FromGlobalPosition(Player->SavedGlobalPosition);
 					const auto Chunk = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition);
-					const auto DoesFit = Chunk->DoesFit(Player->SavedGlobalPosition, GameConstants::Distances::PlayerHeightInLayers);
+					const auto DoesFit = Chunk->DoesFit(Player->SavedGlobalPosition, GameConstants::Scaling::PlayerHeightInLayers);
 
 					if (!DoesFit)
 					{
-						const auto NewZPosition = Chunk->GetFirstGapThatFits(Player->SavedGlobalPosition, GameConstants::Distances::PlayerHeightInLayers);
+						const auto NewZPosition = Chunk->GetFirstGapThatFits(Player->SavedGlobalPosition, GameConstants::Scaling::PlayerHeightInLayers);
 						Player->SavedGlobalPosition.Z = NewZPosition;
 
 						const auto WorldPosition = Player->SavedGlobalPosition.AsActorLocationCopy();

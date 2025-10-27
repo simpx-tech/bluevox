@@ -1,22 +1,5 @@
 ﻿#pragma once
 
-namespace GameConstants::Shapes
-{
-	inline constexpr uint16 GShapeId_Void = 0;
-	
-	inline const FName GShape_Void(TEXT("core:shape:void"));
-	inline const FName GShape_Layer(TEXT("core:shape:layer"));
-	inline const FName GShape_Layer_Dirt(TEXT("core:shape:layer_dirt"));
-	inline const FName GShape_Layer_Grass(TEXT("core:shape:layer_grass"));
-	inline const FName GShape_Layer_Stone(TEXT("core:shape:layer_stone"));
-
-	inline const FName GShape_Water(TEXT("core:shape:water"));
-
-	inline const FName GShape_Test_AlwaysTick(TEXT("core:shape:test_always_tick"));
-	inline const FName GShape_Test_TickOnLoad(TEXT("core:shape:test_tick_on_load"));
-	inline const FName GShape_Test_TickOnNeighborUpdate(TEXT("core:shape:test_tick_on_neighbor_update"));
-}
-
 namespace GameConstants::Chunk
 {
 	extern inline int32 Size = 48;
@@ -53,6 +36,11 @@ namespace GameConstants::Scaling
 		TEXT(
 			"The height of the player (Don't modify player height it's just used for some calculations)"),
 		ECVF_Default);
+
+	extern inline int32 PlayerHeightInLayers = 8;
+	static FAutoConsoleVariableRef CVarPlayerSizeInLayers(
+		TEXT("game.rules.distances.player_height_in_layers"), PlayerHeightInLayers,
+		TEXT("The height of the player in layers"), ECVF_Default);
 }
 
 namespace GameConstants::Distances
@@ -61,11 +49,6 @@ namespace GameConstants::Distances
 	static FAutoConsoleVariableRef CVarInteractionDistance(
 		TEXT("game.rules.distances.interaction_distance"), InteractionDistance,
 		TEXT("The distance for interaction"), ECVF_Default);
-
-	extern inline int32 PlayerHeightInLayers = 8;
-	static FAutoConsoleVariableRef CVarPlayerSizeInLayers(
-		TEXT("game.rules.distances.player_height_in_layers"), PlayerHeightInLayers,
-		TEXT("The height of the player in layers"), ECVF_Default);
 }
 
 namespace GameConstants::Region

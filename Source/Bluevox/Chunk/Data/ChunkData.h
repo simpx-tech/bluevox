@@ -23,7 +23,7 @@ struct FChangeFromSet
 	GENERATED_BODY()
 
 	UPROPERTY()
-	uint16 PieceId;
+	EMaterial MaterialId;
 	
 	UPROPERTY()
 	uint16 PositionZ;
@@ -54,9 +54,6 @@ public:
 	
 	UPROPERTY()
 	FChunkPosition Position;
-
-	UPROPERTY()
-	TArray<FLocalPosition> ScheduledToTick;
 	
 	UPROPERTY()
 	int32 Changes = 0;
@@ -72,7 +69,6 @@ public:
 		
 		Ar << FileVersion;
 		Ar << Columns;
-		Ar << ScheduledToTick;
 	}
 
 	inline int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);

@@ -24,7 +24,7 @@ void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 			auto& Column = OutColumns[Index];
 			
 			Column.Pieces.Add(FPiece{
-				0,
+				EMaterial::Void,
 				static_cast<unsigned short>(GameConstants::Chunk::Height)
 			});
 		}

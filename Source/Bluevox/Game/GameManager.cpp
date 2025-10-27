@@ -7,11 +7,8 @@
 #include "MainController.h"
 #include "WorldSave.h"
 #include "Bluevox/Chunk/ChunkRegistry.h"
-#include "Bluevox/Chunk/Generator/WorldGenerator.h"
 #include "Bluevox/Chunk/VirtualMap/ChunkTaskManager.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
-#include "Bluevox/Network/PlayerNetwork.h"
-#include "Bluevox/Shape/ShapeRegistry.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "GameRules/GameRule.h"
 #include "Kismet/GameplayStatics.h"
@@ -46,9 +43,6 @@ void AGameManager::BeginPlay()
 	VirtualMap = NewObject<UVirtualMap>(this, TEXT("VirtualMap"))->Init(this);
 	
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"))->Init(this);
-
-	ShapeRegistry = NewObject<UShapeRegistry>(this, TEXT("ShapeRegistry"));
-	ShapeRegistry->RegisterAll();
 	
 	TickManager = NewObject<UTickManager>(this, TEXT("TickManager"))->Init();
 	

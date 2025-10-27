@@ -1,6 +1,7 @@
 ﻿#pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Game/VoxelMaterial.h"
 #include "Piece.generated.h"
 
 USTRUCT(BlueprintType)
@@ -12,20 +13,20 @@ struct FPiece
 	{
 	}
 
-	FPiece(const uint16 InId, const uint16 InSize)
-		: Id(InId), Size(InSize)
+	FPiece(const EMaterial InMaterialId, const uint16 InSize)
+		: MaterialId(InMaterialId), Size(InSize)
 	{
 	}
 
 	UPROPERTY()
-	uint16 Id = 0;
+	EMaterial MaterialId = EMaterial::Void;
 
 	UPROPERTY()
 	uint16 Size = 1;
 
 	friend FArchive& operator<<(FArchive& Ar, FPiece& Piece)
 	{
-		Ar << Piece.Id;
+		Ar << Piece.MaterialId;
 		Ar << Piece.Size;
 		return Ar;
 	}

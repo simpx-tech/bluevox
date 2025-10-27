@@ -8,7 +8,6 @@
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/GameConstants.h"
-#include "Bluevox/Shape/ShapeRegistry.h"
 
 void UTestWorldGenerator::GenerateThreeColumns(const FChunkPosition& Position,
 	TArray<FChunkColumn>& OutColumns) const
@@ -20,7 +19,7 @@ void UTestWorldGenerator::GenerateThreeColumns(const FChunkPosition& Position,
 			const int Index = UChunkData::GetIndex(X, Y);
 			OutColumns[Index] = FChunkColumn{
 							{
-								FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+								FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 							}
 			};
 		}
@@ -30,21 +29,21 @@ void UTestWorldGenerator::GenerateThreeColumns(const FChunkPosition& Position,
 	{
 		OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
 					{
-						FPiece{1, 10},
-						FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 10)}
+						FPiece{EMaterial::Dirt, 10},
+						FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 10)}
 					}
 		};
 	
 		OutColumns[UChunkData::GetIndex(1,0)] = FChunkColumn{
 						{
-							FPiece{1, 5},
-							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 5)}
+							FPiece{EMaterial::Dirt, 5},
+							FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 5)}
 						}
 		};
 	
 		OutColumns[UChunkData::GetIndex(0,1)] = FChunkColumn{
 				{
-					FPiece{1, 1024},
+					FPiece{EMaterial::Dirt, 1024},
 				}
 		};
 	}
@@ -60,7 +59,7 @@ void UTestWorldGenerator::GenerateOneColumnTick(const FChunkPosition& Position,
 			const int Index = UChunkData::GetIndex(X, Y);
 			OutColumns[Index] = FChunkColumn{
 								{
-									FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+									FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 								}
 			};
 		}
@@ -70,8 +69,8 @@ void UTestWorldGenerator::GenerateOneColumnTick(const FChunkPosition& Position,
 	{
 		OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
 						{
-							FPiece{1, 100},
-							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 100)}
+							FPiece{EMaterial::Stone, 100},
+							FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 100)}
 						}
 		};
 	}
@@ -81,9 +80,9 @@ void UTestWorldGenerator::GenerateNoise4X4(const FChunkPosition& Position, TArra
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
-	const auto DirtId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
-	const auto GrassId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Grass);
-	const auto StoneId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Stone);
+	constexpr auto DirtId = EMaterial::Dirt;
+	constexpr auto GrassId = EMaterial::Grass;
+	constexpr auto StoneId = EMaterial::Stone;
 
 	const auto MaxHeight = FMath::FloorToInt(GameConstants::Chunk::Height * 0.75f);
 	const FRandomStream RandomStream(123);
@@ -115,13 +114,13 @@ void UTestWorldGenerator::GenerateNoise4X4(const FChunkPosition& Position, TArra
 					Column.Pieces.Emplace(StoneId, StoneHeight);
 					Column.Pieces.Emplace(DirtId, DirtHeight);
 					Column.Pieces.Emplace(GrassId, GrassHeight);
-					Column.Pieces.Emplace(GameConstants::Shapes::GShapeId_Void, VoidHeight);
+					Column.Pieces.Emplace(EMaterial::Void, VoidHeight);
 				} else
 				{
 					const int Index = UChunkData::GetIndex(X, Y);
 					OutColumns[Index] = FChunkColumn{
 						{
-							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+							FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 						}
 					};
 				}
@@ -136,7 +135,7 @@ void UTestWorldGenerator::GenerateNoise4X4(const FChunkPosition& Position, TArra
 				const int Index = UChunkData::GetIndex(X, Y);
 				OutColumns[Index] = FChunkColumn{
 					{
-						FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+						FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 					}
 				};
 			}
@@ -156,23 +155,22 @@ void UTestWorldGenerator::GenerateTickAlwaysShape(const FChunkPosition& Position
 			const int Index = UChunkData::GetIndex(X, Y);
 			OutColumns[Index] = FChunkColumn{
 								{
-									FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+									FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 								}
 			};
 		}
 	}
 
-	if (Position.X == 0 && Position.Y == 0)
-	{
-		const auto TickAlwaysShape = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Test_AlwaysTick);
-		
-		OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
-						{
-							FPiece{TickAlwaysShape, 1},
-							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
-						}
-		};
-	}
+	// if (Position.X == 0 && Position.Y == 0)
+	// {
+	// 	
+	// 	OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
+	// 					{
+	// 						FPiece{TickAlwaysShape, 1},
+	// 						FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
+	// 					}
+	// 	};
+	// }
 }
 
 void UTestWorldGenerator::GenerateTickOnLoadShape(const FChunkPosition& Position,
@@ -187,23 +185,23 @@ void UTestWorldGenerator::GenerateTickOnLoadShape(const FChunkPosition& Position
 			const int Index = UChunkData::GetIndex(X, Y);
 			OutColumns[Index] = FChunkColumn{
 									{
-										FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+										FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 									}
 			};
 		}
 	}
 
-	if (Position.X == 0 && Position.Y == 0)
-	{
-		const auto TickOnLoadShape = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Test_TickOnLoad);
-		
-		OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
-							{
-								FPiece{TickOnLoadShape, 1},
-								FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
-							}
-		};
-	}
+	// if (Position.X == 0 && Position.Y == 0)
+	// {
+	// 	const auto TickOnLoadShape = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Textures::GShape_Test_TickOnLoad);
+	// 	
+	// 	OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
+	// 						{
+	// 							FPiece{TickOnLoadShape, 1},
+	// 							FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
+	// 						}
+	// 	};
+	// }
 }
 
 void UTestWorldGenerator::GenerateTickOnNeighborUpdateShape(const FChunkPosition& Position,
@@ -218,7 +216,7 @@ void UTestWorldGenerator::GenerateTickOnNeighborUpdateShape(const FChunkPosition
 			const int Index = UChunkData::GetIndex(X, Y);
 			OutColumns[Index] = FChunkColumn{
 									{
-										FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height)},
+										FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height)},
 									}
 			};
 		}
@@ -226,24 +224,24 @@ void UTestWorldGenerator::GenerateTickOnNeighborUpdateShape(const FChunkPosition
 
 	if (Position.X == 0 && Position.Y == 0)
 	{
-		const auto Dirt = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
-		const auto TickOnNeighborUpdate = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Test_TickOnNeighborUpdate);
+		const auto Dirt = EMaterial::Dirt;
+		// const auto TickOnNeighborUpdate = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Textures::GShape_Test_TickOnNeighborUpdate);
 		
 		OutColumns[UChunkData::GetIndex(0,0)] = FChunkColumn{
 							{
-								FPiece{TickOnNeighborUpdate, 1},
-								FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
+								FPiece{Dirt, 1},
+								FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
 							}
 		};
 		OutColumns[UChunkData::GetIndex(0,1)] = FChunkColumn{
 									{
 										FPiece{Dirt, 1},
-										FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
+										FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
 									}};
 		OutColumns[UChunkData::GetIndex(1,1)] = FChunkColumn{
 								{
 									FPiece{Dirt, 1},
-									FPiece{0, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
+									FPiece{EMaterial::Void, static_cast<unsigned short>(GameConstants::Chunk::Height - 1)}
 								}
 		};
 	}

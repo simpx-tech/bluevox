@@ -6,8 +6,6 @@
 #include "PieceWithStart.h"
 #include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/Position/GlobalPosition.h"
-#include "Bluevox/Shape/Shape.h"
-#include "Bluevox/Shape/ShapeRegistry.h"
 #include "Bluevox/Tick/TickManager.h"
 
 UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition InPosition,
@@ -54,7 +52,7 @@ int32 UChunkData::GetFirstGapThatFits(const int32 X, const int32 Y, const int32 
 	int32 CurZ = 0;
 	for (const auto& Piece : Column.Pieces)
 	{
-		if (Piece.Id == 0 && Piece.Size >= FitHeightInLayers)
+		if (Piece.MaterialId == EMaterial::Void && Piece.Size >= FitHeightInLayers)
 		{
 			return CurZ;
 		}
@@ -92,7 +90,7 @@ bool UChunkData::DoesFit(const int32 X, const int32 Y, const int32 Z, const int3
 		// Z is inside this piece
 		if (Z < PieceEnd)
 		{
-			if (Piece.Id != GameConstants::Shapes::GShapeId_Void) return false;
+			if (Piece.MaterialId != EMaterial::Void) return false;
 			const int32 Remaining = PieceEnd - Z;
 			return Remaining >= FitHeightInLayers;
 		}
@@ -175,9 +173,9 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 		if (AmountBeforeStart > 0)
 		{
 			// keep the bottom of the first overlapped piece
-			Insert.Emplace(Column.Pieces[Idx].Id, AmountBeforeStart);
+			Insert.Emplace(Column.Pieces[Idx].MaterialId, AmountBeforeStart);
 			
-			OutChangedPieces.Key.Emplace(Column.Pieces[Idx].Id, CurZ, Column.Pieces[Idx].Size - AmountBeforeStart, 0);
+			OutChangedPieces.Key.Emplace(Column.Pieces[Idx].MaterialId, CurZ, Column.Pieces[Idx].Size - AmountBeforeStart, 0);
 		}
 	}
 
@@ -190,7 +188,7 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 		++Idx;
 	}
 
-	Insert.Emplace(Piece.Id, Piece.Size);
+	Insert.Emplace(Piece.MaterialId, Piece.Size);
 
 	const int32 StopReplaceIdx = Idx;
 	if (Idx < Column.Pieces.Num())
@@ -199,8 +197,8 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 		const int32 AmountAfterEnd = FMath::Max<int32>(0, PieceEndZ - static_cast<int32>(NewEnd));
 		if (AmountAfterEnd > 0)
 		{
-			OutChangedPieces.Value.Emplace(Column.Pieces[Idx].Id, CurZ, Column.Pieces[Idx].Size - AmountAfterEnd, AmountAfterEnd);
-			Insert.Emplace(Column.Pieces[Idx].Id, AmountAfterEnd);
+			OutChangedPieces.Value.Emplace(Column.Pieces[Idx].MaterialId, CurZ, Column.Pieces[Idx].Size - AmountAfterEnd, AmountAfterEnd);
+			Insert.Emplace(Column.Pieces[Idx].MaterialId, AmountAfterEnd);
 		} else if (CurZ < NewEnd) {
 			// Fully covered terminal piece whose end == NewEnd
 			OutRemovedPiecesZ.Add(CurZ);
@@ -231,17 +229,10 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 	// Merge neighbors with the same id
 	for (int32 i = 1; i < Column.Pieces.Num(); )
 	{
-		if (Column.Pieces[i - 1].Id == Column.Pieces[i].Id)
+		if (Column.Pieces[i - 1].MaterialId == Column.Pieces[i].MaterialId)
 		{
-			const auto Shape = GameManager->ShapeRegistry->GetShapeById(Column.Pieces[i].Id);
-			if (Shape->ShouldMerge())
-			{
-				Column.Pieces[i - 1].Size += Column.Pieces[i].Size;
-				Column.Pieces.RemoveAt(i);
-				continue;
-			}
-
-			++i;
+			Column.Pieces[i - 1].Size += Column.Pieces[i].Size;
+			Column.Pieces.RemoveAt(i);
 			continue;
 		}
 

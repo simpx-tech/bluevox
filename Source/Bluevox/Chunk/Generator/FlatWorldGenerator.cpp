@@ -5,14 +5,13 @@
 
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/GameConstants.h"
-#include "Bluevox/Shape/ShapeRegistry.h"
 
 void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                         TArray<FChunkColumn>& OutColumns) const
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
-	const auto ShapeId = GameManager->ShapeRegistry->GetShapeIdByName(ShapeName);
+	// const auto ShapeId = GameManager->ShapeRegistry->GetShapeIdByName(ShapeName);
 
 	for (int32 X = 0; X < GameConstants::Chunk::Size; ++X)
 	{
@@ -22,11 +21,11 @@ void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 			auto& Column = OutColumns[Index];
 
 			Column.Pieces.Add(FPiece{
-				ShapeId,
+				Shape,
 				static_cast<unsigned short>(GroundHeight)
 			});
 			Column.Pieces.Add(FPiece{
-				0,
+				EMaterial::Void,
 				static_cast<unsigned short>(GameConstants::Chunk::Height - GroundHeight)
 			});
 		}

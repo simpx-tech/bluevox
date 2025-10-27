@@ -191,12 +191,28 @@ void UChunkTaskManager::ScheduleRender(const TSet<FChunkPosition>& ChunksToRende
 		// Only add the ones that are not being unloaded
 		if (ProcessingUnload.FindRef(ChunkPosition) == false)
 		{
-			// Not render here, only render when all chunks are loaded
-			// TODO probably there's a better way to handle this
 			PendingRender.Add(ChunkPosition);
-		} else
+		}
+		else
 		{
 			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Chunk %s is being unloaded, not scheduling render."), *ChunkPosition.ToString());
+		}
+	}
+}
+
+void UChunkTaskManager::ScheduleRenderForced(const TSet<FChunkPosition>& ChunksToRender)
+{
+	for (const auto& ChunkPosition : ChunksToRender)
+	{
+		UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Scheduling FORCED render for chunk %s"), *ChunkPosition.ToString());
+		if (ProcessingUnload.FindRef(ChunkPosition) == false)
+		{
+			PendingRender.Add(ChunkPosition);
+			ForcedRender.Add(ChunkPosition);
+		}
+		else
+		{
+			UE_LOG(LogVirtualMapTaskManager, Warning, TEXT("Chunk %s is being unloaded, not scheduling forced render."), *ChunkPosition.ToString());
 		}
 	}
 }
@@ -339,7 +355,7 @@ TStatId UChunkTaskManager::GetStatId() const
 
 void UChunkTaskManager::Tick(float DeltaTime)
 {
-	if (ProcessingLoad.Num() == 0 && WaitingToBeSent.Num() == 0 && PendingRender.Num() != 0)
+	if (PendingRender.Num() != 0)
 	{
 		TArray<FChunkPosition> ToRemove;
 		for (const auto& ChunkPosition : PendingRender)
@@ -351,53 +367,87 @@ void UChunkTaskManager::Tick(float DeltaTime)
 				continue;
 			}
 
+			// Avoid double-scheduling renders for the same chunk
+			if (ProcessingRender.Contains(ChunkPosition))
+			{
+				continue;
+			}
+
+			// Ensure this chunk and its 4 neighbors have data available to lock
+			bool bNeighborsReady = true;
+			static const std::array Offsets = {
+				FChunkPosition{0, 0},
+				FChunkPosition{0, 1},
+				FChunkPosition{0, -1},
+				FChunkPosition{1, 0},
+				FChunkPosition{-1, 0}
+			};
+			for (const auto& Offset : Offsets)
+			{
+				if (!GameManager->ChunkRegistry->Th_HasChunkData(ChunkPosition + Offset))
+				{
+					bNeighborsReady = false;
+					break;
+				}
+			}
+			if (!bNeighborsReady)
+			{
+				continue;
+			}
+
+			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
+			Chunk->SetRenderState(State);
+			// If state = none = border, so we can't render it (as it will have no neighbors)
+			if (State == EChunkState::None)
+			{
+				continue;
+			}
+
 			const auto RenderId = LastRenderIndex++;
-			
 			auto& ProcessingRef = ProcessingRender.FindOrAdd(ChunkPosition);
 			ProcessingRef.LastRenderIndex = RenderId;
 			ProcessingRef.PendingTasks++;
-			
 			ToRemove.Add(ChunkPosition);
 
 			UE_LOG(LogVirtualMapTaskManager, Verbose, TEXT("Confirming schedule render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
 
-			const auto State = GameManager->VirtualMap->VirtualChunks.FindRef(ChunkPosition).State;
-			Chunk->SetRenderState(State);
-			
-			// If state = none = border, so we can't render it (as it will have no neighbors)
-			if (State != EChunkState::None)
-			{
-				GameManager->TickManager->RunAsyncThen(
-					[Chunk, this, ChunkPosition]
-					{
-						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Starting render for chunk %s"), *ChunkPosition.ToString());
-						FRenderResult Result;
-						GameManager->ChunkRegistry->LockForRender(ChunkPosition);
-						Result.bSuccess = Chunk->BeginRender(Result.Mesh, Result.WaterMesh);
-						GameManager->ChunkRegistry->UnlockForRender(ChunkPosition);
-						return MoveTemp(Result);
-					},
-					[Chunk, this, ChunkPosition, RenderId](FRenderResult&& Result)
-					{
-						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Finishing render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
-						const auto Processing = ProcessingRender.Find(ChunkPosition);
-						Processing->PendingTasks--;
-						// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
-						if (RenderId > Processing->LastCommitedRenderIndex && Result.bSuccess && Chunk)
-						{
-							UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Committing render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
-							Chunk->CommitRender(MoveTemp(Result));
-							Processing->LastCommitedRenderIndex = RenderId;
-						}
+			// Snapshot whether this render is forced to avoid cross-thread access to the set
+			const bool bForceForThis = ForcedRender.Contains(ChunkPosition);
 
-						if (Processing->PendingTasks == 0) {
-							UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("All render tasks finished for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
-							OnAllRenderTasksFinishedForChunk.Broadcast(ChunkPosition);
-							ProcessingRender.Remove(ChunkPosition);
+			GameManager->TickManager->RunAsyncThen(
+				[Chunk, this, ChunkPosition, bForceForThis]
+				{
+					UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Starting render for chunk %s"), *ChunkPosition.ToString());
+					FRenderResult Result;
+					GameManager->ChunkRegistry->LockForRender(ChunkPosition);
+					Result.bSuccess = Chunk->BeginRender(Result.Mesh, bForceForThis);
+					GameManager->ChunkRegistry->UnlockForRender(ChunkPosition);
+					return MoveTemp(Result);
+				},
+				[Chunk, this, ChunkPosition, RenderId, bForceForThis](FRenderResult&& Result)
+				{
+					UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Finishing render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
+					const auto Processing = ProcessingRender.Find(ChunkPosition);
+					Processing->PendingTasks--;
+					// TODO analyze if Result.bSuccess may cause a mismatch? -> triggered one render, changed the RenderedAtChanges, but is not the last, so it's never committed
+					if (RenderId > Processing->LastCommitedRenderIndex && Result.bSuccess && Chunk)
+					{
+						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("Committing render for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
+						Chunk->CommitRender(MoveTemp(Result));
+						Processing->LastCommitedRenderIndex = RenderId;
+						if (bForceForThis)
+						{
+							ForcedRender.Remove(ChunkPosition);
 						}
 					}
-				);
-			}
+
+					if (Processing->PendingTasks == 0) {
+						UE_LOG(LogVirtualMapTaskManager, VeryVerbose, TEXT("All render tasks finished for chunk %s with RenderId %d"), *ChunkPosition.ToString(), RenderId);
+						OnAllRenderTasksFinishedForChunk.Broadcast(ChunkPosition);
+						ProcessingRender.Remove(ChunkPosition);
+					}
+				}
+			);
 		}
 
 		for (int32 i = 0; i < ToRemove.Num(); ++i)

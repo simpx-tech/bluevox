@@ -3,10 +3,10 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Game/VoxelMaterial.h"
 #include "Bluevox/Tick/GameTickable.h"
 #include "Data/Piece.h"
 #include "Position/ChunkPosition.h"
-#include "Position/LocalPosition.h"
 #include "VirtualMap/ChunkState.h"
 #include "Chunk.generated.h"
 
@@ -29,7 +29,7 @@ class UDynamicMeshComponent;
 struct FRenderNeighbor {
 	const FChunkColumn* Column = nullptr;
 	const FPiece* Piece = nullptr;
-	const UShape* Shape = nullptr;
+	EMaterial MaterialId = EMaterial::Void;
 	int32 Start = 0;
 	int32 Size = 0;
 	int32 Index = 0;
@@ -45,9 +45,6 @@ class BLUEVOX_API AChunk : public AActor, public IGameTickable
 protected:
 	UPROPERTY(EditAnywhere)
 	UDynamicMeshComponent* MeshComponent = nullptr;
-
-	UPROPERTY(EditAnywhere)
-	UDynamicMeshComponent* WaterMeshComponent = nullptr;
 
 	FThreadSafeCounter RenderedAtDirtyChanges = -1;
 
@@ -68,11 +65,9 @@ public:
 	UPROPERTY()
 	UChunkData* ChunkData;
 
-	virtual void GameTick(float DeltaTime) override;
-
 	void SetRenderState(EChunkState State) const;
 	
-	bool BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, UE::Geometry::FDynamicMesh3& OutWaterMesh);
+	bool BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, bool bForceRender = false);
 
 	void CommitRender(FRenderResult&& RenderResult) const;
 };

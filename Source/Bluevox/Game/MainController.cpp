@@ -10,7 +10,6 @@
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Network/PlayerNetwork.h"
 #include "Bluevox/Network/UpdateChunkNetworkPacket.h"
-#include "Bluevox/Shape/ShapeRegistry.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
@@ -162,9 +161,9 @@ void AMainController::RSv_LeftClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		const auto DirtShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Layer_Dirt);
+		const auto DirtShapeId = EMaterial::Void;
 		
-		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(DirtShapeId, 1));
+		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.Position, FPiece(DirtShapeId, 1));
 		
 		// Run locally
 		UpdateChunkPacket->OnReceive(GameManager);
@@ -188,9 +187,9 @@ void AMainController::RSv_RightClick_Implementation()
 {
 	if (LastRaycastResult.bHit)
 	{
-		const auto WaterShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Shapes::GShape_Water);
+		// const auto WaterShapeId = GameManager->ShapeRegistry->GetShapeIdByName(GameConstants::Textures::GShape_Water);
 		
-		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(WaterShapeId, 4));
+		const auto UpdateChunkPacket = NewObject<UUpdateChunkNetworkPacket>(this)->Init(LastRaycastResult.PlacePosition, FPiece(EMaterial::Stone, 4));
 		
 		// Run locally
 		UpdateChunkPacket->OnReceive(GameManager);

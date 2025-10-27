@@ -7,9 +7,6 @@
 #include "LogChunk.h"
 #include "RegionFile.h"
 #include "Bluevox/Game/GameManager.h"
-#include "Bluevox/Shape/Shape.h"
-#include "Bluevox/Shape/ShapeRegistry.h"
-#include "Bluevox/Utils/Face.h"
 #include "Data/ChunkData.h"
 #include "Position/LocalChunkPosition.h"
 #include "Position/LocalPosition.h"
@@ -109,69 +106,6 @@ void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& In
 	TArray<uint16> RemovedPiecesZ;
 	TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>> ChangedPieces;
 	ChunkData->Th_SetPiece(LocalPosition.X, LocalPosition.Y, LocalPosition.Z, MoveTemp(InPiece), RemovedPiecesZ, ChangedPieces);
-	const auto ShapeRegistry = GameManager->ShapeRegistry;
-
-	if (ShapeRegistry->GetShapeById(InPiece.Id)->ShouldTickOnPlace())
-	{
-		ChunkData->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(GlobalPosition));	
-	}
-
-	for (const auto RemovedZ : RemovedPiecesZ)
-	{
-		ChunkData->ScheduledToTick.Remove(FLocalPosition(LocalPosition.X, LocalPosition.Y, RemovedZ));
-	}
-
-	// Special case, place in the middle of another piece, which split it in two, needs to duplicate the tick
-	if (ChangedPieces.Value.IsSet() && ChangedPieces.Key.IsSet() && ChangedPieces.Value->PositionZ == ChangedPieces.Key->PositionZ)
-	{
-		const auto InitialChangedPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Key->PositionZ);
-		const auto ChangedLocalPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Key->PositionZ + ChangedPieces.Value->StartChange);
-		if (ChunkData->ScheduledToTick.Contains(InitialChangedPosition))
-		{
-			ChunkData->ScheduledToTick.Add(ChangedLocalPosition);	
-		}
-	} else if (ChangedPieces.Value.IsSet())
-	{
-		const auto InitialChangedPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Value->PositionZ);
-		if (ChunkData->ScheduledToTick.Contains(InitialChangedPosition))
-		{
-			ChunkData->ScheduledToTick.Remove(FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Value->PositionZ));
-
-			const auto ChangedLocalPosition = FLocalPosition(LocalPosition.X, LocalPosition.Y, ChangedPieces.Value->PositionZ + ChangedPieces.Value->StartChange);
-			ChunkData->ScheduledToTick.Add(ChangedLocalPosition);
-		}
-	}
-	
-	// Notify neighbors about the piece change
-	for (const auto Face : FaceUtils::AllFaces)
-	{
-		// DEV should loop until we reach the end of this piece (if size > 1 can have many neighbors)
-		const auto Offset = FaceUtils::GetOffsetByFace(Face);
-		const auto LocalPosWithOffset = LocalPosition + Offset;
-		const auto Piece = ChunkData->Th_GetPieceCopy(LocalPosWithOffset.X, LocalPosWithOffset.Y, LocalPosWithOffset.Z);
-
-		const auto Shape = ShapeRegistry->GetShapeById(Piece.Id);
-		if (Shape)
-		{
-			if (Shape->ShouldTickOnNeighborUpdate())
-			{
-				const auto NeighborPosition = GlobalPosition + Offset;
-				const auto ChunkPos = FChunkPosition::FromGlobalPosition(GlobalPosition + Offset);
-				const auto Chunk = GetChunkActor(ChunkPos);
-
-				if (Chunk)
-				{
-					Chunk->ChunkData->ScheduledToTick.Add(FLocalPosition::FromGlobalPosition(NeighborPosition));
-				} else
-				{
-					UE_LOG(LogChunk, Warning, TEXT("SetPiece:FaceLoop: Chunk actor not found for position %s"), *ChunkPos.ToString());
-				}
-			}
-		} else
-		{
-			UE_LOG(LogChunk, Warning, TEXT("SetPiece:FaceLoop: Shape not found for piece ID %d at position %s"), Piece.Id, *GlobalPosition.ToString());
-		}
-	}
 	
 	GameManager->ChunkTaskManager->ScheduleRender({ ChunkPosition });
 
@@ -180,7 +114,7 @@ void UChunkRegistry::SetPiece(const FGlobalPosition& GlobalPosition, FPiece&& In
 	if (NeighborsToRender.Num() > 0)
 	{
 		const TSet<FChunkPosition> UniqueNeighborsToRender = TSet(NeighborsToRender);
-		GameManager->ChunkTaskManager->ScheduleRender(UniqueNeighborsToRender);
+		GameManager->ChunkTaskManager->ScheduleRenderForced(UniqueNeighborsToRender);
 	}
 }
 

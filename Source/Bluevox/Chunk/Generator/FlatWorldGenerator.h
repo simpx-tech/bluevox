@@ -6,6 +6,7 @@
 #include "WorldGenerator.h"
 #include "Bluevox/Chunk/Data/ChunkColumn.h"
 #include "Bluevox/Game/GameConstants.h"
+#include "Bluevox/Game/VoxelMaterial.h"
 #include "FlatWorldGenerator.generated.h"
 
 /**
@@ -19,9 +20,12 @@ class BLUEVOX_API UFlatWorldGenerator : public UWorldGenerator
 public:
 	UPROPERTY(EditAnywhere)
 	int32 GroundHeight = 64.0f;
+	
+	UPROPERTY(EditAnywhere)
+	FName ShapeName = "";
 
 	UPROPERTY(EditAnywhere)
-	FName ShapeName = GameConstants::Shapes::GShape_Layer_Dirt;
+	EMaterial Shape;
 	
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 

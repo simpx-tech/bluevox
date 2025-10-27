@@ -10,7 +10,6 @@ class UChunkTaskManager;
 class UGameRule;
 class UWorldGenerator;
 class UMaterialRegistry;
-class UShapeRegistry;
 class UWorldSave;
 class UTickManager;
 class UChunkRegistry;
@@ -83,9 +82,6 @@ public:
 	
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UTickManager* TickManager = nullptr;
-
-	UPROPERTY(EditAnywhere, Category = "Game")
-	UShapeRegistry* ShapeRegistry = nullptr;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;

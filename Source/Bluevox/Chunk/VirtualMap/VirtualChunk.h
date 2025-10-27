@@ -24,6 +24,9 @@ struct FVirtualChunk
 	UPROPERTY()
 	uint16 LoadedForCount = 0;
 
+	UPROPERTY()
+	bool bLiveLocal = false;
+
 	bool ShouldBeKeptAlive() const
 	{
 		return LiveForCount > 0 || LoadedForCount > 0;
@@ -42,7 +45,4 @@ struct FVirtualChunk
 			State = EChunkState::None;
 		}
 	}
-	
-	UPROPERTY()
-	bool bLiveLocal = false;
 };
