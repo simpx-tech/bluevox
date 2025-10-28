@@ -117,14 +117,14 @@ void UChunkTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 			GameManager->TickManager->RunAsyncThen([this, ChunkPosition]
 			{
 				FLoadResult LoadResult;
-				LoadResult.bSuccess = GameManager->ChunkRegistry->Th_FetchChunkDataFromDisk(ChunkPosition, LoadResult.Columns);
+				LoadResult.bSuccess = GameManager->ChunkRegistry->Th_FetchChunkDataFromDisk(ChunkPosition, LoadResult.Columns, LoadResult.Instances);
 
 				if (!LoadResult.bSuccess)
 				{
 					// TODO would re-generate chunk if fail to load from disk, is that a good idea?
-					GameManager->WorldSave->WorldGenerator->GenerateChunk(ChunkPosition, LoadResult.Columns);
+					GameManager->WorldSave->WorldGenerator->GenerateChunk(ChunkPosition, LoadResult.Columns, LoadResult.Instances);
 				}
-				
+
 				return MoveTemp(LoadResult);
 			}, [ChunkPosition, this] (FLoadResult&& Result)
 			{
@@ -132,7 +132,7 @@ void UChunkTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 
 				if (ProcessingLoad.FindRef(ChunkPosition) == true)
 				{
-					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry)->Init(GameManager, ChunkPosition,MoveTemp(Result.Columns));
+					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry)->Init(GameManager, ChunkPosition, MoveTemp(Result.Columns), MoveTemp(Result.Instances));
 					GameManager->ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkData);
 
 					if (PendingPacketsByPosition.Contains(ChunkPosition))

@@ -18,11 +18,21 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 		UE_LOG(LogChunk, Error, TEXT("Chunk data is null for position %s."), *Position.ToString());
 		return;
 	}
-	
+
 	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	FBufferArchive Uncompressed;
 	Uncompressed << ChunkData->Columns;
+
+	// Serialize instances
+	int32 NumCollections = ChunkData->InstanceCollections.Num();
+	Uncompressed << NumCollections;
+
+	for (auto& Pair : ChunkData->InstanceCollections)
+	{
+		FInstanceCollection& Collection = Pair.Value;
+		Uncompressed << Collection;
+	}
 
 	TArray<uint8> Compressed;
 	FArchiveSaveCompressedProxy Compressor(Compressed, NAME_Zlib);
@@ -41,13 +51,14 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 	}
 }
 
-bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns)
+bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
+                                TMap<EInstanceType, FInstanceCollection>& OutInstances)
 {
 	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	TArray<uint8> Compressed;
 	if (!Th_ReadSegment(Index, Compressed)) return false;
-	if (Compressed.Num() == 0) { OutColumns.Reset(); return false; }
+	if (Compressed.Num() == 0) { OutColumns.Reset(); OutInstances.Empty(); return false; }
 
 	FArchiveLoadCompressedProxy Decompressor(Compressed, NAME_Zlib);
 	if (Decompressor.GetError())
@@ -68,6 +79,26 @@ bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChun
 
 	FMemoryReader Reader(Uncompressed, true);
 	Reader << OutColumns;
+
+	// Load instances if available (for backwards compatibility with old saves)
+	if (!Reader.AtEnd())
+	{
+		int32 NumCollections = 0;
+		Reader << NumCollections;
+
+		OutInstances.Empty();
+		for (int32 i = 0; i < NumCollections; ++i)
+		{
+			FInstanceCollection Collection;
+			Reader << Collection;
+			OutInstances.Add(Collection.InstanceType, Collection);
+		}
+	}
+	else
+	{
+		OutInstances.Empty();
+	}
+
 	return !Reader.IsError();
 }
 

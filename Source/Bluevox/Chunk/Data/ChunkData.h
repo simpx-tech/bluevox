@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "ChunkColumn.h"
+#include "InstanceData.h"
 #include "PieceWithStart.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Chunk/Position/LocalColumnPosition.h"
@@ -44,17 +45,21 @@ class BLUEVOX_API UChunkData : public UObject
 	GENERATED_BODY()
 	
 public:
-	UChunkData* Init(AGameManager* InGameManager, const FChunkPosition InPosition, TArray<FChunkColumn>&& InColumns);
+	UChunkData* Init(AGameManager* InGameManager, const FChunkPosition InPosition, TArray<FChunkColumn>&& InColumns,
+	                 TMap<EInstanceType, FInstanceCollection>&& InInstances = TMap<EInstanceType, FInstanceCollection>());
 	
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
 
 	UPROPERTY()
+	TMap<EInstanceType, FInstanceCollection> InstanceCollections;
+
+	UPROPERTY()
 	AGameManager* GameManager;
-	
+
 	UPROPERTY()
 	FChunkPosition Position;
-	
+
 	UPROPERTY()
 	int32 Changes = 0;
 
@@ -66,12 +71,35 @@ public:
 	{
 		FReadScopeLock ReadLock(Lock);
 		int32 FileVersion = GameConstants::Chunk::File::FileVersion;
-		
+
 		Ar << FileVersion;
 		Ar << Columns;
+
+		// Serialize instance collections
+		int32 NumCollections = InstanceCollections.Num();
+		Ar << NumCollections;
+
+		if (Ar.IsSaving())
+		{
+			for (auto& Pair : InstanceCollections)
+			{
+				FInstanceCollection& Collection = Pair.Value;
+				Ar << Collection;
+			}
+		}
+		else if (Ar.IsLoading())
+		{
+			InstanceCollections.Empty();
+			for (int32 i = 0; i < NumCollections; ++i)
+			{
+				FInstanceCollection Collection;
+				Ar << Collection;
+				InstanceCollections.Add(Collection.InstanceType, Collection);
+			}
+		}
 	}
 
-	inline int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);
+	int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);
 	
 	int32 GetFirstGapThatFits(const int32 X, const int32 Y, const int32 FitHeightInLayers);
 

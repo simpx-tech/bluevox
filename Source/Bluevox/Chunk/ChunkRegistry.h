@@ -86,7 +86,8 @@ public:
 
 	// TODO should not use Th_LoadRegionFile, instead use a Th_GetRegionFile and discard immediately
 	UFUNCTION()
-	bool Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns);
+	bool Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
+	                                TMap<EInstanceType, FInstanceCollection>& OutInstances);
 	
 	UFUNCTION()
 	bool Th_HasChunkData(const FChunkPosition& Position);

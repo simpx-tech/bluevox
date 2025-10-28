@@ -5,6 +5,7 @@
 #include "CoreMinimal.h"
 #include "Bluevox/Game/VoxelMaterial.h"
 #include "Bluevox/Tick/GameTickable.h"
+#include "Data/InstanceData.h"
 #include "Data/Piece.h"
 #include "Position/ChunkPosition.h"
 #include "VirtualMap/ChunkState.h"
@@ -25,6 +26,7 @@ namespace UE::Geometry
 
 class UChunkData;
 class UDynamicMeshComponent;
+class UHierarchicalInstancedStaticMeshComponent;
 
 struct FRenderNeighbor {
 	const FChunkColumn* Column = nullptr;
@@ -45,6 +47,9 @@ class BLUEVOX_API AChunk : public AActor, public IGameTickable
 protected:
 	UPROPERTY(EditAnywhere)
 	UDynamicMeshComponent* MeshComponent = nullptr;
+
+	UPROPERTY()
+	TMap<EInstanceType, UHierarchicalInstancedStaticMeshComponent*> ChunkInstanceComponents;
 
 	FThreadSafeCounter RenderedAtDirtyChanges = -1;
 
@@ -70,4 +75,8 @@ public:
 	bool BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, bool bForceRender = false);
 
 	void CommitRender(FRenderResult&& RenderResult) const;
+
+private:
+	UHierarchicalInstancedStaticMeshComponent* GetOrCreateInstanceComponent(EInstanceType Type);
+	void UpdateInstanceRendering();
 };

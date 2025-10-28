@@ -22,11 +22,19 @@ void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 		{
 			const int32 Index = UChunkData::GetIndex(X, Y);
 			auto& Column = OutColumns[Index];
-			
+
 			Column.Pieces.Add(FPiece{
 				EMaterial::Void,
 				static_cast<unsigned short>(GameConstants::Chunk::Height)
 			});
 		}
 	}
+}
+
+void UWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
+                                    TMap<EInstanceType, FInstanceCollection>& OutInstances) const
+{
+	// Default implementation just generates columns, no instances
+	GenerateChunk(Position, OutColumns);
+	OutInstances.Empty();
 }

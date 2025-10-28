@@ -9,14 +9,15 @@
 #include "Bluevox/Tick/TickManager.h"
 
 UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition InPosition,
-	TArray<FChunkColumn>&& InColumns)
+	TArray<FChunkColumn>&& InColumns, TMap<EInstanceType, FInstanceCollection>&& InInstances)
 {
 	GameManager = InGameManager;
 	Position = InPosition;
 	Columns = MoveTemp(InColumns);
+	InstanceCollections = MoveTemp(InInstances);
 
 	GameManager->TickManager->RegisterUObjectTickable(this);
-	
+
 	return this;
 }
 
@@ -25,6 +26,29 @@ void UChunkData::Serialize(FArchive& Ar)
 	FReadScopeLock ReadLock(Lock);
 	UObject::Serialize(Ar);
 	Ar << Columns;
+
+	// Serialize instance collections
+	int32 NumCollections = InstanceCollections.Num();
+	Ar << NumCollections;
+
+	if (Ar.IsSaving())
+	{
+		for (auto& Pair : InstanceCollections)
+		{
+			FInstanceCollection& Collection = Pair.Value;
+			Ar << Collection;
+		}
+	}
+	else if (Ar.IsLoading())
+	{
+		InstanceCollections.Empty();
+		for (int32 i = 0; i < NumCollections; ++i)
+		{
+			FInstanceCollection Collection;
+			Ar << Collection;
+			InstanceCollections.Add(Collection.InstanceType, Collection);
+		}
+	}
 }
 
 int32 UChunkData::GetFirstGapThatFits(const FGlobalPosition& GlobalPosition,

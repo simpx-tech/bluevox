@@ -4,6 +4,7 @@
 
 #include "CoreMinimal.h"
 #include "Bluevox/Chunk/Data/ChunkColumn.h"
+#include "Bluevox/Chunk/Data/InstanceData.h"
 #include "UObject/Object.h"
 #include "WorldGenerator.generated.h"
 
@@ -25,6 +26,9 @@ protected:
 	
 public:
 	UWorldGenerator* Init(AGameManager* InGameManager);
-	
+
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
+
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
+	                           TMap<EInstanceType, FInstanceCollection>& OutInstances) const;
 };

@@ -12,6 +12,7 @@
 #include "Data/ChunkData.h"
 #include "Position/LocalPosition.h"
 #include "Runtime/GeometryFramework/Public/Components/DynamicMeshComponent.h"
+#include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "VirtualMap/ChunkTaskManager.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/MeshNormals.h"
@@ -59,6 +60,15 @@ void AChunk::SetRenderState(const EChunkState State) const
 	UE_LOG(LogChunk, Verbose, TEXT("SetRenderState for chunk %s to %s"), *Position.ToString(), *UEnum::GetValueAsString(State));
 	const auto Visible = EnumHasAllFlags(State, EChunkState::Visible);
 	MeshComponent->SetVisibility(Visible);
+
+	// Update instance visibility
+	for (const auto& Pair : ChunkInstanceComponents)
+	{
+		if (Pair.Value)
+		{
+			Pair.Value->SetVisibility(Visible);
+		}
+	}
 
 	// const auto Collision = EnumHasAllFlags(State, EChunkState::Collision);
 	// MeshComponent->SetCollisionEnabled(Collision ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
@@ -400,4 +410,87 @@ void AChunk::CommitRender(FRenderResult&& RenderResult) const
 	UE_LOG(LogChunk, Verbose, TEXT("Committing render for chunk %s"), *Position.ToString());
 	MeshComponent->SetMaterial(0, GameManager->ChunkMaterial);
 	MeshComponent->SetMesh(MoveTemp(RenderResult.Mesh));
+
+	// Update instance rendering on game thread
+	const_cast<AChunk*>(this)->UpdateInstanceRendering();
+}
+
+UHierarchicalInstancedStaticMeshComponent* AChunk::GetOrCreateInstanceComponent(EInstanceType Type)
+{
+	if (UHierarchicalInstancedStaticMeshComponent** Found = ChunkInstanceComponents.Find(Type))
+	{
+		return *Found;
+	}
+
+	// Create a new HISM component for this instance type
+	const FName ComponentName = FName(*FString::Printf(TEXT("InstanceComponent_%s"), *UEnum::GetValueAsString(Type)));
+	UHierarchicalInstancedStaticMeshComponent* NewComponent = NewObject<UHierarchicalInstancedStaticMeshComponent>(
+		this, ComponentName);
+
+	NewComponent->SetupAttachment(RootComponent);
+	NewComponent->SetMobility(EComponentMobility::Static);
+	NewComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+	NewComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+	NewComponent->SetGenerateOverlapEvents(false);
+	NewComponent->SetStaticMesh(GameManager->TreeMesh);
+	NewComponent->RegisterComponent();
+
+	ChunkInstanceComponents.Add(Type, NewComponent);
+	return NewComponent;
+}
+
+void AChunk::UpdateInstanceRendering()
+{
+	if (!ChunkData)
+	{
+		return;
+	}
+
+	FReadScopeLock ReadLock(ChunkData->Lock);
+
+	// Clear all existing instances
+	for (auto& Pair : ChunkInstanceComponents)
+	{
+		if (Pair.Value)
+		{
+			Pair.Value->ClearInstances();
+		}
+	}
+
+	// Add instances from ChunkData
+	for (const auto& CollectionPair : ChunkData->InstanceCollections)
+	{
+		const EInstanceType Type = CollectionPair.Key;
+		const FInstanceCollection& Collection = CollectionPair.Value;
+
+		if (Collection.Instances.Num() == 0)
+		{
+			continue;
+		}
+
+		UHierarchicalInstancedStaticMeshComponent* Component = GetOrCreateInstanceComponent(Type);
+		if (!Component)
+		{
+			continue;
+		}
+
+		// Add each instance (using local coordinates relative to chunk actor)
+		for (const FInstanceData& InstanceData : Collection.Instances)
+		{
+			// Convert local position to scaled local position
+			const FVector LocalScaled = FVector(
+				InstanceData.Location.X * GameConstants::Scaling::XYWorldSize,
+				InstanceData.Location.Y * GameConstants::Scaling::XYWorldSize,
+				InstanceData.Location.Z * GameConstants::Scaling::ZSize
+			);
+
+			// Use local transform since component is attached to chunk actor
+			const FTransform InstanceTransform(InstanceData.Rotation, LocalScaled, InstanceData.Scale);
+
+			Component->AddInstance(InstanceTransform);
+		}
+
+		UE_LOG(LogChunk, Verbose, TEXT("Added %d instances of type %s to chunk %s"),
+		       Collection.Instances.Num(), *UEnum::GetValueAsString(Type), *Position.ToString());
+	}
 }

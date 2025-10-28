@@ -267,14 +267,15 @@ void UChunkRegistry::Th_RegisterChunk(const FChunkPosition& Position, UChunkData
 }
 
 // TODO if used in other places, may cause to have unused RegionFiles
-bool UChunkRegistry::Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns)
+bool UChunkRegistry::Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
+                                                TMap<EInstanceType, FInstanceCollection>& OutInstances)
 {
 	UE_LOG(LogChunk, Verbose, TEXT("Fetching chunk data from disk for position %s"), *Position.ToString());
-	
+
 	const auto RegionPosition = FRegionPosition::FromChunkPosition(Position);
 	const auto RegionFile = Th_LoadRegionFile(RegionPosition);
 
-	return RegionFile->Th_LoadChunk(FLocalChunkPosition::FromChunkPosition(Position), OutColumns);
+	return RegionFile->Th_LoadChunk(FLocalChunkPosition::FromChunkPosition(Position), OutColumns, OutInstances);
 }
 
 bool UChunkRegistry::Th_HasChunkData(const FChunkPosition& Position)

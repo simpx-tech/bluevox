@@ -48,6 +48,9 @@ public:
 	TArray<UGameRule*> GameRules;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
+	UStaticMesh* TreeMesh = nullptr;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
 	UMaterial* ChunkMaterial = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Assets")
