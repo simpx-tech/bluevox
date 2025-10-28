@@ -93,7 +93,7 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UEntityConversionTickable* EntityConversionTickable = nullptr;
-	
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;
 

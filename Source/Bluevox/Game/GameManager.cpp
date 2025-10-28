@@ -51,7 +51,7 @@ void AGameManager::BeginPlay()
 	EntityConversionTickable = NewObject<UEntityConversionTickable>(this, TEXT("EntityConversionTickable"));
 	EntityConversionTickable->Init(this, ChunkRegistry);
 	TickManager->RegisterUObjectTickable(EntityConversionTickable);
-	
+
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	LocalController = Cast<AMainController>(Controller);
 	LocalPlayerId = LocalController ? LocalController->Id : 0;

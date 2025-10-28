@@ -3,9 +3,11 @@
 
 #include "WorldSave.h"
 
+#include "MainCharacter.h"
 #include "MainController.h"
 #include "Bluevox/Chunk/RegionFile.h"
 #include "Bluevox/Chunk/Generator/WorldGenerator.h"
+#include "Bluevox/Inventory/InventoryComponent.h"
 #include "GameFramework/PlayerState.h"
 #include "Serialization/ObjectAndNameAsStringProxyArchive.h"
 
@@ -102,14 +104,25 @@ bool UWorldSave::SavePlayer(AMainController* PlayerController) const
 		checkf(false, TEXT("PlayerController is null"));
 		return false;
 	}
-	
+
 	const auto PlayerState = PlayerController->GetPlayerState<APlayerState>();
 
 	const auto FilePath = GetPlayersDir(WorldName) / FString::Printf(TEXT("%s.dat"), *PlayerState->GetPlayerName());
 
 	TArray<uint8> ByteArray;
 	FMemoryWriter MemoryWriter(ByteArray, true);
+
+	// Save player controller data
 	PlayerController->SerializeForWorldSave(MemoryWriter);
+
+	// Save player inventory data
+	if (AMainCharacter* PlayerCharacter = Cast<AMainCharacter>(PlayerController->GetCharacter()))
+	{
+		if (PlayerCharacter->InventoryComponent)
+		{
+			PlayerCharacter->InventoryComponent->Serialize(MemoryWriter);
+		}
+	}
 
 	if (!FFileHelper::SaveArrayToFile(MoveTemp(ByteArray), *FilePath))
 	{
@@ -136,7 +149,7 @@ bool UWorldSave::LoadPlayer(AMainController* PlayerController) const
 		PlayerController->SavedGlobalPosition = SpawnPosition;
 		SavePlayer(PlayerController);
 	}
-	
+
 	TArray<uint8> ByteArray;
 	if (!FFileHelper::LoadFileToArray(ByteArray, *FilePath))
 	{
@@ -145,7 +158,19 @@ bool UWorldSave::LoadPlayer(AMainController* PlayerController) const
 	}
 
 	FMemoryReader MemoryReader(ByteArray, true);
+
+	// Load player controller data
 	PlayerController->Serialize(MemoryReader);
+
+	// Load player inventory data
+	if (AMainCharacter* PlayerCharacter = Cast<AMainCharacter>(PlayerController->GetCharacter()))
+	{
+		if (PlayerCharacter->InventoryComponent)
+		{
+			PlayerCharacter->InventoryComponent->Serialize(MemoryReader);
+		}
+	}
+
 	return true;
 }
 
@@ -154,9 +179,9 @@ void UWorldSave::Save()
 	TArray<uint8> ByteArray;
 	FMemoryWriter MemoryWriter(ByteArray, true);
 	FObjectAndNameAsStringProxyArchive Ar(MemoryWriter, false);
-	
+
 	CreateSaveFolder(WorldName);
-	
+
 	Serialize(Ar);
 
 	if (!FFileHelper::SaveArrayToFile(MoveTemp(ByteArray), *GetFullSavePath(WorldName)))

@@ -8,6 +8,7 @@
 #include "Bluevox/Chunk/Position/GlobalPosition.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "Bluevox/Entity/EntityFacade.h"
+#include "Bluevox/Inventory/ItemWorldActor.h"
 
 UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition InPosition,
 	TArray<FChunkColumn>&& InColumns, TMap<FPrimaryAssetId, FInstanceCollection>&& InInstances)
@@ -23,6 +24,79 @@ UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition I
 	GameManager->TickManager->RegisterUObjectTickable(this);
 
 	return this;
+}
+
+void UChunkData::SerializeForSave(FArchive& Ar)
+{
+	FReadScopeLock ReadLock(Lock);
+	int32 FileVersion = GameConstants::Chunk::File::FileVersion;
+
+	Ar << FileVersion;
+	Ar << Columns;
+
+	// Serialize instance collections
+	int32 NumCollections = InstanceCollections.Num();
+	Ar << NumCollections;
+
+	if (Ar.IsSaving())
+	{
+		for (auto& Pair : InstanceCollections)
+		{
+			FInstanceCollection& Collection = Pair.Value;
+			Ar << Collection;
+		}
+	}
+	else if (Ar.IsLoading())
+	{
+		InstanceCollections.Empty();
+		for (int32 i = 0; i < NumCollections; ++i)
+		{
+			FInstanceCollection Collection;
+			Ar << Collection;
+			InstanceCollections.Add(Collection.InstanceTypeId, Collection);
+		}
+	}
+
+	// Serialize world items
+	TArray<FWorldItemData> WorldItems;
+
+	if (Ar.IsSaving())
+	{
+		// Collect all valid world items
+		for (auto& Pair : WorldItemGrid)
+		{
+			if (AItemWorldActor* ItemActor = Pair.Value.Get())
+			{
+				FWorldItemData ItemData(
+					ItemActor->GetItemType(),
+					ItemActor->GetStackAmount(),
+					ItemActor->GetActorLocation(),
+					ItemActor->GetActorRotation()
+				);
+				WorldItems.Add(ItemData);
+			}
+		}
+	}
+
+	int32 NumWorldItems = WorldItems.Num();
+	Ar << NumWorldItems;
+
+	if (Ar.IsSaving())
+	{
+		for (FWorldItemData& ItemData : WorldItems)
+		{
+			Ar << ItemData;
+		}
+	}
+	else if (Ar.IsLoading())
+	{
+		WorldItems.SetNum(NumWorldItems);
+		for (int32 i = 0; i < NumWorldItems; ++i)
+		{
+			Ar << WorldItems[i];
+		}
+		// Items will be spawned later when chunk is loaded
+	}
 }
 
 void UChunkData::Serialize(FArchive& Ar)
@@ -312,4 +386,39 @@ void UChunkData::UnregisterEntity(const FVector& LocalPosition)
 {
 	const FIntVector GridPos = GetGridPosition(LocalPosition);
 	EntityGrid.Remove(GridPos);
+}
+
+bool UChunkData::HasWorldItemAt(const FVector& LocalPosition) const
+{
+	const FIntVector GridPos = GetGridPosition(LocalPosition);
+	const TWeakObjectPtr<AItemWorldActor>* ItemPtr = WorldItemGrid.Find(GridPos);
+	return ItemPtr && ItemPtr->IsValid();
+}
+
+void UChunkData::RegisterWorldItem(const FVector& LocalPosition, AItemWorldActor* WorldItem)
+{
+	if (WorldItem)
+	{
+		const FIntVector GridPos = GetGridPosition(LocalPosition);
+		WorldItemGrid.Add(GridPos, WorldItem);
+	}
+}
+
+void UChunkData::UnregisterWorldItem(const FVector& LocalPosition)
+{
+	const FIntVector GridPos = GetGridPosition(LocalPosition);
+	WorldItemGrid.Remove(GridPos);
+}
+
+TArray<AItemWorldActor*> UChunkData::GetWorldItems() const
+{
+	TArray<AItemWorldActor*> Result;
+	for (const auto& Pair : WorldItemGrid)
+	{
+		if (AItemWorldActor* Item = Pair.Value.Get())
+		{
+			Result.Add(Item);
+		}
+	}
+	return Result;
 }

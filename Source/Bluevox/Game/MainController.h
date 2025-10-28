@@ -96,6 +96,34 @@ public:
 	UInputAction* CrouchAction;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* PickupItemAction;
+
+	// Quick inventory slot input actions (1-8)
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot1Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot2Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot3Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot4Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot5Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot6Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot7Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
+	UInputAction* QuickSlot8Action;
+
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Input")
 	UInputMappingContext* DefaultInputContext;
 
 	FBlockRaycastResult LastRaycastResult;

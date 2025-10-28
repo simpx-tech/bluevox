@@ -13,7 +13,7 @@ AEntityFacade::AEntityFacade()
 	// Set this actor to replicate
 	bReplicates = true;
 	bAlwaysRelevant = false;
-	NetCullDistanceSquared = FMath::Square(5000.0f);
+	SetNetCullDistanceSquared(FMath::Square(5000.0f));
 }
 
 void AEntityFacade::BeginPlay()

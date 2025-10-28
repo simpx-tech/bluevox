@@ -17,6 +17,8 @@
 
 struct FGlobalPosition;
 class AGameManager;
+class AItemWorldActor;
+class UItemTypeDataAsset;
 
 USTRUCT()
 struct FChangeFromSet
@@ -25,7 +27,7 @@ struct FChangeFromSet
 
 	UPROPERTY()
 	EMaterial MaterialId;
-	
+
 	UPROPERTY()
 	uint16 PositionZ;
 
@@ -34,6 +36,58 @@ struct FChangeFromSet
 
 	UPROPERTY()
 	int32 StartChange;
+};
+
+/**
+ * Serializable struct for storing world item data
+ */
+USTRUCT()
+struct FWorldItemData
+{
+	GENERATED_BODY()
+
+	/** Item type asset reference */
+	UPROPERTY()
+	TSoftObjectPtr<UItemTypeDataAsset> ItemType;
+
+	/** Stack amount */
+	UPROPERTY()
+	int32 StackAmount = 1;
+
+	/** World location */
+	UPROPERTY()
+	FVector Location = FVector::ZeroVector;
+
+	/** World rotation */
+	UPROPERTY()
+	FRotator Rotation = FRotator::ZeroRotator;
+
+	FWorldItemData() = default;
+
+	FWorldItemData(const TSoftObjectPtr<UItemTypeDataAsset>& InItemType, int32 InStackAmount, const FVector& InLocation, const FRotator& InRotation)
+		: ItemType(InItemType), StackAmount(InStackAmount), Location(InLocation), Rotation(InRotation)
+	{
+	}
+
+	/** Custom serialization */
+	friend FArchive& operator<<(FArchive& Ar, FWorldItemData& ItemData)
+	{
+		// Serialize as string for compatibility
+		FString AssetPath;
+		if (Ar.IsSaving())
+		{
+			AssetPath = ItemData.ItemType.ToString();
+		}
+		Ar << AssetPath;
+		if (Ar.IsLoading())
+		{
+			ItemData.ItemType = TSoftObjectPtr<UItemTypeDataAsset>(FSoftObjectPath(AssetPath));
+		}
+		Ar << ItemData.StackAmount;
+		Ar << ItemData.Location;
+		Ar << ItemData.Rotation;
+		return Ar;
+	}
 };
 
 /**
@@ -58,6 +112,10 @@ public:
 	UPROPERTY()
 	TMap<FIntVector, TWeakObjectPtr<class AEntityFacade>> EntityGrid;
 
+	// World item tracking - maps grid position to item actor
+	UPROPERTY()
+	TMap<FIntVector, TWeakObjectPtr<AItemWorldActor>> WorldItemGrid;
+
 	// Spatial index for fast instance lookups - maps grid pos to (AssetId, InstanceIndex)
 	TMap<FIntVector, TPair<FPrimaryAssetId, int32>> InstanceSpatialIndex;
 
@@ -74,37 +132,7 @@ public:
 	
 	virtual void Serialize(FArchive& Ar) override;
 
-	void SerializeForSave(FArchive& Ar)
-	{
-		FReadScopeLock ReadLock(Lock);
-		int32 FileVersion = GameConstants::Chunk::File::FileVersion;
-
-		Ar << FileVersion;
-		Ar << Columns;
-
-		// Serialize instance collections
-		int32 NumCollections = InstanceCollections.Num();
-		Ar << NumCollections;
-
-		if (Ar.IsSaving())
-		{
-			for (auto& Pair : InstanceCollections)
-			{
-				FInstanceCollection& Collection = Pair.Value;
-				Ar << Collection;
-			}
-		}
-		else if (Ar.IsLoading())
-		{
-			InstanceCollections.Empty();
-			for (int32 i = 0; i < NumCollections; ++i)
-			{
-				FInstanceCollection Collection;
-				Ar << Collection;
-				InstanceCollections.Add(Collection.InstanceTypeId, Collection);
-			}
-		}
-	}
+	void SerializeForSave(FArchive& Ar);
 
 	int32 GetFirstGapThatFits(const FGlobalPosition& GlobalPosition, const int32 FitHeightInLayers);
 	
@@ -148,6 +176,18 @@ public:
 
 	// Remove entity from grid
 	void UnregisterEntity(const FVector& LocalPosition);
+
+	// Check if world item exists at grid position
+	bool HasWorldItemAt(const FVector& LocalPosition) const;
+
+	// Register a world item at a position
+	void RegisterWorldItem(const FVector& LocalPosition, AItemWorldActor* WorldItem);
+
+	// Remove world item from grid
+	void UnregisterWorldItem(const FVector& LocalPosition);
+
+	// Get all world items in this chunk
+	TArray<AItemWorldActor*> GetWorldItems() const;
 
 	// Get grid position from local coordinates
 	static FIntVector GetGridPosition(const FVector& LocalPosition)
