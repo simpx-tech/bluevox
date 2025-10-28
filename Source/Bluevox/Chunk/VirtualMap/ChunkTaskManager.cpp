@@ -32,9 +32,11 @@ void UChunkTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunks& Pe
 			continue;
 		}
 
+		UChunkData* ChunkData = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition);
 		DataToSend.Add(FChunkDataWithPosition{
 			ChunkPosition,
-			GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition)->Columns
+			ChunkData->Columns,
+			ChunkData->InstanceCollections
 		});
 	}
 
@@ -80,7 +82,7 @@ void UChunkTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Pa
 		}
 
 		auto* ChunkDataObject = NewObject<UChunkData>(ChunkRegistry);
-		ChunkDataObject->Init(GameManager, ChunkPosition, MoveTemp(ChunkData.Columns));
+		ChunkDataObject->Init(GameManager, ChunkPosition, MoveTemp(ChunkData.Columns), MoveTemp(ChunkData.Instances));
 		ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkDataObject);
 
 		// Prevent stuttering the game

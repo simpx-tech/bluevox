@@ -87,11 +87,17 @@ public:
 	// TODO should not use Th_LoadRegionFile, instead use a Th_GetRegionFile and discard immediately
 	UFUNCTION()
 	bool Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-	                                TMap<EInstanceType, FInstanceCollection>& OutInstances);
+	                                TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances);
 	
 	UFUNCTION()
 	bool Th_HasChunkData(const FChunkPosition& Position);
 
-	UFUNCTION()
+public:
+	// Get all chunk actors
+	UFUNCTION(BlueprintPure, Category = "Chunk")
+	const TMap<FChunkPosition, AChunk*>& GetChunkActors() const { return ChunkActors; }
+
+	// Get specific chunk actor
+	UFUNCTION(BlueprintPure, Category = "Chunk")
 	AChunk* GetChunkActor(const FChunkPosition& Position) const;
 };

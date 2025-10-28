@@ -28,7 +28,7 @@ struct FLoadResult
 
 	bool bSuccess = false;
 	TArray<FChunkColumn> Columns = {};
-	TMap<EInstanceType, FInstanceCollection> Instances = {};
+	TMap<FPrimaryAssetId, FInstanceCollection> Instances = {};
 };
 
 struct FRenderResult

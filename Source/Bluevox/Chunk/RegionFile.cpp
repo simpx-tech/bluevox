@@ -52,7 +52,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 }
 
 bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-                                TMap<EInstanceType, FInstanceCollection>& OutInstances)
+                                TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances)
 {
 	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
@@ -91,7 +91,7 @@ bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChun
 		{
 			FInstanceCollection Collection;
 			Reader << Collection;
-			OutInstances.Add(Collection.InstanceType, Collection);
+			OutInstances.Add(Collection.InstanceTypeId, Collection);
 		}
 	}
 	else

@@ -3,61 +3,60 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Engine/AssetManager.h"
 #include "InstanceData.generated.h"
 
-UENUM(BlueprintType)
-enum class EInstanceType : uint8
-{
-	None UMETA(DisplayName = "None"),
-	Tree UMETA(DisplayName = "Tree"),
-	Rock UMETA(DisplayName = "Rock"),
-	Bush UMETA(DisplayName = "Bush"),
-};
+class UInstanceTypeDataAsset;
 
 /**
  * Metadata for a single instance
- * Stores location, rotation, scale, and extensible per-instance data
+ * Stores transform and reference to instance type data asset
  */
 USTRUCT(BlueprintType)
 struct BLUEVOX_API FInstanceData
 {
 	GENERATED_BODY()
 
-	// Local position within the chunk (X, Y in [0, ChunkSize), Z in [0, ChunkHeight))
+	// Transform of the instance (local to chunk)
 	UPROPERTY()
-	FVector Location = FVector::ZeroVector;
+	FTransform Transform = FTransform::Identity;
 
-	// Rotation of the instance
+	// Reference to the instance type data asset
 	UPROPERTY()
-	FRotator Rotation = FRotator::ZeroRotator;
-
-	// Scale of the instance
-	UPROPERTY()
-	FVector Scale = FVector::OneVector;
-
-	// Optional metadata flags (for future use: interactability, health, etc.)
-	UPROPERTY()
-	uint32 Flags = 0;
-
-	// Optional custom data (for future per-instance customization)
-	UPROPERTY()
-	TArray<float> CustomData;
+	TSoftObjectPtr<UInstanceTypeDataAsset> InstanceType;
 
 	FInstanceData() = default;
 
-	FInstanceData(const FVector& InLocation, const FRotator& InRotation = FRotator::ZeroRotator,
-	              const FVector& InScale = FVector::OneVector)
-		: Location(InLocation), Rotation(InRotation), Scale(InScale)
+	FInstanceData(const FTransform& InTransform, const TSoftObjectPtr<UInstanceTypeDataAsset>& InInstanceType)
+		: Transform(InTransform), InstanceType(InInstanceType)
+	{
+	}
+
+	// Convenience constructor from separate components
+	FInstanceData(const FVector& InLocation, const FRotator& InRotation, const FVector& InScale,
+	              const TSoftObjectPtr<UInstanceTypeDataAsset>& InInstanceType)
+		: Transform(FTransform(InRotation, InLocation, InScale)), InstanceType(InInstanceType)
 	{
 	}
 
 	friend FArchive& operator<<(FArchive& Ar, FInstanceData& Data)
 	{
-		Ar << Data.Location;
-		Ar << Data.Rotation;
-		Ar << Data.Scale;
-		Ar << Data.Flags;
-		Ar << Data.CustomData;
+		Ar << Data.Transform;
+
+		// Serialize asset path as string for better compatibility
+		FString AssetPath;
+		if (Ar.IsSaving())
+		{
+			AssetPath = Data.InstanceType.ToString();
+		}
+
+		Ar << AssetPath;
+
+		if (Ar.IsLoading())
+		{
+			Data.InstanceType = TSoftObjectPtr<UInstanceTypeDataAsset>(FSoftObjectPath(AssetPath));
+		}
+
 		return Ar;
 	}
 };
@@ -70,22 +69,35 @@ struct BLUEVOX_API FInstanceCollection
 {
 	GENERATED_BODY()
 
+	// Primary asset ID of the instance type
 	UPROPERTY()
-	EInstanceType InstanceType = EInstanceType::None;
+	FPrimaryAssetId InstanceTypeId;
 
+	// Array of instances
 	UPROPERTY()
 	TArray<FInstanceData> Instances;
 
+	// Server-only: indices of instances that have been converted to entities
+	UPROPERTY(NotReplicated)
+	TSet<int32> ConvertedInstanceIndices;
+
+	// Cached transforms for efficient bulk rendering
+	TArray<FTransform> CachedTransforms;
+
+	// Flag to indicate if cached transforms need rebuilding
+	bool bTransformsCacheDirty = true;
+
 	FInstanceCollection() = default;
 
-	explicit FInstanceCollection(EInstanceType InType)
-		: InstanceType(InType)
+	explicit FInstanceCollection(const FPrimaryAssetId& InTypeId)
+		: InstanceTypeId(InTypeId)
 	{
 	}
 
 	void AddInstance(const FInstanceData& Instance)
 	{
 		Instances.Add(Instance);
+		bTransformsCacheDirty = true;
 	}
 
 	void RemoveInstance(int32 Index)
@@ -93,20 +105,54 @@ struct BLUEVOX_API FInstanceCollection
 		if (Instances.IsValidIndex(Index))
 		{
 			Instances.RemoveAt(Index);
+			ConvertedInstanceIndices.Remove(Index);
+			bTransformsCacheDirty = true;
 		}
+	}
+
+	// Rebuild cached transforms for bulk operations
+	void RebuildTransformCache()
+	{
+		CachedTransforms.Empty(Instances.Num());
+		for (const auto& Instance : Instances)
+		{
+			CachedTransforms.Add(Instance.Transform);
+		}
+		bTransformsCacheDirty = false;
+	}
+
+	// Get cached transforms, rebuilding if necessary
+	const TArray<FTransform>& GetCachedTransforms()
+	{
+		if (bTransformsCacheDirty)
+		{
+			RebuildTransformCache();
+		}
+		return CachedTransforms;
 	}
 
 	friend FArchive& operator<<(FArchive& Ar, FInstanceCollection& Collection)
 	{
-		uint8 TypeValue = static_cast<uint8>(Collection.InstanceType);
-		Ar << TypeValue;
+		// Serialize asset ID as string
+		FString AssetIdString;
+		if (Ar.IsSaving())
+		{
+			AssetIdString = Collection.InstanceTypeId.ToString();
+		}
+
+		Ar << AssetIdString;
 
 		if (Ar.IsLoading())
 		{
-			Collection.InstanceType = static_cast<EInstanceType>(TypeValue);
+			Collection.InstanceTypeId = FPrimaryAssetId(AssetIdString);
 		}
 
+		// Serialize instances
 		Ar << Collection.Instances;
+
+		// Don't serialize runtime data (ConvertedInstanceIndices, CachedTransforms)
+		// These will be rebuilt at runtime
+
 		return Ar;
 	}
 };

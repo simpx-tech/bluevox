@@ -24,18 +24,20 @@ class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 	UPROPERTY(EditAnywhere)
 	int32 WaterLevel = 100;
 
-	UPROPERTY(EditAnywhere, Category = "Instances")
-	float TreeSpawnChance = 0.05f;
-
-	UPROPERTY(EditAnywhere, Category = "Instances")
-	int32 TreeHeightInLayers = 8;
+	// Instance types to generate
+	UPROPERTY(EditAnywhere, Category = "Instances", meta = (AllowAbstract = "false"))
+	TArray<TSoftObjectPtr<class UInstanceTypeDataAsset>> InstanceTypesToGenerate;
 
 public:
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-	                           TMap<EInstanceType, FInstanceCollection>& OutInstances) const override;
+	                           TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const override;
 
 private:
-	void GenerateInstances(const FChunkPosition& Position, const TArray<FChunkColumn>& Columns, TMap<EInstanceType, FInstanceCollection>& OutInstances) const;
+	void GenerateInstances(const FChunkPosition& Position, const TArray<FChunkColumn>& Columns,
+	                      TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const;
+
+	void GenerateInstancesOfType(class UInstanceTypeDataAsset* Asset, const FChunkPosition& Position,
+	                             const TArray<FChunkColumn>& Columns, TArray<FInstanceData>& OutInstances) const;
 };

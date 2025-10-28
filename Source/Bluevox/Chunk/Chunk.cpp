@@ -16,6 +16,8 @@
 #include "VirtualMap/ChunkTaskManager.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "DynamicMesh/MeshNormals.h"
+#include "Bluevox/Data/InstanceTypeDataAsset.h"
+#include "Engine/AssetManager.h"
 
 void AChunk::BeginDestroy()
 {
@@ -396,7 +398,6 @@ bool AChunk::BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, bool bForceRender
 		}
 	}
 
-
 	RenderedAtDirtyChanges.Set(ChunkData->Changes);
 
 	const uint64 End = FPlatformTime::Cycles64();
@@ -415,15 +416,22 @@ void AChunk::CommitRender(FRenderResult&& RenderResult) const
 	const_cast<AChunk*>(this)->UpdateInstanceRendering();
 }
 
-UHierarchicalInstancedStaticMeshComponent* AChunk::GetOrCreateInstanceComponent(EInstanceType Type)
+UHierarchicalInstancedStaticMeshComponent* AChunk::GetOrCreateInstanceComponent(
+	const FPrimaryAssetId& AssetId,
+	UInstanceTypeDataAsset* Asset)
 {
-	if (UHierarchicalInstancedStaticMeshComponent** Found = ChunkInstanceComponents.Find(Type))
+	if (UHierarchicalInstancedStaticMeshComponent** Found = ChunkInstanceComponents.Find(AssetId))
 	{
 		return *Found;
 	}
 
+	if (!Asset || !Asset->StaticMesh)
+	{
+		return nullptr;
+	}
+
 	// Create a new HISM component for this instance type
-	const FName ComponentName = FName(*FString::Printf(TEXT("InstanceComponent_%s"), *UEnum::GetValueAsString(Type)));
+	const FName ComponentName = FName(*FString::Printf(TEXT("InstanceComponent_%s"), *AssetId.ToString()));
 	UHierarchicalInstancedStaticMeshComponent* NewComponent = NewObject<UHierarchicalInstancedStaticMeshComponent>(
 		this, ComponentName);
 
@@ -432,10 +440,11 @@ UHierarchicalInstancedStaticMeshComponent* AChunk::GetOrCreateInstanceComponent(
 	NewComponent->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
 	NewComponent->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
 	NewComponent->SetGenerateOverlapEvents(false);
-	NewComponent->SetStaticMesh(GameManager->TreeMesh);
+	NewComponent->SetStaticMesh(Asset->StaticMesh);
+	NewComponent->SetCullDistances(0, Asset->CullDistance);
 	NewComponent->RegisterComponent();
 
-	ChunkInstanceComponents.Add(Type, NewComponent);
+	ChunkInstanceComponents.Add(AssetId, NewComponent);
 	return NewComponent;
 }
 
@@ -448,6 +457,46 @@ void AChunk::UpdateInstanceRendering()
 
 	FReadScopeLock ReadLock(ChunkData->Lock);
 
+	const bool bIsClient = IsClientOnly();
+
+	// On clients, track what needs to be visible and only update if changed
+	if (bIsClient && bInstancesInitialized)
+	{
+		bool bNeedsUpdate = false;
+
+		// Check if visibility state has changed for any instance
+		for (const auto& [AssetId, Collection] : ChunkData->InstanceCollections)
+		{
+			TSet<int32>& CurrentVisible = VisibleInstanceIndices.FindOrAdd(AssetId);
+			TSet<int32> NewVisible;
+
+			for (int32 i = 0; i < Collection.Instances.Num(); i++)
+			{
+				const FInstanceData& Instance = Collection.Instances[i];
+				if (!ChunkData->HasEntityAt(Instance.Transform.GetLocation()))
+				{
+					NewVisible.Add(i);
+				}
+			}
+
+			// Check if visibility changed
+			if (CurrentVisible.Num() != NewVisible.Num() || !CurrentVisible.Includes(NewVisible))
+			{
+				bNeedsUpdate = true;
+				break;
+			}
+		}
+
+		// No changes needed
+		if (!bNeedsUpdate)
+		{
+			return;
+		}
+	}
+
+	// Clear visible instance tracking
+	VisibleInstanceIndices.Empty();
+
 	// Clear all existing instances
 	for (auto& Pair : ChunkInstanceComponents)
 	{
@@ -457,40 +506,129 @@ void AChunk::UpdateInstanceRendering()
 		}
 	}
 
-	// Add instances from ChunkData
-	for (const auto& CollectionPair : ChunkData->InstanceCollections)
+	// Add instances from ChunkData using bulk operations
+	for (const auto& [AssetId, Collection] : ChunkData->InstanceCollections)
 	{
-		const EInstanceType Type = CollectionPair.Key;
-		const FInstanceCollection& Collection = CollectionPair.Value;
-
 		if (Collection.Instances.Num() == 0)
 		{
 			continue;
 		}
 
-		UHierarchicalInstancedStaticMeshComponent* Component = GetOrCreateInstanceComponent(Type);
+		// Load the asset
+		UInstanceTypeDataAsset* Asset = nullptr;
+
+		// First try to load from asset manager using primary asset ID
+		if (UAssetManager* AssetManager = UAssetManager::GetIfInitialized())
+		{
+			FSoftObjectPath AssetPath = AssetManager->GetPrimaryAssetPath(AssetId);
+			if (AssetPath.IsValid())
+			{
+				Asset = Cast<UInstanceTypeDataAsset>(AssetPath.TryLoad());
+			}
+		}
+
+		// If asset manager doesn't have it, try to load directly using the asset ID name
+		// This handles cases where the asset isn't registered with the asset manager
+		if (!Asset && Collection.Instances.Num() > 0)
+		{
+			// Get the first instance's asset reference to load it directly
+			const FInstanceData& FirstInstance = Collection.Instances[0];
+			if (FirstInstance.InstanceType.IsValid())
+			{
+				Asset = FirstInstance.InstanceType.LoadSynchronous();
+			}
+		}
+
+		if (!Asset)
+		{
+			continue;
+		}
+
+		UHierarchicalInstancedStaticMeshComponent* Component = GetOrCreateInstanceComponent(AssetId, Asset);
 		if (!Component)
 		{
 			continue;
 		}
 
-		// Add each instance (using local coordinates relative to chunk actor)
-		for (const FInstanceData& InstanceData : Collection.Instances)
+		// Get or create visible indices set for tracking
+		TSet<int32>* VisibleIndices = bIsClient ? &VisibleInstanceIndices.FindOrAdd(AssetId) : nullptr;
+
+		// Build array of transforms for bulk add
+		TArray<FTransform> TransformsToAdd;
+		TransformsToAdd.Reserve(Collection.Instances.Num());
+
+		for (int32 i = 0; i < Collection.Instances.Num(); i++)
 		{
+			const FInstanceData& Instance = Collection.Instances[i];
+
+			// Server: Skip converted instances
+			if (!bIsClient && Collection.ConvertedInstanceIndices.Contains(i))
+			{
+				continue;
+			}
+
+			// Client: Skip instances where entities exist
+			if (bIsClient && ChunkData->HasEntityAt(Instance.Transform.GetLocation()))
+			{
+				continue;
+			}
+
+			// Track visible instances for clients
+			if (VisibleIndices)
+			{
+				VisibleIndices->Add(i);
+			}
+
 			// Convert local position to scaled local position
 			const FVector LocalScaled = FVector(
-				InstanceData.Location.X * GameConstants::Scaling::XYWorldSize,
-				InstanceData.Location.Y * GameConstants::Scaling::XYWorldSize,
-				InstanceData.Location.Z * GameConstants::Scaling::ZSize
+				Instance.Transform.GetLocation().X * GameConstants::Scaling::XYWorldSize,
+				Instance.Transform.GetLocation().Y * GameConstants::Scaling::XYWorldSize,
+				Instance.Transform.GetLocation().Z * GameConstants::Scaling::ZSize
 			);
 
-			// Use local transform since component is attached to chunk actor
-			const FTransform InstanceTransform(InstanceData.Rotation, LocalScaled, InstanceData.Scale);
+			// Create scaled transform
+			FTransform ScaledTransform = Instance.Transform;
+			ScaledTransform.SetLocation(LocalScaled);
 
-			Component->AddInstance(InstanceTransform);
+			TransformsToAdd.Add(ScaledTransform);
 		}
 
-		UE_LOG(LogChunk, Verbose, TEXT("Added %d instances of type %s to chunk %s"),
-		       Collection.Instances.Num(), *UEnum::GetValueAsString(Type), *Position.ToString());
+		// Bulk add all instances at once
+		if (TransformsToAdd.Num() > 0)
+		{
+			Component->AddInstances(TransformsToAdd, false); // false = don't build tree yet
+
+			UE_LOG(LogChunk, Verbose, TEXT("Added %d instances of type %s to chunk %s"),
+			       TransformsToAdd.Num(), *AssetId.ToString(), *Position.ToString());
+		}
 	}
+
+	// Build trees for all components at once
+	for (auto& [AssetId, Component] : ChunkInstanceComponents)
+	{
+		if (Component)
+		{
+			Component->BuildTreeIfOutdated(true, true);
+		}
+	}
+
+	// Mark instances as initialized after first render
+	bInstancesInitialized = true;
+}
+
+void AChunk::RefreshInstanceVisibility()
+{
+	// Only clients need to refresh visibility
+	if (!IsClientOnly() || !ChunkData)
+	{
+		return;
+	}
+
+	// UpdateInstanceRendering now handles change detection and only rebuilds when necessary
+	UpdateInstanceRendering();
+}
+
+bool AChunk::IsClientOnly() const
+{
+	return GameManager && GameManager->IsClientOnly();
 }

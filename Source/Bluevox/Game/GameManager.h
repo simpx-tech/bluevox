@@ -16,6 +16,7 @@ class UChunkRegistry;
 class AMainCharacter;
 class AMainController;
 class UVirtualMap;
+class UEntityConversionTickable;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoin, AMainController*, PlayerController);
 
@@ -74,6 +75,10 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	bool bClientOnly = false;
 
+	// Check if running as client-only
+	UFUNCTION(BlueprintPure, Category = "Game")
+	bool IsClientOnly() const { return bClientOnly; }
+
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	UVirtualMap* VirtualMap = nullptr;
 
@@ -82,9 +87,12 @@ public:
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	UChunkTaskManager* ChunkTaskManager = nullptr;
-	
+
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UTickManager* TickManager = nullptr;
+
+	UPROPERTY(EditAnywhere, Category = "Game")
+	UEntityConversionTickable* EntityConversionTickable = nullptr;
 	
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;

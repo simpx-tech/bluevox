@@ -30,5 +30,5 @@ public:
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const;
 
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-	                           TMap<EInstanceType, FInstanceCollection>& OutInstances) const;
+	                           TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const;
 };

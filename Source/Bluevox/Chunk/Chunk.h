@@ -49,7 +49,7 @@ protected:
 	UDynamicMeshComponent* MeshComponent = nullptr;
 
 	UPROPERTY()
-	TMap<EInstanceType, UHierarchicalInstancedStaticMeshComponent*> ChunkInstanceComponents;
+	TMap<FPrimaryAssetId, UHierarchicalInstancedStaticMeshComponent*> ChunkInstanceComponents;
 
 	FThreadSafeCounter RenderedAtDirtyChanges = -1;
 
@@ -76,7 +76,25 @@ public:
 
 	void CommitRender(FRenderResult&& RenderResult) const;
 
-private:
-	UHierarchicalInstancedStaticMeshComponent* GetOrCreateInstanceComponent(EInstanceType Type);
+public:
+	// Update instance visibility for clients (hides instances where entities exist)
+	void RefreshInstanceVisibility();
+
+	// Force update instance rendering
 	void UpdateInstanceRendering();
+
+private:
+	// Track which instances are currently visible (client-side)
+	// Key: AssetId, Value: Set of visible instance indices
+	TMap<FPrimaryAssetId, TSet<int32>> VisibleInstanceIndices;
+
+	// Track if instances have been initially rendered
+	bool bInstancesInitialized = false;
+
+	UHierarchicalInstancedStaticMeshComponent* GetOrCreateInstanceComponent(
+		const FPrimaryAssetId& AssetId,
+		class UInstanceTypeDataAsset* Asset);
+
+	// Check if running as client-only
+	bool IsClientOnly() const;
 };

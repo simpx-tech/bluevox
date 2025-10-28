@@ -32,7 +32,7 @@ void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 }
 
 void UWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-                                    TMap<EInstanceType, FInstanceCollection>& OutInstances) const
+                                    TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const
 {
 	// Default implementation just generates columns, no instances
 	GenerateChunk(Position, OutColumns);

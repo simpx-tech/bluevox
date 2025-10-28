@@ -46,13 +46,20 @@ class BLUEVOX_API UChunkData : public UObject
 	
 public:
 	UChunkData* Init(AGameManager* InGameManager, const FChunkPosition InPosition, TArray<FChunkColumn>&& InColumns,
-	                 TMap<EInstanceType, FInstanceCollection>&& InInstances = TMap<EInstanceType, FInstanceCollection>());
-	
+	                 TMap<FPrimaryAssetId, FInstanceCollection>&& InInstances = TMap<FPrimaryAssetId, FInstanceCollection>());
+
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
 
 	UPROPERTY()
-	TMap<EInstanceType, FInstanceCollection> InstanceCollections;
+	TMap<FPrimaryAssetId, FInstanceCollection> InstanceCollections;
+
+	// Entity tracking - maps grid position to entity actor
+	UPROPERTY()
+	TMap<FIntVector, TWeakObjectPtr<class AEntityFacade>> EntityGrid;
+
+	// Spatial index for fast instance lookups - maps grid pos to (AssetId, InstanceIndex)
+	TMap<FIntVector, TPair<FPrimaryAssetId, int32>> InstanceSpatialIndex;
 
 	UPROPERTY()
 	AGameManager* GameManager;
@@ -94,7 +101,7 @@ public:
 			{
 				FInstanceCollection Collection;
 				Ar << Collection;
-				InstanceCollections.Add(Collection.InstanceType, Collection);
+				InstanceCollections.Add(Collection.InstanceTypeId, Collection);
 			}
 		}
 	}
@@ -127,6 +134,24 @@ public:
 	FPieceWithStart Th_GetPieceCopy(const int32 X, const int32 Y, const int32 Z);
 
 	void Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece, TArray<uint16>& OutRemovedPiecesZ, TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>>& OutChangedPieces);
-	
+
 	void Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece);
+
+	// Spatial indexing for instances and entities
+	void BuildSpatialIndex();
+
+	// Check if entity exists at grid position
+	bool HasEntityAt(const FVector& LocalPosition) const;
+
+	// Register an entity at a position
+	void RegisterEntity(const FVector& LocalPosition, class AEntityFacade* Entity);
+
+	// Remove entity from grid
+	void UnregisterEntity(const FVector& LocalPosition);
+
+	// Get grid position from local coordinates
+	static FIntVector GetGridPosition(const FVector& LocalPosition)
+	{
+		return FIntVector(LocalPosition / 100.0f);
+	}
 };
