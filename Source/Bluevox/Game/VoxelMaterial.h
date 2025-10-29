@@ -10,4 +10,7 @@ enum class EMaterial : uint8
 	Dirt UMETA(DisplayName = "Dirt"),
 	Grass UMETA(DisplayName = "Grass"),
 	Stone UMETA(DisplayName = "Stone"),
+	Sand UMETA(DisplayName = "Sand"),
+	Snow UMETA(DisplayName = "Snow"),
+	Water UMETA(DisplayName = "Water"),
 };

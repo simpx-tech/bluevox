@@ -19,6 +19,7 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 		return;
 	}
 
+	
 	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	FBufferArchive Uncompressed;
