@@ -400,8 +400,8 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 
 	// Apply sensible defaults if not configured
 	const float SpawnChance = Asset->SpawnChance > 0 ? Asset->SpawnChance : 0.05f;  // 5% default spawn chance
-	const float MinSpacing = Asset->MinSpacing > 0 ? Asset->MinSpacing : 3.0f;      // 3 units minimum spacing
-	const int32 RequiredVoidSpace = Asset->RequiredVoidSpace > 0 ? Asset->RequiredVoidSpace : 5; // 5 blocks void space
+	const float MinSpacing = Asset->Radius > 0 ? Asset->Radius : 3.0f;      // 3 units minimum spacing
+	const int32 RequiredVoidSpace = Asset->Height > 0 ? Asset->Height : 5; // 5 blocks void space
 	const float MinScale = Asset->MinScale > 0 ? Asset->MinScale : 0.8f;
 	const float MaxScale = Asset->MaxScale > 0 ? Asset->MaxScale : 1.2f;
 

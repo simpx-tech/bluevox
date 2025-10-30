@@ -27,7 +27,7 @@ struct FGlobalPosition
 		FGlobalPosition GlobalPosition;
 		GlobalPosition.X = FMath::FloorToInt(Location.X / GameConstants::Scaling::XYWorldSize);
 		GlobalPosition.Y = FMath::FloorToInt(Location.Y / GameConstants::Scaling::XYWorldSize);
-		GlobalPosition.Z = FMath::FloorToInt(Location.Z / GameConstants::Scaling::ZSize);
+		GlobalPosition.Z = FMath::FloorToInt(Location.Z / GameConstants::Scaling::ZWorldSize);
 		return GlobalPosition;
 	}
 
@@ -92,7 +92,7 @@ struct FGlobalPosition
 		return FVector(
 			X * GameConstants::Scaling::XYWorldSize,
 			Y * GameConstants::Scaling::XYWorldSize,
-			Z * GameConstants::Scaling::ZSize);
+			Z * GameConstants::Scaling::ZWorldSize);
 	}
 };
 

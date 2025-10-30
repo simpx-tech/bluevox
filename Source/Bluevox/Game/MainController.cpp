@@ -84,7 +84,7 @@ FBlockRaycastResult AMainController::BlockRaycast() const
 	// DrawDebugLine(
 	// 	GetWorld(), Hit.ImpactPoint, Hit.ImpactPoint + Face * GameRules::Scaling::ZSize, FColor::Red, false, -1.0f, 0);
 	
-	const double Increment = 0.25 * (Axis == 2 ? GameConstants::Scaling::ZSize : GameConstants::Scaling::XYWorldSize);
+	const double Increment = 0.25 * (Axis == 2 ? GameConstants::Scaling::ZWorldSize : GameConstants::Scaling::XYWorldSize);
 	
 	FBlockRaycastResult Result;
 	Result.bHit = true;
@@ -114,12 +114,12 @@ void AMainController::Tick(float DeltaSeconds)
 			FString::Printf(TEXT("Place position: %s"), *LastRaycastResult.PlacePosition.ToString()));
 
 		DrawDebugBox(
-			GetWorld(), LastRaycastResult.Position.AsActorLocationCopy() + FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
-			FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
+			GetWorld(), LastRaycastResult.Position.AsActorLocationCopy() + FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZWorldSize * 0.5f),
+			FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZWorldSize * 0.5f),
 			FQuat::Identity, FColor::Green, false, -1.0f);
 		DrawDebugBox(
-			GetWorld(), LastRaycastResult.PlacePosition.AsActorLocationCopy() + FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
-			FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZSize * 0.5f),
+			GetWorld(), LastRaycastResult.PlacePosition.AsActorLocationCopy() + FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZWorldSize * 0.5f),
+			FVector(GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::XYWorldSize * 0.5f, GameConstants::Scaling::ZWorldSize * 0.5f),
 			FQuat::Identity, FColor::Blue, false, -1.0f);
 	}
 }

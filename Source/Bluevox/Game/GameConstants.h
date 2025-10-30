@@ -25,14 +25,14 @@ namespace GameConstants::Scaling
 		TEXT("game.rules.scaling.xy_world_size"), XYWorldSize,
 		TEXT("The size of a block in the world"), ECVF_Default);
 
-	extern inline float ZSize = 25;
+	extern inline float ZWorldSize = 25;
 	static FAutoConsoleVariableRef CVarLayerWorldSize(
-		TEXT("game.rules.scaling.z_world_size"), ZSize,
+		TEXT("game.rules.scaling.z_world_size"), ZWorldSize,
 		TEXT("The size of a layer in the world"), ECVF_Default);
 
 	extern inline float PlayerHeight = 100;
 	static FAutoConsoleVariableRef CVarPlayerHeight(
-		TEXT("game.rules.scaling.player_height"), ZSize,
+		TEXT("game.rules.scaling.player_height"), ZWorldSize,
 		TEXT(
 			"The height of the player (Don't modify player height it's just used for some calculations)"),
 		ECVF_Default);

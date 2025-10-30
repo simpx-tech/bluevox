@@ -26,7 +26,7 @@ struct FLocalPosition
 	{
 		const int32 GlobalX = FMath::FloorToInt(Location.X / GameConstants::Scaling::XYWorldSize);
 		const int32 GlobalY = FMath::FloorToInt(Location.Y / GameConstants::Scaling::XYWorldSize);
-		const int32 GlobalZ = FMath::FloorToInt(Location.Z / GameConstants::Scaling::ZSize);
+		const int32 GlobalZ = FMath::FloorToInt(Location.Z / GameConstants::Scaling::ZWorldSize);
 
 		FLocalPosition LocalPosition;
 		LocalPosition.X = static_cast<uint8>(PositiveMod(GlobalX, GameConstants::Chunk::Size));

@@ -3,6 +3,7 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Bluevox/Game/GameConstants.h"
 #include "Engine/DataAsset.h"
 #include "Bluevox/Game/VoxelMaterial.h"
 #include "InstanceTypeDataAsset.generated.h"
@@ -39,11 +40,11 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generation", meta = (ClampMin = "0.0", ClampMax = "1.0"))
 	float SpawnChance = 0.05f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generation", meta = (ClampMin = "1.0", ClampMax = "20.0"))
-	float MinSpacing = 3.0f;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Generation")
+	float Radius = 3.0f;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generation", meta = (ClampMin = "1", ClampMax = "50"))
-	int32 RequiredVoidSpace = 8;
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = "Generation")
+	int32 Height = 8;
 
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generation")
 	TArray<EMaterial> ValidSurfaces;
@@ -58,35 +59,30 @@ public:
 	// Get the primary asset ID for this data asset
 	virtual FPrimaryAssetId GetPrimaryAssetId() const override;
 
-	static void EstimateInstanceSpacingFromMesh(
-		const UStaticMesh* Mesh,
-		float ScaleToUseXY, float ScaleToUseZ,
-		float XYBlockSize, float ZBlockSize,
-		/*out*/ float& OutMinSpacingBlocks,
-		/*out*/ int32& OutRequiredVoidBlocks,
-		int32 ExtraXYBlockPadding = 0
-	)
+#if WITH_EDITOR
+	virtual void PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent) override;
+#endif
+
+	void EstimateInstanceSpacingFromMesh(
+		float& OutMinSpacingBlocks,
+		int32& OutRequiredVoidBlocks
+	) const
 	{
 		OutMinSpacingBlocks = 1.0f;
 		OutRequiredVoidBlocks = 1;
 
-		if (!Mesh) return;
+		if (!StaticMesh) return;
 
-		const FBox Box = Mesh->GetBoundingBox();
+		const FBox Box = StaticMesh->GetBoundingBox();
 		const FVector Ext = Box.GetExtent(); // half sizes (cm)
 
 		// World-space extents with chosen scale(s)
-		const float widthXY_cm = 2.0f * FMath::Max(Ext.X, Ext.Y) * ScaleToUseXY;
-		const float heightZ_cm  = 2.0f * Ext.Z * ScaleToUseZ;
+		const float widthXY_cm = 2.0f * FMath::Max(Ext.X, Ext.Y);
+		const float heightZ_cm  = 2.0f * Ext.Z;
 
 		// Convert to blocks
-		float minSpacingBlocks = widthXY_cm / FMath::Max(1e-3f, XYBlockSize);
-		int32 requiredVoidBlocks = FMath::CeilToInt(heightZ_cm / FMath::Max(1e-3f, ZBlockSize));
-
-		// Padding and clamping to your UPROPERTY ranges
-		minSpacingBlocks = FMath::CeilToFloat(minSpacingBlocks) + ExtraXYBlockPadding;
-		minSpacingBlocks = FMath::Clamp(minSpacingBlocks, 1.0f, 20.0f);
-		requiredVoidBlocks = FMath::Clamp(requiredVoidBlocks, 1, 50);
+		float minSpacingBlocks = widthXY_cm / FMath::Max(1e-3f, GameConstants::Scaling::XYWorldSize);
+		int32 requiredVoidBlocks = FMath::CeilToInt(heightZ_cm / FMath::Max(1e-3f, GameConstants::Scaling::ZWorldSize));
 
 		OutMinSpacingBlocks = minSpacingBlocks;
 		OutRequiredVoidBlocks = requiredVoidBlocks;

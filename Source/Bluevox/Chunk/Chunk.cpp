@@ -161,7 +161,7 @@ bool AChunk::BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, bool bForceRender
 
 	// Geometry scaling
 	const float SXY = GameConstants::Scaling::XYWorldSize;
-	const float SZ = GameConstants::Scaling::ZSize;
+	const float SZ = GameConstants::Scaling::ZWorldSize;
 
 	// Precompute base world column position
 	FColumnPosition GlobalPos;
