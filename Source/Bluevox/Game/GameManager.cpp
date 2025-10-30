@@ -9,7 +9,6 @@
 #include "Bluevox/Chunk/ChunkRegistry.h"
 #include "Bluevox/Chunk/VirtualMap/ChunkTaskManager.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
-#include "Bluevox/Entity/EntityConversionTickable.h"
 #include "Bluevox/Tick/TickManager.h"
 #include "GameRules/GameRule.h"
 #include "Kismet/GameplayStatics.h"
@@ -46,11 +45,6 @@ void AGameManager::BeginPlay()
 	ChunkRegistry = NewObject<UChunkRegistry>(this, TEXT("ChunkRegistry"))->Init(this);
 
 	TickManager = NewObject<UTickManager>(this, TEXT("TickManager"))->Init();
-
-	// Initialize and register EntityConversionTickable
-	EntityConversionTickable = NewObject<UEntityConversionTickable>(this, TEXT("EntityConversionTickable"));
-	EntityConversionTickable->Init(this, ChunkRegistry);
-	TickManager->RegisterUObjectTickable(EntityConversionTickable);
 
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	LocalController = Cast<AMainController>(Controller);

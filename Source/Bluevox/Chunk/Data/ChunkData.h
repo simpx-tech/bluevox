@@ -108,16 +108,9 @@ public:
 	UPROPERTY()
 	TMap<FPrimaryAssetId, FInstanceCollection> InstanceCollections;
 
-	// Entity tracking - maps grid position to entity actor
-	UPROPERTY()
-	TMap<FIntVector, TWeakObjectPtr<class AEntityFacade>> EntityGrid;
-
 	// World item tracking - maps grid position to item actor
 	UPROPERTY()
 	TMap<FIntVector, TWeakObjectPtr<AItemWorldActor>> WorldItemGrid;
-
-	// Spatial index for fast instance lookups - maps grid pos to (AssetId, InstanceIndex)
-	TMap<FIntVector, TPair<FPrimaryAssetId, int32>> InstanceSpatialIndex;
 
 	UPROPERTY()
 	AGameManager* GameManager;
@@ -164,18 +157,6 @@ public:
 	void Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece, TArray<uint16>& OutRemovedPiecesZ, TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>>& OutChangedPieces);
 
 	void Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const FPiece& Piece);
-
-	// Spatial indexing for instances and entities
-	void BuildSpatialIndex();
-
-	// Check if entity exists at grid position
-	bool HasEntityAt(const FVector& LocalPosition) const;
-
-	// Register an entity at a position
-	void RegisterEntity(const FVector& LocalPosition, class AEntityFacade* Entity);
-
-	// Remove entity from grid
-	void UnregisterEntity(const FVector& LocalPosition);
 
 	// Check if world item exists at grid position
 	bool HasWorldItemAt(const FVector& LocalPosition) const;

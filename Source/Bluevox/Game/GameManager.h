@@ -16,7 +16,6 @@ class UChunkRegistry;
 class AMainCharacter;
 class AMainController;
 class UVirtualMap;
-class UEntityConversionTickable;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoin, AMainController*, PlayerController);
 
@@ -90,9 +89,6 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UTickManager* TickManager = nullptr;
-
-	UPROPERTY(EditAnywhere, Category = "Game")
-	UEntityConversionTickable* EntityConversionTickable = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;

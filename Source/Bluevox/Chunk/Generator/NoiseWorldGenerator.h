@@ -90,7 +90,18 @@ class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 	UPROPERTY(EditAnywhere, Category = "Instances", meta = (AllowAbstract = "false"))
 	TArray<TSoftObjectPtr<class UInstanceTypeDataAsset>> InstanceTypesToGenerate;
 
+	// Cached loaded instance type assets for thread-safe access
+	UPROPERTY()
+	TArray<class UInstanceTypeDataAsset*> LoadedInstanceTypes;
+
 public:
+	// Init to preload instance assets
+	UWorldGenerator* Init(AGameManager* InGameManager);
+
+	// Preload instance type assets for thread-safe access
+	void PreloadInstanceAssets();
+
+
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
 
 	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,

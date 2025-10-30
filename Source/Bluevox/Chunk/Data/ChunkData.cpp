@@ -7,7 +7,6 @@
 #include "Bluevox/Chunk/LogChunk.h"
 #include "Bluevox/Chunk/Position/GlobalPosition.h"
 #include "Bluevox/Tick/TickManager.h"
-#include "Bluevox/Entity/EntityFacade.h"
 #include "Bluevox/Inventory/ItemWorldActor.h"
 
 UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition InPosition,
@@ -17,9 +16,6 @@ UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition I
 	Position = InPosition;
 	Columns = MoveTemp(InColumns);
 	InstanceCollections = MoveTemp(InInstances);
-
-	// Build spatial index for fast lookups
-	BuildSpatialIndex();
 
 	GameManager->TickManager->RegisterUObjectTickable(this);
 
@@ -349,43 +345,6 @@ void UChunkData::Th_SetPiece(const int32 X, const int32 Y, const int32 Z, const 
 	TArray<uint16> Tmp;
 	TPair<TOptional<FChangeFromSet>, TOptional<FChangeFromSet>> Tmp2;
 	Th_SetPiece(X, Y, Z, Piece, Tmp, Tmp2);
-}
-
-void UChunkData::BuildSpatialIndex()
-{
-	InstanceSpatialIndex.Empty();
-
-	for (auto& [AssetId, Collection] : InstanceCollections)
-	{
-		for (int32 i = 0; i < Collection.Instances.Num(); i++)
-		{
-			const FVector LocalPos = Collection.Instances[i].Transform.GetLocation();
-			const FIntVector GridPos = GetGridPosition(LocalPos);
-			InstanceSpatialIndex.Add(GridPos, TPair<FPrimaryAssetId, int32>(AssetId, i));
-		}
-	}
-}
-
-bool UChunkData::HasEntityAt(const FVector& LocalPosition) const
-{
-	const FIntVector GridPos = GetGridPosition(LocalPosition);
-	const TWeakObjectPtr<AEntityFacade>* EntityPtr = EntityGrid.Find(GridPos);
-	return EntityPtr && EntityPtr->IsValid();
-}
-
-void UChunkData::RegisterEntity(const FVector& LocalPosition, AEntityFacade* Entity)
-{
-	if (Entity)
-	{
-		const FIntVector GridPos = GetGridPosition(LocalPosition);
-		EntityGrid.Add(GridPos, Entity);
-	}
-}
-
-void UChunkData::UnregisterEntity(const FVector& LocalPosition)
-{
-	const FIntVector GridPos = GetGridPosition(LocalPosition);
-	EntityGrid.Remove(GridPos);
 }
 
 bool UChunkData::HasWorldItemAt(const FVector& LocalPosition) const

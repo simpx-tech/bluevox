@@ -228,37 +228,158 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 	GenerateInstances(Position, OutColumns, OutInstances);
 }
 
+UWorldGenerator* UNoiseWorldGenerator::Init(AGameManager* InGameManager)
+{
+	// Call parent Init
+	Super::Init(InGameManager);
+
+	UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - Starting initialization with %d instance types to generate"),
+		InstanceTypesToGenerate.Num());
+
+	// If no instance types are configured, try to add default ones
+	if (InstanceTypesToGenerate.Num() == 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - No instance types configured, adding default Instance_Tree"));
+
+		// Try the standard path for Instance_Tree
+		TSoftObjectPtr<UInstanceTypeDataAsset> TreeAsset(FSoftObjectPath(TEXT("/Game/Data/Instances/Instance_Tree.Instance_Tree")));
+		InstanceTypesToGenerate.Add(TreeAsset);
+
+		// Try loading it to verify
+		UInstanceTypeDataAsset* LoadedAsset = TreeAsset.LoadSynchronous();
+		if (LoadedAsset)
+		{
+			UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - Successfully added and verified Instance_Tree asset"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator::Init - Failed to load Instance_Tree asset, instance generation will not work!"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - Found %d instance types already configured"),
+			InstanceTypesToGenerate.Num());
+	}
+
+	// Preload all instance assets on the main thread
+	PreloadInstanceAssets();
+
+	return this;
+}
+
+
+void UNoiseWorldGenerator::PreloadInstanceAssets()
+{
+	LoadedInstanceTypes.Empty();
+
+	// Preload all instance type assets on the game thread
+	for (const auto& AssetPtr : InstanceTypesToGenerate)
+	{
+		if (AssetPtr.IsValid())
+		{
+			UInstanceTypeDataAsset* Asset = AssetPtr.LoadSynchronous();
+			if (Asset)
+			{
+				LoadedInstanceTypes.Add(Asset);
+				UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Preloaded instance asset %s"),
+					*Asset->GetName());
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator: Failed to preload instance asset"));
+			}
+		}
+	}
+
+	UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Preloaded %d instance type assets"),
+		LoadedInstanceTypes.Num());
+}
+
 void UNoiseWorldGenerator::GenerateInstances(const FChunkPosition& Position, const TArray<FChunkColumn>& Columns,
                                              TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const
 {
 	OutInstances.Empty();
 
-	// Process each configured instance type
-	for (const auto& AssetPtr : InstanceTypesToGenerate)
+	// If LoadedInstanceTypes is empty (e.g., on background thread), load from InstanceTypesToGenerate
+	if (LoadedInstanceTypes.Num() == 0 && InstanceTypesToGenerate.Num() > 0)
 	{
-		UInstanceTypeDataAsset* Asset = AssetPtr.LoadSynchronous();
-		if (!Asset)
+		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - LoadedInstanceTypes is empty, loading %d instance types directly"),
+			InstanceTypesToGenerate.Num());
+
+		for (const auto& AssetPtr : InstanceTypesToGenerate)
 		{
-			continue;
-		}
+			UInstanceTypeDataAsset* Asset = AssetPtr.LoadSynchronous();
+			if (!Asset)
+			{
+				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator::GenerateInstances - Failed to load instance asset"));
+				continue;
+			}
 
-		FPrimaryAssetId AssetId = Asset->GetPrimaryAssetId();
-		if (!AssetId.IsValid())
+			FPrimaryAssetId AssetId = Asset->GetPrimaryAssetId();
+			if (!AssetId.IsValid())
+			{
+				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator: Asset %s has invalid PrimaryAssetId!"),
+					*Asset->GetName());
+				continue;
+			}
+
+			// Create collection for this instance type
+			FInstanceCollection& Collection = OutInstances.FindOrAdd(AssetId);
+			Collection.InstanceTypeId = AssetId;
+
+			// Generate instances for this type
+			GenerateInstancesOfType(Asset, Position, Columns, Collection.Instances);
+
+			// Rebuild cache for efficient rendering
+			Collection.RebuildTransformCache();
+
+			UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - Generated %d instances of %s for chunk (%d,%d)"),
+				Collection.Instances.Num(), *Asset->GetName(), Position.X, Position.Y);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, VeryVerbose, TEXT("NoiseWorldGenerator::GenerateInstances - Generating for chunk (%d,%d) with %d loaded instance types"),
+			Position.X, Position.Y, LoadedInstanceTypes.Num());
+
+		// Process each preloaded instance type (thread-safe)
+		for (UInstanceTypeDataAsset* Asset : LoadedInstanceTypes)
 		{
-			// If asset doesn't have a valid primary asset ID, create one from its path
-			AssetId = FPrimaryAssetId(UInstanceTypeDataAsset::StaticClass()->GetFName(),
-				FName(*Asset->GetPathName()));
+			if (!Asset)
+			{
+				continue;
+			}
+
+			FPrimaryAssetId AssetId = Asset->GetPrimaryAssetId();
+			if (!AssetId.IsValid())
+			{
+				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator: Asset %s has invalid PrimaryAssetId!"),
+					*Asset->GetName());
+				continue;
+			}
+
+			// Create collection for this instance type
+			FInstanceCollection& Collection = OutInstances.FindOrAdd(AssetId);
+			Collection.InstanceTypeId = AssetId;
+
+			// Generate instances for this type
+			GenerateInstancesOfType(Asset, Position, Columns, Collection.Instances);
+
+			// Rebuild cache for efficient rendering
+			Collection.RebuildTransformCache();
 		}
+	}
 
-		// Create collection for this instance type
-		FInstanceCollection& Collection = OutInstances.FindOrAdd(AssetId);
-		Collection.InstanceTypeId = AssetId;
-
-		// Generate instances for this type
-		GenerateInstancesOfType(Asset, Position, Columns, Collection.Instances);
-
-		// Rebuild cache for efficient rendering
-		Collection.RebuildTransformCache();
+	if (OutInstances.Num() > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - Total %d instance collections generated for chunk (%d,%d)"),
+			OutInstances.Num(), Position.X, Position.Y);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - No instances generated for chunk (%d,%d)"),
+			Position.X, Position.Y);
 	}
 }
 
@@ -270,9 +391,22 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 		return;
 	}
 
+	UE_LOG(LogTemp, VeryVerbose, TEXT("NoiseWorldGenerator::GenerateInstancesOfType - Generating %s for chunk (%d,%d)"),
+		*Asset->GetName(), Position.X, Position.Y);
+
 	// Use position-based seed for deterministic random generation
 	const int32 Seed = Position.X * 73856093 + Position.Y * 19349663 + GetTypeHash(Asset->GetPrimaryAssetId());
 	FRandomStream RandomStream(Seed);
+
+	// Apply sensible defaults if not configured
+	const float SpawnChance = Asset->SpawnChance > 0 ? Asset->SpawnChance : 0.05f;  // 5% default spawn chance
+	const float MinSpacing = Asset->MinSpacing > 0 ? Asset->MinSpacing : 3.0f;      // 3 units minimum spacing
+	const int32 RequiredVoidSpace = Asset->RequiredVoidSpace > 0 ? Asset->RequiredVoidSpace : 5; // 5 blocks void space
+	const float MinScale = Asset->MinScale > 0 ? Asset->MinScale : 0.8f;
+	const float MaxScale = Asset->MaxScale > 0 ? Asset->MaxScale : 1.2f;
+
+	UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Generating %s with SpawnChance=%.2f, MinSpacing=%.1f, RequiredVoidSpace=%d"),
+		*Asset->GetName(), SpawnChance, MinSpacing, RequiredVoidSpace);
 
 	// Track placed instance positions for collision detection
 	TArray<FVector2D> PlacedPositions;
@@ -282,7 +416,7 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 		for (int32 Y = 0; Y < GameConstants::Chunk::Size; ++Y)
 		{
 			// Random chance to spawn based on asset configuration
-			if (RandomStream.FRand() > Asset->SpawnChance)
+			if (RandomStream.FRand() > SpawnChance)
 			{
 				continue;
 			}
@@ -307,7 +441,29 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 			}
 
 			// Check if surface material is valid for this instance type
-			if (SurfaceZ < 0 || !Asset->ValidSurfaces.Contains(SurfaceMaterial))
+			if (SurfaceZ < 0)
+			{
+				continue;
+			}
+
+			// If no valid surfaces configured, default to spawning on grass and stone
+			static bool bLoggedValidSurfaces = false;
+			if (Asset->ValidSurfaces.Num() == 0)
+			{
+				// Log once per asset type
+				if (!bLoggedValidSurfaces)
+				{
+					UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: %s has no ValidSurfaces configured, defaulting to Grass and Stone"),
+						*Asset->GetName());
+					bLoggedValidSurfaces = true;
+				}
+				// Default to grass and stone surfaces
+				if (SurfaceMaterial != EMaterial::Grass && SurfaceMaterial != EMaterial::Stone)
+				{
+					continue;
+				}
+			}
+			else if (!Asset->ValidSurfaces.Contains(SurfaceMaterial))
 			{
 				continue;
 			}
@@ -326,7 +482,7 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 			}
 
 			// Ensure there's enough space based on asset configuration
-			if (VoidAboveSurface < Asset->RequiredVoidSpace)
+			if (VoidAboveSurface < RequiredVoidSpace)
 			{
 				continue;
 			}
@@ -337,7 +493,7 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 			for (const FVector2D& PlacedPos : PlacedPositions)
 			{
 				const float DistanceSquared = FVector2D::DistSquared(CurrentPos, PlacedPos);
-				if (DistanceSquared < Asset->MinSpacing * Asset->MinSpacing)
+				if (DistanceSquared < MinSpacing * MinSpacing)
 				{
 					bTooClose = true;
 					break;
@@ -357,7 +513,7 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 			const FRotator Rotation(0.0f, RandomYaw, 0.0f);
 
 			// Random scale variation based on asset configuration
-			const float ScaleVariation = RandomStream.FRandRange(Asset->MinScale, Asset->MaxScale);
+			const float ScaleVariation = RandomStream.FRandRange(MinScale, MaxScale);
 			const FVector Scale(ScaleVariation, ScaleVariation, ScaleVariation);
 
 			// Create instance with transform and asset reference
@@ -368,6 +524,12 @@ void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset
 
 			PlacedPositions.Add(CurrentPos);
 		}
+	}
+
+	if (OutInstances.Num() > 0)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Generated %d instances of %s for chunk (%d,%d)"),
+			OutInstances.Num(), *Asset->GetName(), Position.X, Position.Y);
 	}
 }
 
