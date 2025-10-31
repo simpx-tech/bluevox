@@ -19,20 +19,23 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 		return;
 	}
 
-	
 	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	FBufferArchive Uncompressed;
 	Uncompressed << ChunkData->Columns;
 
-	// Serialize instances
-	int32 NumCollections = ChunkData->InstanceCollections.Num();
-	Uncompressed << NumCollections;
-
-	for (auto& Pair : ChunkData->InstanceCollections)
+	// Serialize entities (flatten TSparseArray)
+	TArray<FEntityRecord> EntitiesArray;
+	EntitiesArray.Reserve(ChunkData->Entities.Num());
+	for (const FEntityRecord& Rec : ChunkData->Entities)
 	{
-		FInstanceCollection& Collection = Pair.Value;
-		Uncompressed << Collection;
+		EntitiesArray.Add(Rec);
+	}
+	int32 NumEntities = EntitiesArray.Num();
+	Uncompressed << NumEntities;
+	for (FEntityRecord& Rec : EntitiesArray)
+	{
+		Uncompressed << Rec;
 	}
 
 	TArray<uint8> Compressed;
@@ -53,13 +56,13 @@ void FRegionFile::Th_SaveChunk(const FLocalChunkPosition& Position, UChunkData* 
 }
 
 bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-                                TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances)
+                                TArray<FEntityRecord>& OutEntities)
 {
 	const uint32 Index = Position.X + Position.Y * GameConstants::Region::Size;
 
 	TArray<uint8> Compressed;
 	if (!Th_ReadSegment(Index, Compressed)) return false;
-	if (Compressed.Num() == 0) { OutColumns.Reset(); OutInstances.Empty(); return false; }
+	if (Compressed.Num() == 0) { OutColumns.Reset(); return false; }
 
 	FArchiveLoadCompressedProxy Decompressor(Compressed, NAME_Zlib);
 	if (Decompressor.GetError())
@@ -81,25 +84,20 @@ bool FRegionFile::Th_LoadChunk(const FLocalChunkPosition& Position, TArray<FChun
 	FMemoryReader Reader(Uncompressed, true);
 	Reader << OutColumns;
 
-	// Load instances if available (for backwards compatibility with old saves)
+	// Load entities
+	OutEntities.Empty();
 	if (!Reader.AtEnd())
 	{
-		int32 NumCollections = 0;
-		Reader << NumCollections;
-
-		OutInstances.Empty();
-		for (int32 i = 0; i < NumCollections; ++i)
+		int32 NumEntities = 0;
+		Reader << NumEntities;
+		OutEntities.SetNum(NumEntities);
+		for (int32 i = 0; i < NumEntities; ++i)
 		{
-			FInstanceCollection Collection;
-			Reader << Collection;
-			OutInstances.Add(Collection.InstanceTypeId, Collection);
+			Reader << OutEntities[i];
+			OutEntities[i].ArrayIndex = i; // assign stable index matching position in array
 		}
 	}
-	else
-	{
-		OutInstances.Empty();
-	}
-
+	
 	return !Reader.IsError();
 }
 

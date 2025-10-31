@@ -10,8 +10,11 @@
 #include "Bluevox/Chunk/VirtualMap/ChunkTaskManager.h"
 #include "Bluevox/Chunk/VirtualMap/VirtualMap.h"
 #include "Bluevox/Tick/TickManager.h"
+#include "Bluevox/Entity/EntityConversionSystem.h"
 #include "GameRules/GameRule.h"
 #include "Kismet/GameplayStatics.h"
+#include "Engine/AssetManager.h"
+#include "Engine/AssetManagerTypes.h"
 
 
 // Sets default values
@@ -46,6 +49,12 @@ void AGameManager::BeginPlay()
 
 	TickManager = NewObject<UTickManager>(this, TEXT("TickManager"))->Init();
 
+	// Create entity conversion system on server only
+	if (bServer)
+	{
+		EntityConversionSystem = NewObject<UEntityConversionSystem>(this, TEXT("EntityConversionSystem"))->Init(this);
+	}
+	
 	const auto Controller = UGameplayStatics::GetPlayerController(GetWorld(), 0);
 	LocalController = Cast<AMainController>(Controller);
 	LocalPlayerId = LocalController ? LocalController->Id : 0;
@@ -67,5 +76,16 @@ void AGameManager::BeginPlay()
 	}
 
 	bInitialized = true;
+
+	FPrimaryAssetTypeInfo Info;
+	const bool bHasType = UAssetManager::Get().GetPrimaryAssetTypeInfo(FPrimaryAssetType("InstanceType"), Info);
+	UE_LOG(LogTemp, Warning, TEXT("[AM] HasType=%d"), bHasType ? 1 : 0);
+	TArray<FPrimaryAssetId> AllIds;
+	UAssetManager::Get().GetPrimaryAssetIdList(FPrimaryAssetType("InstanceType"), AllIds);
+	UE_LOG(LogTemp, Warning, TEXT("[AM] InstanceType IDs: %d"), AllIds.Num());
+	for (const FPrimaryAssetId& Id : AllIds)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[AM] ID: %s"), *Id.ToString());
+	}
 }
 

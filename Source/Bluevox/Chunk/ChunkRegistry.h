@@ -6,6 +6,7 @@
 #include "Position/RegionPosition.h"
 #include "Position/ChunkPosition.h"
 #include "UObject/Object.h"
+#include "Bluevox/Entity/EntityTypes.h"
 #include "ChunkRegistry.generated.h"
 
 struct FPiece;
@@ -87,7 +88,7 @@ public:
 	// TODO should not use Th_LoadRegionFile, instead use a Th_GetRegionFile and discard immediately
 	UFUNCTION()
 	bool Th_FetchChunkDataFromDisk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-	                                TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances);
+	                                TArray<FEntityRecord>& OutEntities);
 	
 	UFUNCTION()
 	bool Th_HasChunkData(const FChunkPosition& Position);

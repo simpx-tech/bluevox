@@ -16,6 +16,7 @@ class UChunkRegistry;
 class AMainCharacter;
 class AMainController;
 class UVirtualMap;
+class UEntityConversionSystem;
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnPlayerJoin, AMainController*, PlayerController);
 
@@ -89,6 +90,10 @@ public:
 
 	UPROPERTY(EditAnywhere, Category = "Game")
 	UTickManager* TickManager = nullptr;
+
+	// Entity/Instance conversion system (server-only)
+	UPROPERTY(EditAnywhere, Category = "Game")
+	class UEntityConversionSystem* EntityConversionSystem = nullptr;
 
 	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Game")
 	AMainController* LocalController = nullptr;

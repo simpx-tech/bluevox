@@ -5,11 +5,14 @@
 
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/GameConstants.h"
+#include "Bluevox/Entity/EntityTypes.h"
 
 void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
-                                        TArray<FChunkColumn>& OutColumns) const
+                                        TArray<FChunkColumn>& OutColumns,
+                                        TArray<FEntityRecord>& OutEntities) const
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
+	OutEntities.Empty(); // FlatWorldGenerator doesn't generate entities
 
 	// const auto ShapeId = GameManager->ShapeRegistry->GetShapeIdByName(ShapeName);
 

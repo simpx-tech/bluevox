@@ -7,9 +7,10 @@
 
 FPrimaryAssetId UInstanceTypeDataAsset::GetPrimaryAssetId() const
 {
-	return FPrimaryAssetId("InstanceType", GetFName());
+	return FPrimaryAssetId(TEXT("InstanceType"), GetFName());
 }
 
+#if WITH_EDITOR
 void UInstanceTypeDataAsset::PostEditChangeProperty(FPropertyChangedEvent& PropertyChangedEvent)
 {
 	Super::PostEditChangeProperty(PropertyChangedEvent);
@@ -32,3 +33,4 @@ void UInstanceTypeDataAsset::PostEditChangeProperty(FPropertyChangedEvent& Prope
 		MarkPackageDirty();
 	}
 }
+#endif

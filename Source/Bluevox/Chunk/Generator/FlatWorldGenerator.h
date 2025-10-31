@@ -27,7 +27,7 @@ public:
 	UPROPERTY(EditAnywhere)
 	EMaterial Shape;
 	
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) const override;
 
 	virtual void Serialize(FArchive& Ar) override;
 };

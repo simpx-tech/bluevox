@@ -33,10 +33,17 @@ void UChunkTaskManager::Sv_ProcessPendingNetSend(const FPendingNetSendChunks& Pe
 		}
 
 		UChunkData* ChunkData = GameManager->ChunkRegistry->Th_GetChunkData(ChunkPosition);
+		// Flatten entities to an array for network
+		TArray<FEntityRecord> EntitiesArray;
+		EntitiesArray.Reserve(ChunkData->Entities.Num());
+		for (const FEntityRecord& Rec : ChunkData->Entities)
+		{
+			EntitiesArray.Add(Rec);
+		}
 		DataToSend.Add(FChunkDataWithPosition{
 			ChunkPosition,
 			ChunkData->Columns,
-			ChunkData->InstanceCollections
+			MoveTemp(EntitiesArray)
 		});
 	}
 
@@ -82,7 +89,7 @@ void UChunkTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Pa
 		}
 
 		auto* ChunkDataObject = NewObject<UChunkData>(ChunkRegistry);
-		ChunkDataObject->Init(GameManager, ChunkPosition, MoveTemp(ChunkData.Columns), MoveTemp(ChunkData.Instances));
+		ChunkDataObject->Init(GameManager, ChunkPosition, MoveTemp(ChunkData.Columns), MoveTemp(ChunkData.Entities));
 		ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkDataObject);
 
 		// Prevent stuttering the game
@@ -90,7 +97,7 @@ void UChunkTaskManager::HandleChunkDataNetworkPacket(UChunkDataNetworkPacket* Pa
 		{
 			if (!ProcessingUnload.Contains(ChunkPosition))
 			{
-				ChunkRegistry->SpawnChunk(ChunkPosition);	
+				ChunkRegistry->SpawnChunk(ChunkPosition);
 			}
 		});
 	}
@@ -119,12 +126,12 @@ void UChunkTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 			GameManager->TickManager->RunAsyncThen([this, ChunkPosition]
 			{
 				FLoadResult LoadResult;
-				LoadResult.bSuccess = GameManager->ChunkRegistry->Th_FetchChunkDataFromDisk(ChunkPosition, LoadResult.Columns, LoadResult.Instances);
+				LoadResult.bSuccess = GameManager->ChunkRegistry->Th_FetchChunkDataFromDisk(ChunkPosition, LoadResult.Columns, LoadResult.Entities);
 
 				if (!LoadResult.bSuccess)
 				{
 					// TODO would re-generate chunk if fail to load from disk, is that a good idea?
-					GameManager->WorldSave->WorldGenerator->GenerateChunk(ChunkPosition, LoadResult.Columns, LoadResult.Instances);
+					GameManager->WorldSave->WorldGenerator->GenerateChunk(ChunkPosition, LoadResult.Columns, LoadResult.Entities);
 				}
 
 				return MoveTemp(LoadResult);
@@ -134,7 +141,8 @@ void UChunkTaskManager::ScheduleLoad(const TSet<FChunkPosition>& ChunksToLoad)
 
 				if (ProcessingLoad.FindRef(ChunkPosition) == true)
 				{
-					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry)->Init(GameManager, ChunkPosition, MoveTemp(Result.Columns), MoveTemp(Result.Instances));
+					const auto ChunkData = NewObject<UChunkData>(GameManager->ChunkRegistry)->Init(
+     					GameManager, ChunkPosition, MoveTemp(Result.Columns), MoveTemp(Result.Entities));
 					GameManager->ChunkRegistry->Th_RegisterChunk(ChunkPosition, ChunkData);
 
 					if (PendingPacketsByPosition.Contains(ChunkPosition))

@@ -53,8 +53,179 @@ AChunk* AChunk::Init(const FChunkPosition InPosition, AGameManager* InGameManage
 	Position = InPosition;
 	GameManager = InGameManager;
 	ChunkData = InData;
-	
+
 	return this;
+}
+
+void AChunk::InitialSpawnInstancesFromEntities()
+{
+	if (!ChunkData || !GameManager) return;
+
+	if (GameManager->bClientOnly)
+	{
+		UE_LOG(LogChunk, Verbose, TEXT("[InstanceSpawn] Client only, skipping instance spawn"));
+	}
+
+	// Only spawn instances once per chunk
+	if (bInstancesSpawned)
+	{
+		UE_LOG(LogChunk, Verbose, TEXT("[InstanceSpawn] Instances already spawned for chunk %s, skipping"),
+		       *Position.ToString());
+		return;
+	}
+
+	FWriteScopeLock WriteLock(ChunkData->Lock);
+
+	UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Checking entities for chunk %s. Total entities: %d"),
+	       *Position.ToString(), ChunkData->Entities.Num());
+
+	// Group entities by instance type for batching
+	TMap<FPrimaryAssetId, TArray<int32>> EntitiesToSpawnByType; // TypeId -> Array of EntityIndices
+
+	// First pass: collect entities to spawn, grouped by type
+	for (auto It = ChunkData->Entities.CreateIterator(); It; ++It)
+	{
+		const int32 EntityIndex = It.GetIndex();
+		FEntityRecord& Entity = *It;
+
+		// Skip entities that are already converted to facades
+		if (Entity.bIsConvertedToEntity)
+			continue;
+
+		// Skip if already has an instance index
+		if (Entity.InstanceIndex != INDEX_NONE)
+			continue;
+
+		// Add to batch for this type
+		EntitiesToSpawnByType.FindOrAdd(Entity.InstanceTypeId).Add(EntityIndex);
+	}
+
+	UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Found %d instance types to spawn in chunk %s"),
+	       EntitiesToSpawnByType.Num(), *Position.ToString());
+
+	// Second pass: process each instance type in batch
+	for (const auto& Pair : EntitiesToSpawnByType)
+	{
+		const FPrimaryAssetId& TypeId = Pair.Key;
+		const TArray<int32>& EntityIndices = Pair.Value;
+
+		if (EntityIndices.Num() == 0)
+			continue;
+
+		UAssetManager& AM = UAssetManager::Get();
+		UE_LOG(LogTemp, Warning, TEXT("[InstanceSpawn] AM init=%d, TypeId=%s, Type=%s, Name=%s"),
+			AM.IsInitialized() ? 1 : 0,
+			*TypeId.ToString(), *TypeId.PrimaryAssetType.ToString(), *TypeId.PrimaryAssetName.ToString());
+
+		TArray<FPrimaryAssetId> AllIds;
+		AM.GetPrimaryAssetIdList(FPrimaryAssetType("InstanceType"), AllIds);
+		UE_LOG(LogTemp, Warning, TEXT("[InstanceSpawn] Known InstanceType IDs: %d"), AllIds.Num());
+		for (const FPrimaryAssetId& Id : AllIds)
+		{
+			UE_LOG(LogTemp, Verbose, TEXT("  - %s"), *Id.ToString());
+		}
+
+		const FSoftObjectPath Path = AM.GetPrimaryAssetPath(TypeId);
+		UE_LOG(LogTemp, Warning, TEXT("[InstanceSpawn] Path for %s = %s (IsNull=%d, IsValid=%d)"),
+			*TypeId.ToString(), *Path.ToString(), Path.IsNull() ? 1 : 0, Path.IsValid() ? 1 : 0);
+		
+		// Resolve InstanceType asset from PrimaryAssetId
+		UInstanceTypeDataAsset* InstanceType = nullptr;
+		{
+			UAssetManager& AssetManager = UAssetManager::Get();
+			const FSoftObjectPath AssetPath = AssetManager.GetPrimaryAssetPath(TypeId);
+			if (AssetPath.IsValid())
+			{
+				UObject* LoadedObj = AssetPath.ResolveObject();
+				if (!LoadedObj)
+				{
+					LoadedObj = AssetManager.GetStreamableManager().LoadSynchronous(AssetPath, false);
+				}
+				InstanceType = Cast<UInstanceTypeDataAsset>(LoadedObj);
+			}
+		}
+		
+		if (!InstanceType)
+		{
+			UE_LOG(LogChunk, Warning, TEXT("[InstanceSpawn] Instance type %s could not be loaded for chunk %s"),
+			       *TypeId.ToString(), *Position.ToString());
+			continue;
+		}
+
+		UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Found InstanceType %s in registry, Mesh: %s"),
+		       *TypeId.ToString(), InstanceType->StaticMesh ? *InstanceType->StaticMesh->GetName() : TEXT("NULL"));
+
+		// Get or create HISM component for this instance type
+		UHierarchicalInstancedStaticMeshComponent* HISM = nullptr;
+
+		if (ChunkInstanceComponents.Contains(TypeId))
+		{
+			HISM = ChunkInstanceComponents[TypeId];
+		}
+		else
+		{
+			// Create new HISM component
+			HISM = NewObject<UHierarchicalInstancedStaticMeshComponent>(this);
+			HISM->SetStaticMesh(InstanceType->StaticMesh);
+			HISM->SetMobility(EComponentMobility::Static);
+			HISM->SetCollisionEnabled(ECollisionEnabled::QueryAndPhysics);
+			HISM->SetCollisionProfileName(UCollisionProfile::BlockAll_ProfileName);
+			HISM->SetCastShadow(true);
+			HISM->bCastDynamicShadow = true;
+			HISM->SetVisibility(true);
+			HISM->SetHiddenInGame(false);
+			HISM->SetupAttachment(RootComponent);
+			HISM->RegisterComponent();
+
+			ChunkInstanceComponents.Add(TypeId, HISM);
+
+			UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Created HISM component for instance type %s in chunk %s. Mesh: %s"),
+			       *TypeId.ToString(), *Position.ToString(),
+			       InstanceType->StaticMesh ? *InstanceType->StaticMesh->GetName() : TEXT("NULL"));
+		}
+
+		if (!HISM)
+			continue;
+
+		// Batch add all instances of this type
+		TArray<FTransform> Transforms;
+		Transforms.Reserve(EntityIndices.Num());
+
+		for (int32 EntityIndex : EntityIndices)
+		{
+			if (ChunkData->Entities.IsValidIndex(EntityIndex))
+			{
+				Transforms.Add(ChunkData->Entities[EntityIndex].Transform);
+			}
+		}
+
+		// Add all instances at once
+		TArray<int32> InstanceIndices = HISM->AddInstances(Transforms, true);
+
+		UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Added %d instances of type %s to HISM (total instances now: %d)"),
+		       Transforms.Num(), *TypeId.ToString(), HISM->GetInstanceCount());
+
+		// Update entity records with their instance indices
+		for (int32 i = 0; i < EntityIndices.Num(); ++i)
+		{
+			const int32 EntityIndex = EntityIndices[i];
+			if (ChunkData->Entities.IsValidIndex(EntityIndex) && InstanceIndices.IsValidIndex(i))
+			{
+				ChunkData->Entities[EntityIndex].InstanceIndex = InstanceIndices[i];
+			}
+		}
+
+		// Make sure HISM is visible
+		HISM->SetVisibility(true);
+		HISM->SetHiddenInGame(false);
+
+		UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Successfully spawned %d instances of type %s in chunk %s. HISM Visible: %s"),
+		       EntityIndices.Num(), *TypeId.ToString(), *Position.ToString(), HISM->IsVisible() ? TEXT("Yes") : TEXT("No"));
+	}
+
+	// Mark instances as spawned
+	bInstancesSpawned = true;
+	UE_LOG(LogChunk, Log, TEXT("[InstanceSpawn] Finished spawning instances for chunk %s"), *Position.ToString());
 }
 
 void AChunk::SetRenderState(const EChunkState State) const
@@ -406,10 +577,75 @@ bool AChunk::BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, bool bForceRender
 	return true;
 }
 
-void AChunk::CommitRender(FRenderResult&& RenderResult) const
+void AChunk::CommitRender(FRenderResult&& RenderResult)
 {
-	UE_LOG(LogChunk, Verbose, TEXT("Committing render for chunk %s"), *Position.ToString());
+	UE_LOG(LogChunk, Log, TEXT("[CommitRender] Committing render for chunk %s"), *Position.ToString());
 	MeshComponent->SetMaterial(0, GameManager->ChunkMaterial);
 	MeshComponent->SetMesh(MoveTemp(RenderResult.Mesh));
+
+	// Spawn instances when chunk is first rendered
+	UE_LOG(LogChunk, Log, TEXT("[CommitRender] Calling SpawnInstancesFromEntities for chunk %s"), *Position.ToString());
+	InitialSpawnInstancesFromEntities();
 }
 
+
+
+// Client-side helpers to sync instances when entities are spawned/despawned
+void AChunk::Cl_RemoveInstance(const FPrimaryAssetId& TypeId, int32 InstanceIndex)
+{
+	UHierarchicalInstancedStaticMeshComponent** CompPtr = ChunkInstanceComponents.Find(TypeId);
+	if (!CompPtr) return;
+	UHierarchicalInstancedStaticMeshComponent* Comp = *CompPtr;
+	if (!IsValid(Comp)) return;
+
+	const int32 Count = Comp->GetInstanceCount();
+	if (InstanceIndex >= 0 && InstanceIndex < Count)
+	{
+		Comp->RemoveInstance(InstanceIndex);
+	}
+}
+
+int32 AChunk::Cl_AddInstance(const FPrimaryAssetId& TypeId, const FTransform& LocalTransform)
+{
+	UHierarchicalInstancedStaticMeshComponent** CompPtr = ChunkInstanceComponents.Find(TypeId);
+	if (!CompPtr) return INDEX_NONE;
+	UHierarchicalInstancedStaticMeshComponent* Comp = *CompPtr;
+	if (!IsValid(Comp)) return INDEX_NONE;
+
+	return Comp->AddInstance(LocalTransform);
+}
+
+void AChunk::Cl_HideInstance(const FPrimaryAssetId& TypeId, int32 InstanceIndex)
+{
+	UHierarchicalInstancedStaticMeshComponent** CompPtr = ChunkInstanceComponents.Find(TypeId);
+	if (!CompPtr) return;
+	UHierarchicalInstancedStaticMeshComponent* Comp = *CompPtr;
+	if (!IsValid(Comp)) return;
+
+	const int32 Count = Comp->GetInstanceCount();
+	if (InstanceIndex >= 0 && InstanceIndex < Count)
+	{
+		// Get the current transform and scale it to zero to hide
+		FTransform InstanceTransform;
+		if (Comp->GetInstanceTransform(InstanceIndex, InstanceTransform, true))
+		{
+			InstanceTransform.SetScale3D(FVector::ZeroVector);
+			Comp->UpdateInstanceTransform(InstanceIndex, InstanceTransform, true, true, true);
+		}
+	}
+}
+
+void AChunk::Cl_ShowInstance(const FPrimaryAssetId& TypeId, int32 InstanceIndex, const FTransform& LocalTransform)
+{
+	UHierarchicalInstancedStaticMeshComponent** CompPtr = ChunkInstanceComponents.Find(TypeId);
+	if (!CompPtr) return;
+	UHierarchicalInstancedStaticMeshComponent* Comp = *CompPtr;
+	if (!IsValid(Comp)) return;
+
+	const int32 Count = Comp->GetInstanceCount();
+	if (InstanceIndex >= 0 && InstanceIndex < Count)
+	{
+		// Restore the original transform to show the instance
+		Comp->UpdateInstanceTransform(InstanceIndex, LocalTransform, false, true, true);
+	}
+}

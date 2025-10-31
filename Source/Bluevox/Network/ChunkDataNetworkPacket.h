@@ -5,8 +5,8 @@
 #include "CoreMinimal.h"
 #include "ClientNetworkPacket.h"
 #include "Bluevox/Chunk/Data/ChunkColumn.h"
-#include "Bluevox/Chunk/Data/InstanceData.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
+#include "Bluevox/Entity/EntityTypes.h"
 #include "ChunkDataNetworkPacket.generated.h"
 
 class UChunkData;
@@ -16,13 +16,11 @@ struct FChunkDataWithPosition
 {
 	GENERATED_BODY()
 
-	FChunkDataWithPosition()
-	{
-	}
+	FChunkDataWithPosition() {}
 
 	FChunkDataWithPosition(const FChunkPosition& InPosition, const TArray<FChunkColumn>& InColumns,
-		const TMap<FPrimaryAssetId, FInstanceCollection>& InInstances)
-		: Position(InPosition), Columns(InColumns), Instances(InInstances)
+		const TArray<FEntityRecord>& InEntities)
+		: Position(InPosition), Columns(InColumns), Entities(InEntities)
 	{
 	}
 
@@ -33,13 +31,13 @@ struct FChunkDataWithPosition
 	TArray<FChunkColumn> Columns;
 
 	UPROPERTY()
-	TMap<FPrimaryAssetId, FInstanceCollection> Instances;
+	TArray<FEntityRecord> Entities;
 
 	friend FArchive& operator<<(FArchive& Ar, FChunkDataWithPosition& Data)
 	{
 		Ar << Data.Position;
 		Ar << Data.Columns;
-		Ar << Data.Instances;
+		Ar << Data.Entities;
 		return Ar;
 	}
 };

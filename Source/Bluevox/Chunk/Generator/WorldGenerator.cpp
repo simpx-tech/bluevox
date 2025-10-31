@@ -4,6 +4,7 @@
 #include "WorldGenerator.h"
 
 #include "Bluevox/Chunk/Data/ChunkData.h"
+#include "Bluevox/Entity/EntityTypes.h"
 
 UWorldGenerator* UWorldGenerator::Init(AGameManager* InGameManager)
 {
@@ -12,7 +13,8 @@ UWorldGenerator* UWorldGenerator::Init(AGameManager* InGameManager)
 }
 
 void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
-                                    TArray<FChunkColumn>& OutColumns) const
+                                    TArray<FChunkColumn>& OutColumns,
+                                    TArray<FEntityRecord>& OutEntities) const
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
@@ -29,12 +31,7 @@ void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
 			});
 		}
 	}
-}
 
-void UWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-                                    TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const
-{
-	// Default implementation just generates columns, no instances
-	GenerateChunk(Position, OutColumns);
-	OutInstances.Empty();
+	// Base implementation doesn't generate entities
+	OutEntities.Empty();
 }

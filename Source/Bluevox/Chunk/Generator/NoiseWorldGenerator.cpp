@@ -7,8 +7,8 @@
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Data/InstanceTypeDataAsset.h"
+#include "Bluevox/Entity/EntityTypes.h"
 #include "FastNoiseWrapper.h"
-#include "Engine/AssetManager.h"
 
 UNoiseWorldGenerator::UNoiseWorldGenerator()
 {
@@ -116,14 +116,7 @@ UNoiseWorldGenerator::UNoiseWorldGenerator()
 	);
 }
 
-void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const
-{
-	TMap<FPrimaryAssetId, FInstanceCollection> DummyInstances;
-	GenerateChunk(Position, OutColumns, DummyInstances);
-}
-
-void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-                                         TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const
+void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<FEntityRecord>& OutEntities) const
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 
@@ -224,313 +217,125 @@ void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<
 		}
 	}
 
-	// Generate instances after terrain generation
-	GenerateInstances(Position, OutColumns, OutInstances);
-}
+	// Generate instances
+	OutEntities.Empty();
 
-UWorldGenerator* UNoiseWorldGenerator::Init(AGameManager* InGameManager)
-{
-	// Call parent Init
-	Super::Init(InGameManager);
-
-	UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - Starting initialization with %d instance types to generate"),
-		InstanceTypesToGenerate.Num());
-
-	// If no instance types are configured, try to add default ones
-	if (InstanceTypesToGenerate.Num() == 0)
+	if (InstanceTypes.Num() == 0 || MaxInstancesPerChunk <= 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - No instance types configured, adding default Instance_Tree"));
-
-		// Try the standard path for Instance_Tree
-		TSoftObjectPtr<UInstanceTypeDataAsset> TreeAsset(FSoftObjectPath(TEXT("/Game/Data/Instances/Instance_Tree.Instance_Tree")));
-		InstanceTypesToGenerate.Add(TreeAsset);
-
-		// Try loading it to verify
-		UInstanceTypeDataAsset* LoadedAsset = TreeAsset.LoadSynchronous();
-		if (LoadedAsset)
-		{
-			UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - Successfully added and verified Instance_Tree asset"));
-		}
-		else
-		{
-			UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator::Init - Failed to load Instance_Tree asset, instance generation will not work!"));
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::Init - Found %d instance types already configured"),
-			InstanceTypesToGenerate.Num());
+		return; // No instances to generate
 	}
 
-	// Preload all instance assets on the main thread
-	PreloadInstanceAssets();
+	// Use a deterministic random seed based on chunk position
+	FRandomStream RandomStream(Position.X * 73856093 ^ Position.Y * 19349663 ^ 83492791);
 
-	return this;
-}
+	int32 InstancesGenerated = 0;
 
-
-void UNoiseWorldGenerator::PreloadInstanceAssets()
-{
-	LoadedInstanceTypes.Empty();
-
-	// Preload all instance type assets on the game thread
-	for (const auto& AssetPtr : InstanceTypesToGenerate)
+	// Try to place instances at random positions
+	for (int32 Attempt = 0; Attempt < MaxInstancesPerChunk * 10 && InstancesGenerated < MaxInstancesPerChunk; ++Attempt)
 	{
-		if (AssetPtr.IsValid())
+		// Random position within chunk
+		const int32 X = RandomStream.RandRange(1, GameConstants::Chunk::Size - 2);
+		const int32 Y = RandomStream.RandRange(1, GameConstants::Chunk::Size - 2);
+
+		const int32 Index = UChunkData::GetIndex(X, Y);
+		const int32 TerrainHeight = FMath::RoundToInt(Heights[Index]);
+
+		// Skip underwater positions
+		if (TerrainHeight < SeaLevel)
+			continue;
+
+		// Get biome info for this position
+		const float WorldX = X + Position.X * GameConstants::Chunk::Size;
+		const float WorldY = Y + Position.Y * GameConstants::Chunk::Size;
+		const float Temperature = GetTemperature(WorldX, WorldY, TerrainHeight);
+		const float Precipitation = GetPrecipitation(WorldX, WorldY);
+		const EBiomeType Biome = GetBiome(Temperature, Precipitation);
+
+		// Get the surface material at this position
+		EMaterial SurfaceMaterial = GetMaterialForBiome(TerrainHeight, Biome, Temperature, Precipitation, false);
+
+		// Try to find a suitable instance type for this position
+		TArray<UInstanceTypeDataAsset*> ValidInstances;
+
+		for (UInstanceTypeDataAsset* InstanceType : InstanceTypes)
 		{
-			UInstanceTypeDataAsset* Asset = AssetPtr.LoadSynchronous();
-			if (Asset)
-			{
-				LoadedInstanceTypes.Add(Asset);
-				UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Preloaded instance asset %s"),
-					*Asset->GetName());
-			}
-			else
-			{
-				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator: Failed to preload instance asset"));
-			}
-		}
-	}
-
-	UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Preloaded %d instance type assets"),
-		LoadedInstanceTypes.Num());
-}
-
-void UNoiseWorldGenerator::GenerateInstances(const FChunkPosition& Position, const TArray<FChunkColumn>& Columns,
-                                             TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const
-{
-	OutInstances.Empty();
-
-	// If LoadedInstanceTypes is empty (e.g., on background thread), load from InstanceTypesToGenerate
-	if (LoadedInstanceTypes.Num() == 0 && InstanceTypesToGenerate.Num() > 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - LoadedInstanceTypes is empty, loading %d instance types directly"),
-			InstanceTypesToGenerate.Num());
-
-		for (const auto& AssetPtr : InstanceTypesToGenerate)
-		{
-			UInstanceTypeDataAsset* Asset = AssetPtr.LoadSynchronous();
-			if (!Asset)
-			{
-				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator::GenerateInstances - Failed to load instance asset"));
+			if (!InstanceType)
 				continue;
-			}
 
-			FPrimaryAssetId AssetId = Asset->GetPrimaryAssetId();
-			if (!AssetId.IsValid())
+			// Check if this instance can spawn on this surface
+			if (InstanceType->ValidSurfaces.Contains(SurfaceMaterial))
 			{
-				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator: Asset %s has invalid PrimaryAssetId!"),
-					*Asset->GetName());
-				continue;
-			}
-
-			// Create collection for this instance type
-			FInstanceCollection& Collection = OutInstances.FindOrAdd(AssetId);
-			Collection.InstanceTypeId = AssetId;
-
-			// Generate instances for this type
-			GenerateInstancesOfType(Asset, Position, Columns, Collection.Instances);
-
-			// Rebuild cache for efficient rendering
-			Collection.RebuildTransformCache();
-
-			UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - Generated %d instances of %s for chunk (%d,%d)"),
-				Collection.Instances.Num(), *Asset->GetName(), Position.X, Position.Y);
-		}
-	}
-	else
-	{
-		UE_LOG(LogTemp, VeryVerbose, TEXT("NoiseWorldGenerator::GenerateInstances - Generating for chunk (%d,%d) with %d loaded instance types"),
-			Position.X, Position.Y, LoadedInstanceTypes.Num());
-
-		// Process each preloaded instance type (thread-safe)
-		for (UInstanceTypeDataAsset* Asset : LoadedInstanceTypes)
-		{
-			if (!Asset)
-			{
-				continue;
-			}
-
-			FPrimaryAssetId AssetId = Asset->GetPrimaryAssetId();
-			if (!AssetId.IsValid())
-			{
-				UE_LOG(LogTemp, Error, TEXT("NoiseWorldGenerator: Asset %s has invalid PrimaryAssetId!"),
-					*Asset->GetName());
-				continue;
-			}
-
-			// Create collection for this instance type
-			FInstanceCollection& Collection = OutInstances.FindOrAdd(AssetId);
-			Collection.InstanceTypeId = AssetId;
-
-			// Generate instances for this type
-			GenerateInstancesOfType(Asset, Position, Columns, Collection.Instances);
-
-			// Rebuild cache for efficient rendering
-			Collection.RebuildTransformCache();
-		}
-	}
-
-	if (OutInstances.Num() > 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - Total %d instance collections generated for chunk (%d,%d)"),
-			OutInstances.Num(), Position.X, Position.Y);
-	}
-	else
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator::GenerateInstances - No instances generated for chunk (%d,%d)"),
-			Position.X, Position.Y);
-	}
-}
-
-void UNoiseWorldGenerator::GenerateInstancesOfType(UInstanceTypeDataAsset* Asset, const FChunkPosition& Position,
-                                                   const TArray<FChunkColumn>& Columns, TArray<FInstanceData>& OutInstances) const
-{
-	if (!Asset)
-	{
-		return;
-	}
-
-	UE_LOG(LogTemp, VeryVerbose, TEXT("NoiseWorldGenerator::GenerateInstancesOfType - Generating %s for chunk (%d,%d)"),
-		*Asset->GetName(), Position.X, Position.Y);
-
-	// Use position-based seed for deterministic random generation
-	const int32 Seed = Position.X * 73856093 + Position.Y * 19349663 + GetTypeHash(Asset->GetPrimaryAssetId());
-	FRandomStream RandomStream(Seed);
-
-	// Apply sensible defaults if not configured
-	const float SpawnChance = Asset->SpawnChance > 0 ? Asset->SpawnChance : 0.05f;  // 5% default spawn chance
-	const float MinSpacing = Asset->Radius > 0 ? Asset->Radius : 3.0f;      // 3 units minimum spacing
-	const int32 RequiredVoidSpace = Asset->Height > 0 ? Asset->Height : 5; // 5 blocks void space
-	const float MinScale = Asset->MinScale > 0 ? Asset->MinScale : 0.8f;
-	const float MaxScale = Asset->MaxScale > 0 ? Asset->MaxScale : 1.2f;
-
-	UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Generating %s with SpawnChance=%.2f, MinSpacing=%.1f, RequiredVoidSpace=%d"),
-		*Asset->GetName(), SpawnChance, MinSpacing, RequiredVoidSpace);
-
-	// Track placed instance positions for collision detection
-	TArray<FVector2D> PlacedPositions;
-
-	for (int32 X = 0; X < GameConstants::Chunk::Size; ++X)
-	{
-		for (int32 Y = 0; Y < GameConstants::Chunk::Size; ++Y)
-		{
-			// Random chance to spawn based on asset configuration
-			if (RandomStream.FRand() > SpawnChance)
-			{
-				continue;
-			}
-
-			const int32 Index = UChunkData::GetIndex(X, Y);
-			const FChunkColumn& Column = Columns[Index];
-
-			// Find the surface (first non-void from top)
-			int32 SurfaceZ = -1;
-			int32 CurrentZ = 0;
-			EMaterial SurfaceMaterial = EMaterial::Void;
-
-			for (const FPiece& Piece : Column.Pieces)
-			{
-				if (Piece.MaterialId != EMaterial::Void)
+				// Check spawn chance
+				if (RandomStream.FRand() < InstanceType->SpawnChance)
 				{
-					// This is a solid piece, the top of it is the surface
-					SurfaceZ = CurrentZ + Piece.Size;
-					SurfaceMaterial = Piece.MaterialId;
-				}
-				CurrentZ += Piece.Size;
-			}
-
-			// Check if surface material is valid for this instance type
-			if (SurfaceZ < 0)
-			{
-				continue;
-			}
-
-			// If no valid surfaces configured, default to spawning on grass and stone
-			static bool bLoggedValidSurfaces = false;
-			if (Asset->ValidSurfaces.Num() == 0)
-			{
-				// Log once per asset type
-				if (!bLoggedValidSurfaces)
-				{
-					UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: %s has no ValidSurfaces configured, defaulting to Grass and Stone"),
-						*Asset->GetName());
-					bLoggedValidSurfaces = true;
-				}
-				// Default to grass and stone surfaces
-				if (SurfaceMaterial != EMaterial::Grass && SurfaceMaterial != EMaterial::Stone)
-				{
-					continue;
+					ValidInstances.Add(InstanceType);
 				}
 			}
-			else if (!Asset->ValidSurfaces.Contains(SurfaceMaterial))
-			{
-				continue;
-			}
-
-			// Check if there's enough space above
-			int32 VoidAboveSurface = 0;
-			CurrentZ = 0;
-			for (const FPiece& Piece : Column.Pieces)
-			{
-				if (CurrentZ >= SurfaceZ && Piece.MaterialId == EMaterial::Void)
-				{
-					VoidAboveSurface = Piece.Size;
-					break;
-				}
-				CurrentZ += Piece.Size;
-			}
-
-			// Ensure there's enough space based on asset configuration
-			if (VoidAboveSurface < RequiredVoidSpace)
-			{
-				continue;
-			}
-
-			// Check collision with existing instances
-			const FVector2D CurrentPos(X, Y);
-			bool bTooClose = false;
-			for (const FVector2D& PlacedPos : PlacedPositions)
-			{
-				const float DistanceSquared = FVector2D::DistSquared(CurrentPos, PlacedPos);
-				if (DistanceSquared < MinSpacing * MinSpacing)
-				{
-					bTooClose = true;
-					break;
-				}
-			}
-
-			if (bTooClose)
-			{
-				continue;
-			}
-
-			// Create instance at the surface
-			const FVector Location(X, Y, SurfaceZ);
-
-			// Random rotation around Z axis
-			const float RandomYaw = RandomStream.FRand() * 360.0f;
-			const FRotator Rotation(0.0f, RandomYaw, 0.0f);
-
-			// Random scale variation based on asset configuration
-			const float ScaleVariation = RandomStream.FRandRange(MinScale, MaxScale);
-			const FVector Scale(ScaleVariation, ScaleVariation, ScaleVariation);
-
-			// Create instance with transform and asset reference
-			FTransform Transform(Rotation, Location, Scale);
-			// Create TSoftObjectPtr from asset path rather than loaded asset
-			TSoftObjectPtr<UInstanceTypeDataAsset> AssetRef(FSoftObjectPath(Asset->GetPathName()));
-			OutInstances.Add(FInstanceData(Transform, AssetRef));
-
-			PlacedPositions.Add(CurrentPos);
 		}
+
+		if (ValidInstances.Num() == 0)
+			continue;
+
+		// Select random instance from valid ones
+		UInstanceTypeDataAsset* SelectedInstance = ValidInstances[RandomStream.RandRange(0, ValidInstances.Num() - 1)];
+
+		// Check spacing requirements (ensure instances don't overlap)
+		bool bCanPlace = true;
+		const float RequiredSpacing = SelectedInstance->Radius * GameConstants::Scaling::XYWorldSize;
+		const float RequiredSpacingLocal = SelectedInstance->Radius;
+
+		for (const FEntityRecord& ExistingEntity : OutEntities)
+		{
+			FVector ExistingPos = ExistingEntity.Transform.GetLocation();
+			float DistX = FMath::Abs((X * GameConstants::Scaling::XYWorldSize) - ExistingPos.X);
+			float DistY = FMath::Abs((Y * GameConstants::Scaling::XYWorldSize) - ExistingPos.Y);
+
+			if (DistX < RequiredSpacing && DistY < RequiredSpacing)
+			{
+				bCanPlace = false;
+				break;
+			}
+		}
+
+		if (!bCanPlace)
+			continue;
+
+		// Create entity record for this instance
+		FEntityRecord NewEntity;
+
+		// Random rotation around Z axis
+		float RandomYaw = RandomStream.FRandRange(0.0f, 360.0f);
+
+		// Random scale within defined range
+		float RandomScale = RandomStream.FRandRange(SelectedInstance->MinScale, SelectedInstance->MaxScale);
+
+		// Set transform (local to chunk)
+		FVector LocalPosition(
+			X * GameConstants::Scaling::XYWorldSize,
+			Y * GameConstants::Scaling::XYWorldSize,
+			TerrainHeight * GameConstants::Scaling::ZWorldSize
+		);
+
+		NewEntity.Transform = FTransform(
+			FRotator(0.0f, RandomYaw, 0.0f),
+			LocalPosition,
+			FVector(RandomScale)
+		);
+
+		// Set the instance type
+		NewEntity.InstanceTypeId = SelectedInstance->GetPrimaryAssetId();
+
+		// Instance index will be assigned when added to HISM component
+		NewEntity.InstanceIndex = INDEX_NONE;
+
+		// Add to entities array
+		const auto ArrayIndex = OutEntities.Add(NewEntity);
+		OutEntities[ArrayIndex].ArrayIndex = ArrayIndex;
+		
+		InstancesGenerated++;
 	}
 
-	if (OutInstances.Num() > 0)
-	{
-		UE_LOG(LogTemp, Warning, TEXT("NoiseWorldGenerator: Generated %d instances of %s for chunk (%d,%d)"),
-			OutInstances.Num(), *Asset->GetName(), Position.X, Position.Y);
-	}
+	UE_LOG(LogTemp, Verbose, TEXT("Generated %d instances for chunk %s"), InstancesGenerated, *Position.ToString());
 }
 
 float UNoiseWorldGenerator::GetTerrainHeight(float WorldX, float WorldY) const

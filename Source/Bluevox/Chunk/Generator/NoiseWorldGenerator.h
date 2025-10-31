@@ -86,26 +86,15 @@ class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "-0.5", ClampMax = "0.5"))
 	float LandBias = 0.3f;  // Positive bias to favor land over water
 
-	// Instance types to generate
-	UPROPERTY(EditAnywhere, Category = "Instances", meta = (AllowAbstract = "false"))
-	TArray<TSoftObjectPtr<class UInstanceTypeDataAsset>> InstanceTypesToGenerate;
+	// Instance generation
+	UPROPERTY(EditAnywhere, Category = "Instances")
+	TArray<class UInstanceTypeDataAsset*> InstanceTypes;
 
-	// Cached loaded instance type assets for thread-safe access
-	UPROPERTY()
-	TArray<class UInstanceTypeDataAsset*> LoadedInstanceTypes;
+	UPROPERTY(EditAnywhere, Category = "Instances", meta = (ClampMin = "1", ClampMax = "100"))
+	int32 MaxInstancesPerChunk = 20;  // Maximum instances to spawn per chunk
 
 public:
-	// Init to preload instance assets
-	UWorldGenerator* Init(AGameManager* InGameManager);
-
-	// Preload instance type assets for thread-safe access
-	void PreloadInstanceAssets();
-
-
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns) const override;
-
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns,
-	                           TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const override;
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) const override;
 
 private:
 	// Terrain generation helpers
@@ -123,10 +112,4 @@ private:
 	static float SmoothStep(float Edge0, float Edge1, float X);
 	static float TerrainCurve(float Value);
 	static float Lerp(float A, float B, float T);
-
-	void GenerateInstances(const FChunkPosition& Position, const TArray<FChunkColumn>& Columns,
-	                      TMap<FPrimaryAssetId, FInstanceCollection>& OutInstances) const;
-
-	void GenerateInstancesOfType(class UInstanceTypeDataAsset* Asset, const FChunkPosition& Position,
-	                             const TArray<FChunkColumn>& Columns, TArray<FInstanceData>& OutInstances) const;
 };

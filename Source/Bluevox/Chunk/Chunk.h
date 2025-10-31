@@ -5,7 +5,6 @@
 #include "CoreMinimal.h"
 #include "Bluevox/Game/VoxelMaterial.h"
 #include "Bluevox/Tick/GameTickable.h"
-#include "Data/InstanceData.h"
 #include "Data/Piece.h"
 #include "Position/ChunkPosition.h"
 #include "VirtualMap/ChunkState.h"
@@ -53,6 +52,9 @@ protected:
 
 	FThreadSafeCounter RenderedAtDirtyChanges = -1;
 
+	// Track if instances have been spawned for this chunk
+	bool bInstancesSpawned = false;
+
 	UPROPERTY()
 	AGameManager* GameManager = nullptr;
 
@@ -66,13 +68,37 @@ public:
 	AChunk();
 	
 	AChunk* Init(const FChunkPosition InPosition, AGameManager* InGameManager, UChunkData* InData);
-	
+
+	// Spawn HISM instances from entity records
+	void InitialSpawnInstancesFromEntities();
+
 	UPROPERTY()
 	UChunkData* ChunkData;
-
+	
 	void SetRenderState(EChunkState State) const;
 	
 	bool BeginRender(UE::Geometry::FDynamicMesh3& OutMesh, bool bForceRender = false);
 
-	void CommitRender(FRenderResult&& RenderResult) const;
+	void CommitRender(FRenderResult&& RenderResult);
+
+	// Client-side helpers to sync instances when entities are spawned/despawned
+	UFUNCTION()
+	void Cl_RemoveInstance(const FPrimaryAssetId& TypeId, int32 InstanceIndex);
+
+	UFUNCTION()
+	int32 Cl_AddInstance(const FPrimaryAssetId& TypeId, const FTransform& LocalTransform);
+
+	// Hide/show instances without removing them (for entity facade sync)
+	UFUNCTION()
+	void Cl_HideInstance(const FPrimaryAssetId& TypeId, int32 InstanceIndex);
+
+	UFUNCTION()
+	void Cl_ShowInstance(const FPrimaryAssetId& TypeId, int32 InstanceIndex, const FTransform& LocalTransform);
+
+	// Access instance components for entity conversion
+	UHierarchicalInstancedStaticMeshComponent* GetInstanceComponent(const FPrimaryAssetId& TypeId) const
+	{
+		UHierarchicalInstancedStaticMeshComponent* const* Found = ChunkInstanceComponents.Find(TypeId);
+		return Found ? *Found : nullptr;
+	}
 };

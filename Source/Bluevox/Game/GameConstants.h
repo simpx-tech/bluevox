@@ -79,3 +79,25 @@ namespace GameConstants::Tick
 		TEXT("game.ticks.budget_ns"), TickBudget,
 		TEXT("Maximum time (in nanoseconds) before spreading tasks across frames"), ECVF_Default);
 }
+
+
+// Entity/Instance conversion system CVars (cm-based distances)
+namespace GameConstants::EntityConversion
+{
+	extern inline float IntervalSeconds = 1.0f;
+	static FAutoConsoleVariableRef CVarEntityConversionInterval(
+		TEXT("game.entity.conversion.interval_s"), IntervalSeconds,
+		TEXT("Interval in seconds between entity/instance conversion evaluations on the server"), ECVF_Default);
+
+	// Convert to entity when any player is within this distance (in cm). Default ~1 chunk in XY.
+	extern inline float ToEntityRangeCm = [](){ return GameConstants::Scaling::XYWorldSize * GameConstants::Chunk::Size * 1.0f; }();
+	static FAutoConsoleVariableRef CVarToEntityRangeCm(
+		TEXT("game.entity.conversion.to_entity_range_cm"), ToEntityRangeCm,
+		TEXT("Distance (cm) at which instances convert to entities if any player is within this range"), ECVF_Default);
+
+	// Convert back to instance when all players are beyond this distance (in cm). Slightly larger to add hysteresis.
+	extern inline float ToInstanceRangeCm = [](){ return GameConstants::Scaling::XYWorldSize * GameConstants::Chunk::Size * 1.5f; }();
+	static FAutoConsoleVariableRef CVarToInstanceRangeCm(
+		TEXT("game.entity.conversion.to_instance_range_cm"), ToInstanceRangeCm,
+		TEXT("Distance (cm) beyond which entities convert back to instances when all players are outside this range"), ECVF_Default);
+}

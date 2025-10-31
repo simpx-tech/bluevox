@@ -4,8 +4,8 @@
 
 #include "CoreMinimal.h"
 #include "Bluevox/Chunk/Data/ChunkColumn.h"
-#include "Bluevox/Chunk/Data/InstanceData.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
+#include "Bluevox/Entity/EntityTypes.h"
 #include "DynamicMesh/DynamicMesh3.h"
 #include "UObject/Object.h"
 #include "ChunkTaskManager.generated.h"
@@ -28,7 +28,7 @@ struct FLoadResult
 
 	bool bSuccess = false;
 	TArray<FChunkColumn> Columns = {};
-	TMap<FPrimaryAssetId, FInstanceCollection> Instances = {};
+	TArray<FEntityRecord> Entities = {};
 };
 
 struct FRenderResult

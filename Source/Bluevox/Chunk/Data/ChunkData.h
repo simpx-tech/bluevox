@@ -4,14 +4,13 @@
 
 #include "CoreMinimal.h"
 #include "ChunkColumn.h"
-#include "InstanceData.h"
 #include "PieceWithStart.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Chunk/Position/LocalColumnPosition.h"
 #include "Bluevox/Chunk/Position/LocalPosition.h"
 #include "Bluevox/Game/GameConstants.h"
 #include "Bluevox/Game/GameManager.h"
-#include "Bluevox/Tick/GameTickable.h"
+#include "Bluevox/Entity/EntityTypes.h"
 #include "UObject/Object.h"
 #include "ChunkData.generated.h"
 
@@ -100,13 +99,13 @@ class BLUEVOX_API UChunkData : public UObject
 	
 public:
 	UChunkData* Init(AGameManager* InGameManager, const FChunkPosition InPosition, TArray<FChunkColumn>&& InColumns,
-	                 TMap<FPrimaryAssetId, FInstanceCollection>&& InInstances = TMap<FPrimaryAssetId, FInstanceCollection>());
+	                 TArray<FEntityRecord>&& InEntities = TArray<FEntityRecord>());
 
 	UPROPERTY()
 	TArray<FChunkColumn> Columns;
 
-	UPROPERTY()
-	TMap<FPrimaryAssetId, FInstanceCollection> InstanceCollections;
+	// Persistent entity records stored in this chunk (server authoritative)
+	TSparseArray<FEntityRecord> Entities;
 
 	// World item tracking - maps grid position to item actor
 	UPROPERTY()

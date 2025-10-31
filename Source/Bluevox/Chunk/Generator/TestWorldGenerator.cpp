@@ -6,6 +6,7 @@
 #include "FastNoiseWrapper.h"
 #include "Bluevox/Chunk/Data/ChunkData.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
+#include "Bluevox/Entity/EntityTypes.h"
 #include "Bluevox/Game/GameManager.h"
 #include "Bluevox/Game/GameConstants.h"
 
@@ -254,9 +255,11 @@ UTestWorldGenerator::UTestWorldGenerator()
 }
 
 void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
-                                        TArray<FChunkColumn>& OutColumns) const
+                                        TArray<FChunkColumn>& OutColumns,
+                                        TArray<FEntityRecord>& OutEntities) const
 {
 	// GenerateTickAlwaysShape(Position, OutColumns);
 	// GenerateTickOnLoadShape(Position, OutColumns);
 	GenerateTickOnNeighborUpdateShape(Position, OutColumns);
+	OutEntities.Empty(); // TestWorldGenerator doesn't generate entities
 }

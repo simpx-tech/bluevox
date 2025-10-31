@@ -32,9 +32,6 @@ public:
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Entity Conversion", meta = (EditCondition = "bCanConvertToEntity"))
 	TSubclassOf<AActor> EntityClass;
 
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Entity Conversion", meta = (EditCondition = "bCanConvertToEntity"))
-	float EntityConversionDistance = 500.0f;
-
 	// TODO move this to the generator not the asset
 	// Generation rules
 	UPROPERTY(EditAnywhere, BlueprintReadOnly, Category = "Generation", meta = (ClampMin = "0.0", ClampMax = "1.0"))

@@ -10,12 +10,21 @@
 #include "Bluevox/Inventory/ItemWorldActor.h"
 
 UChunkData* UChunkData::Init(AGameManager* InGameManager, const FChunkPosition InPosition,
-	TArray<FChunkColumn>&& InColumns, TMap<FPrimaryAssetId, FInstanceCollection>&& InInstances)
+	TArray<FChunkColumn>&& InColumns,
+	TArray<FEntityRecord>&& InEntities)
 {
 	GameManager = InGameManager;
 	Position = InPosition;
 	Columns = MoveTemp(InColumns);
-	InstanceCollections = MoveTemp(InInstances);
+
+	// Populate sparse array with provided entities maintaining indices
+	Entities.Empty();
+	for (FEntityRecord& Rec : InEntities)
+	{
+		const int32 NewIdx = Entities.Add(MoveTemp(Rec));
+		// Ensure the record knows its instance index if not set (left as-is otherwise)
+		if (!Entities.IsValidIndex(NewIdx)) { /* no-op */ }
+	}
 
 	GameManager->TickManager->RegisterUObjectTickable(this);
 
@@ -29,29 +38,6 @@ void UChunkData::SerializeForSave(FArchive& Ar)
 
 	Ar << FileVersion;
 	Ar << Columns;
-
-	// Serialize instance collections
-	int32 NumCollections = InstanceCollections.Num();
-	Ar << NumCollections;
-
-	if (Ar.IsSaving())
-	{
-		for (auto& Pair : InstanceCollections)
-		{
-			FInstanceCollection& Collection = Pair.Value;
-			Ar << Collection;
-		}
-	}
-	else if (Ar.IsLoading())
-	{
-		InstanceCollections.Empty();
-		for (int32 i = 0; i < NumCollections; ++i)
-		{
-			FInstanceCollection Collection;
-			Ar << Collection;
-			InstanceCollections.Add(Collection.InstanceTypeId, Collection);
-		}
-	}
 
 	// Serialize world items
 	TArray<FWorldItemData> WorldItems;
@@ -100,29 +86,6 @@ void UChunkData::Serialize(FArchive& Ar)
 	FReadScopeLock ReadLock(Lock);
 	UObject::Serialize(Ar);
 	Ar << Columns;
-
-	// Serialize instance collections
-	int32 NumCollections = InstanceCollections.Num();
-	Ar << NumCollections;
-
-	if (Ar.IsSaving())
-	{
-		for (auto& Pair : InstanceCollections)
-		{
-			FInstanceCollection& Collection = Pair.Value;
-			Ar << Collection;
-		}
-	}
-	else if (Ar.IsLoading())
-	{
-		InstanceCollections.Empty();
-		for (int32 i = 0; i < NumCollections; ++i)
-		{
-			FInstanceCollection Collection;
-			Ar << Collection;
-			InstanceCollections.Add(Collection.InstanceTypeId, Collection);
-		}
-	}
 }
 
 int32 UChunkData::GetFirstGapThatFits(const FGlobalPosition& GlobalPosition,
