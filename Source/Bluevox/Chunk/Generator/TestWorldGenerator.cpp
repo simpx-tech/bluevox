@@ -256,7 +256,7 @@ UTestWorldGenerator::UTestWorldGenerator()
 
 void UTestWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                         TArray<FChunkColumn>& OutColumns,
-                                        TArray<FEntityRecord>& OutEntities) const
+                                        TArray<FEntityRecord>& OutEntities)
 {
 	// GenerateTickAlwaysShape(Position, OutColumns);
 	// GenerateTickOnLoadShape(Position, OutColumns);

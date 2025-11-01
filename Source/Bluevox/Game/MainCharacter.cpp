@@ -36,6 +36,10 @@ AMainCharacter::AMainCharacter()
 void AMainCharacter::BeginPlay()
 {
 	Super::BeginPlay();
+
+	// Initialize previous-state caches for replication notifications
+	PrevQuickInventorySlots = QuickInventorySlots;
+	PrevHeldSlot = CurrentlyHeldSlot;
 	
 	if (const AMainController* PlayerController = Cast<AMainController>(GetController()))
 	{
@@ -57,11 +61,15 @@ void AMainCharacter::BeginPlay()
 		InventoryComponent->Init(this, 100.0f); // Default max weight of 100
 	}
 
-	// Initialize quick inventory slots (8 slots, all empty)
+	// Initialize quick inventory slots (12 slots, all empty)
 	if (QuickInventorySlots.Num() == 0)
 	{
-		QuickInventorySlots.Init(-1, 8);
+		QuickInventorySlots.Init(-1, QuickSlotCount);
 	}
+
+	// After initialization, sync previous-state caches
+	PrevQuickInventorySlots = QuickInventorySlots;
+	PrevHeldSlot = CurrentlyHeldSlot;
 }
 
 // Called every frame
@@ -94,15 +102,11 @@ void AMainCharacter::SetupPlayerInputComponent(UInputComponent* PlayerInputCompo
 
 			EnhancedInputComponent->BindAction(MainController->PickupItemAction, ETriggerEvent::Started, this, &AMainCharacter::HandlePickupItemAction);
 
-			// Bind quick slot actions (1-8)
+			// Bind quick slot actions (1-4 only)
 			EnhancedInputComponent->BindAction(MainController->QuickSlot1Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot1Action);
 			EnhancedInputComponent->BindAction(MainController->QuickSlot2Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot2Action);
 			EnhancedInputComponent->BindAction(MainController->QuickSlot3Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot3Action);
 			EnhancedInputComponent->BindAction(MainController->QuickSlot4Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot4Action);
-			EnhancedInputComponent->BindAction(MainController->QuickSlot5Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot5Action);
-			EnhancedInputComponent->BindAction(MainController->QuickSlot6Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot6Action);
-			EnhancedInputComponent->BindAction(MainController->QuickSlot7Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot7Action);
-			EnhancedInputComponent->BindAction(MainController->QuickSlot8Action, ETriggerEvent::Started, this, &AMainCharacter::HandleQuickSlot8Action);
 		}
 	} else
 	{
@@ -270,41 +274,28 @@ void AMainCharacter::HandleQuickSlot4Action()
 	Cl_HandleQuickSlotInput(3);
 }
 
-void AMainCharacter::HandleQuickSlot5Action()
-{
-	Cl_HandleQuickSlotInput(4);
-}
-
-void AMainCharacter::HandleQuickSlot6Action()
-{
-	Cl_HandleQuickSlotInput(5);
-}
-
-void AMainCharacter::HandleQuickSlot7Action()
-{
-	Cl_HandleQuickSlotInput(6);
-}
-
-void AMainCharacter::HandleQuickSlot8Action()
-{
-	Cl_HandleQuickSlotInput(7);
-}
-
 // ========== Quick Inventory Implementation ==========
 
 void AMainCharacter::Cl_HandleQuickSlotInput(int32 SlotIndex)
 {
-	// Validate slot index (0-7)
-	if (SlotIndex < 0 || SlotIndex >= 8)
+	// Only quick actions 1-4 are supported via input (slots 0-3)
+	if (SlotIndex < 0 || SlotIndex > 3)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::Cl_HandleQuickSlotInput: Invalid slot index %d"), SlotIndex);
+		UE_LOG(LogTemp, Verbose, TEXT("AMainCharacter::Cl_HandleQuickSlotInput: Ignoring quick slot %d (only 1-4 are bound)"), SlotIndex);
+		return;
+	}
+
+	// Validate slot index against inventory slots as well
+	if (SlotIndex >= QuickSlotCount)
+	{
+		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::Cl_HandleQuickSlotInput: Invalid slot index %d (QuickSlotCount=%d)"), SlotIndex, QuickSlotCount);
 		return;
 	}
 
 	// Check if this slot has an item assigned
 	if (!QuickInventorySlots.IsValidIndex(SlotIndex) || QuickInventorySlots[SlotIndex] < 0)
 	{
-		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::Cl_HandleQuickSlotInput: Slot %d is empty"), SlotIndex);
+		UE_LOG(LogTemp, Verbose, TEXT("AMainCharacter::Cl_HandleQuickSlotInput: Slot %d is empty"), SlotIndex);
 		return;
 	}
 
@@ -324,7 +315,7 @@ void AMainCharacter::Cl_HandleQuickSlotInput(int32 SlotIndex)
 void AMainCharacter::RSv_SetHeldQuickSlot_Implementation(int32 SlotIndex)
 {
 	// Server validation
-	if (SlotIndex != -1 && (SlotIndex < 0 || SlotIndex >= 8))
+	if (SlotIndex != -1 && (SlotIndex < 0 || SlotIndex >= QuickSlotCount))
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::RSv_SetHeldQuickSlot: Invalid slot index %d"), SlotIndex);
 		return;
@@ -338,7 +329,18 @@ void AMainCharacter::RSv_SetHeldQuickSlot_Implementation(int32 SlotIndex)
 	}
 
 	// Update the currently held slot (replicated to all clients)
+	const int32 OldSlot = CurrentlyHeldSlot;
+	if (OldSlot == SlotIndex)
+	{
+		return; // no change
+	}
 	CurrentlyHeldSlot = SlotIndex;
+
+	// Broadcast immediately on server for server-side listeners
+	OnHeldQuickSlotChanged.Broadcast(CurrentlyHeldSlot, OldSlot);
+
+	// Keep server-side cache in sync so future diffs are correct
+	PrevHeldSlot = CurrentlyHeldSlot;
 }
 
 void AMainCharacter::Sv_SetQuickSlot(int32 QuickSlotIndex, int32 InventoryItemIndex)
@@ -351,7 +353,7 @@ void AMainCharacter::Sv_SetQuickSlot(int32 QuickSlotIndex, int32 InventoryItemIn
 	}
 
 	// Validate quick slot index
-	if (QuickSlotIndex < 0 || QuickSlotIndex >= 8)
+	if (QuickSlotIndex < 0 || QuickSlotIndex >= QuickSlotCount)
 	{
 		UE_LOG(LogTemp, Warning, TEXT("AMainCharacter::Sv_SetQuickSlot: Invalid quick slot index %d"), QuickSlotIndex);
 		return;
@@ -370,19 +372,41 @@ void AMainCharacter::Sv_SetQuickSlot(int32 QuickSlotIndex, int32 InventoryItemIn
 		return;
 	}
 
-	// Set the quick slot
+	// Ensure prev cache is sized
+	if (PrevQuickInventorySlots.Num() != QuickInventorySlots.Num())
+	{
+		PrevQuickInventorySlots = QuickInventorySlots;
+	}
+
+	// Change the quick slot mapping
+	const int32 OldInventoryIndex = QuickInventorySlots.IsValidIndex(QuickSlotIndex) ? QuickInventorySlots[QuickSlotIndex] : -1;
+	if (OldInventoryIndex == InventoryItemIndex)
+	{
+		return; // no change
+	}
 	QuickInventorySlots[QuickSlotIndex] = InventoryItemIndex;
 
 	// If the currently held slot is being cleared, unhold it
 	if (CurrentlyHeldSlot == QuickSlotIndex && InventoryItemIndex == -1)
 	{
+		const int32 OldHeld = CurrentlyHeldSlot;
 		CurrentlyHeldSlot = -1;
+		OnHeldQuickSlotChanged.Broadcast(CurrentlyHeldSlot, OldHeld);
+		PrevHeldSlot = CurrentlyHeldSlot;
+	}
+
+	// Broadcast slot mapping change immediately on server
+	OnQuickInventorySlotChanged.Broadcast(QuickSlotIndex, InventoryItemIndex, OldInventoryIndex);
+	// Keep prev cache in sync
+	if (PrevQuickInventorySlots.IsValidIndex(QuickSlotIndex))
+	{
+		PrevQuickInventorySlots[QuickSlotIndex] = InventoryItemIndex;
 	}
 }
 
 UItemTypeDataAsset* AMainCharacter::GetCurrentlyHeldItem() const
 {
-	if (CurrentlyHeldSlot < 0 || CurrentlyHeldSlot >= 8)
+	if (CurrentlyHeldSlot < 0 || CurrentlyHeldSlot >= QuickSlotCount)
 	{
 		return nullptr;
 	}
@@ -393,7 +417,7 @@ UItemTypeDataAsset* AMainCharacter::GetCurrentlyHeldItem() const
 UItemTypeDataAsset* AMainCharacter::GetItemInQuickSlot(int32 SlotIndex) const
 {
 	// Validate slot index
-	if (SlotIndex < 0 || SlotIndex >= 8)
+	if (SlotIndex < 0 || SlotIndex >= QuickSlotCount)
 	{
 		return nullptr;
 	}
@@ -416,6 +440,33 @@ UItemTypeDataAsset* AMainCharacter::GetItemInQuickSlot(int32 SlotIndex) const
 	// Get the item type from the inventory
 	const FInventoryItem& InventoryItem = InventoryComponent->GetItems()[InventoryItemIndex];
 	return InventoryItem.ItemType.LoadSynchronous();
+}
+
+void AMainCharacter::OnRep_QuickInventorySlots()
+{
+	// Ensure previous cache size
+	if (PrevQuickInventorySlots.Num() != QuickInventorySlots.Num())
+	{
+		PrevQuickInventorySlots.SetNum(QuickInventorySlots.Num());
+	}
+
+	for (int32 i = 0; i < QuickInventorySlots.Num(); ++i)
+	{
+		const int32 OldIdx = PrevQuickInventorySlots[i];
+		const int32 NewIdx = QuickInventorySlots[i];
+		if (OldIdx != NewIdx)
+		{
+			OnQuickInventorySlotChanged.Broadcast(i, NewIdx, OldIdx);
+			PrevQuickInventorySlots[i] = NewIdx;
+		}
+	}
+}
+
+void AMainCharacter::OnRep_CurrentlyHeldSlot()
+{
+	const int32 Old = PrevHeldSlot;
+	OnHeldQuickSlotChanged.Broadcast(CurrentlyHeldSlot, Old);
+	PrevHeldSlot = CurrentlyHeldSlot;
 }
 
 void AMainCharacter::GetLifetimeReplicatedProps(

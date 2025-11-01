@@ -33,5 +33,5 @@ class BLUEVOX_API UTestWorldGenerator : public UWorldGenerator
 public:
 	UTestWorldGenerator();
 
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) const override;
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) override;
 };

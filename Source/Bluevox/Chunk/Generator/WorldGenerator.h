@@ -26,5 +26,5 @@ protected:
 public:
 	UWorldGenerator* Init(AGameManager* InGameManager);
 
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) const;
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities);
 };

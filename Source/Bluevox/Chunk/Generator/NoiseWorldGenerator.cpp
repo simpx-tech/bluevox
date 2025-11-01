@@ -4,826 +4,515 @@
 #include "NoiseWorldGenerator.h"
 
 #include "Bluevox/Chunk/Data/ChunkData.h"
+#include "Bluevox/Chunk/Data/ChunkColumn.h"
+#include "Bluevox/Chunk/Data/Piece.h"
 #include "Bluevox/Chunk/Position/ChunkPosition.h"
 #include "Bluevox/Game/GameConstants.h"
-#include "Bluevox/Data/InstanceTypeDataAsset.h"
+#include "Bluevox/Game/VoxelMaterial.h"
 #include "Bluevox/Entity/EntityTypes.h"
 #include "FastNoiseWrapper.h"
+#include "Bluevox/Data/InstanceTypeDataAsset.h"
+
+namespace
+{
+	static FORCEINLINE float Smooth01(float t)
+	{
+		return t * t * (3.0f - 2.0f * t);
+	}
+}
 
 UNoiseWorldGenerator::UNoiseWorldGenerator()
 {
-	// Continental noise - large scale terrain features
-	ContinentalNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("ContinentalNoise"));
-	ContinentalNoise->SetupFastNoise(
-		EFastNoise_NoiseType::SimplexFractal,
-		1337,                                  // seed
-		TerrainScale,                          // frequency
-		EFastNoise_Interp::Quintic,            // interpolation
-		EFastNoise_FractalType::FBM,           // fractal type
-		4,                                      // octaves
-		2.2f,                                   // lacunarity
-		0.5f                                    // gain
-	);
-
-	// Erosion noise - simulates natural erosion patterns
-	ErosionNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("ErosionNoise"));
-	ErosionNoise->SetupFastNoise(
-		EFastNoise_NoiseType::SimplexFractal,
-		2468,                                   // seed
-		TerrainScale * 2.0f,                   // frequency
-		EFastNoise_Interp::Quintic,            // interpolation
-		EFastNoise_FractalType::Billow,        // fractal type - billow for erosion patterns
-		3,                                      // octaves
-		2.0f,                                   // lacunarity
-		0.45f                                   // gain
-	);
-
-	// Peaks noise - sharp mountain features
-	PeaksNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("PeaksNoise"));
-	PeaksNoise->SetupFastNoise(
-		EFastNoise_NoiseType::SimplexFractal,
-		9876,                                   // seed
-		TerrainScale * 1.5f,                   // frequency
-		EFastNoise_Interp::Quintic,            // interpolation
-		EFastNoise_FractalType::RigidMulti,    // fractal type - rigid for sharp peaks
-		5,                                      // octaves
-		2.5f,                                   // lacunarity
-		0.6f                                    // gain
-	);
-
-	// Detail noise - small scale terrain details
+	ContinentNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("ContinentalNoise"));
+	MountainNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("MountainNoise"));
 	DetailNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("DetailNoise"));
-	DetailNoise->SetupFastNoise(
-		EFastNoise_NoiseType::Simplex,
-		5432,                                   // seed
-		TerrainScale * 10.0f,                  // frequency
-		EFastNoise_Interp::Quintic             // interpolation
-	);
-
-	// Temperature noise - controls temperature distribution
-	TemperatureNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("TemperatureNoise"));
-	TemperatureNoise->SetupFastNoise(
-		EFastNoise_NoiseType::SimplexFractal,
-		8888,                                   // seed
-		TerrainScale * 0.3f,                   // large scale temperature zones
-		EFastNoise_Interp::Quintic,
-		EFastNoise_FractalType::FBM,
-		2,                                      // octaves
-		2.0f,                                   // lacunarity
-		0.5f                                    // gain
-	);
-
-	// Precipitation noise - controls moisture distribution
-	PrecipitationNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("PrecipitationNoise"));
-	PrecipitationNoise->SetupFastNoise(
-		EFastNoise_NoiseType::SimplexFractal,
-		9999,                                   // seed
-		TerrainScale * 0.4f,                   // precipitation patterns
-		EFastNoise_Interp::Quintic,
-		EFastNoise_FractalType::Billow,        // billow for cloud-like patterns
-		2,                                      // octaves
-		2.0f,                                   // lacunarity
-		0.6f                                    // gain
-	);
-
-	// Worley noise - creates cellular patterns for mountain variation
-	WorleyNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("WorleyNoise"));
-	WorleyNoise->SetupFastNoise(
-		EFastNoise_NoiseType::Cellular,
-		3333,                                   // seed
-		TerrainScale * 2.0f,                   // frequency
-		EFastNoise_Interp::Quintic,
-		EFastNoise_FractalType::FBM,
-		1,                                      // octaves
-		2.0f,                                   // lacunarity
-		0.5f,                                   // gain
-		0.3f,                                   // cellular jitter
-		EFastNoise_CellularDistanceFunction::Euclidean,
-		EFastNoise_CellularReturnType::Distance
-	);
-
-	// Ridge noise - creates ridge patterns for mountains
-	RidgeNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("RidgeNoise"));
-	RidgeNoise->SetupFastNoise(
-		EFastNoise_NoiseType::SimplexFractal,
-		4444,                                   // seed
-		TerrainScale * 3.0f,                   // frequency
-		EFastNoise_Interp::Quintic,
-		EFastNoise_FractalType::RigidMulti,    // rigid for sharp ridges
-		3,                                      // octaves
-		2.0f,                                   // lacunarity
-		0.5f                                    // gain
-	);
+	TempNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("TempNoise"));
+	MoistureNoise = CreateDefaultSubobject<UFastNoiseWrapper>(TEXT("MoistureNoise"));
 }
 
-void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<FEntityRecord>& OutEntities) const
+void UNoiseWorldGenerator::PostLoad()
 {
-	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
+	Super::PostLoad();
 
-	// Store heights for erosion simulation
-	TArray<float> Heights;
-	Heights.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
-
-	// First pass: Generate base terrain heights
-	for (int X = 0; X < GameConstants::Chunk::Size; ++X)
+	if (!bFixedSeed)
 	{
-		for (int Y = 0; Y < GameConstants::Chunk::Size; ++Y)
-		{
-			const float WorldX = X + Position.X * GameConstants::Chunk::Size;
-			const float WorldY = Y + Position.Y * GameConstants::Chunk::Size;
+		Seed = FMath::RandRange(0, 0xFFFFFFFF);
+		ContinentSeed = FMath::RandRange(0, 0xFFFFFFFF);
+		MountainSeed = FMath::RandRange(0, 0xFFFFFFFF);
+		DetailSeed = FMath::RandRange(0, 0xFFFFFFFF);
+		TemperatureSeed = FMath::RandRange(0, 0xFFFFFFFF);
+		MoistureSeed = FMath::RandRange(0, 0xFFFFFFFF);
 
-			const int Index = UChunkData::GetIndex(X, Y);
-			Heights[Index] = GetTerrainHeight(WorldX, WorldY);
+		// Setup noise types and seeds. Frequency will mostly be controlled by sampling scale.
+		if (ContinentNoise)
+		{
+			ContinentNoise->SetupFastNoise(EFastNoise_NoiseType::Perlin, Seed + ContinentSeed, 1.0f);
+		}
+		if (MountainNoise)
+		{
+			MountainNoise->SetupFastNoise(EFastNoise_NoiseType::Perlin, Seed + MountainSeed, 1.0f);
+		}
+		if (DetailNoise)
+		{
+			DetailNoise->SetupFastNoise(EFastNoise_NoiseType::Perlin, Seed + DetailSeed, 1.0f);
+		}
+		if (TempNoise)
+		{
+			TempNoise->SetupFastNoise(EFastNoise_NoiseType::Perlin, Seed + TemperatureSeed, 1.0f);
+		}
+		if (MoistureNoise)
+		{
+			MoistureNoise->SetupFastNoise(EFastNoise_NoiseType::Perlin, Seed + MoistureSeed, 1.0f);
 		}
 	}
+}
 
-	// Smooth terrain to reduce spikes and sharp edges
-	SmoothTerrain(Heights);
-
-	// Apply erosion simulation for more realistic terrain
-	ApplyErosion(Heights, Position.X, Position.Y);
-
-	// Additional smoothing pass after erosion
-	SmoothTerrain(Heights);
-
-	// Second pass: Build chunk columns with biome-based materials
-	for (int X = 0; X < GameConstants::Chunk::Size; ++X)
+float UNoiseWorldGenerator::Fractal2D(const UFastNoiseWrapper* Noise, float X, float Y, float BaseFreq, int32 Octaves, float Lacunarity, float Gain) const
+{
+	if (!Noise)
 	{
-		for (int Y = 0; Y < GameConstants::Chunk::Size; ++Y)
+		return 0.0f;
+	}
+	float sum = 0.0f;
+	float amp = 1.0f;
+	float freq = BaseFreq;
+	float ampSum = 0.0f;
+	for (int32 o = 0; o < Octaves; ++o)
+	{
+		sum += Noise->GetNoise2D(X * freq, Y * freq) * amp;
+		ampSum += amp;
+		amp *= Gain;
+		freq *= Lacunarity;
+	}
+	if (ampSum > KINDA_SMALL_NUMBER)
+	{
+		sum /= ampSum; // keep in roughly [-1,1]
+	}
+	return FMath::Clamp(sum, -1.0f, 1.0f);
+}
+
+float UNoiseWorldGenerator::ComputeLandMask(float X, float Y) const
+{
+	const float n = Fractal2D(ContinentNoise, X, Y, ContinentFrequency, 4, 2.0f, 0.5f); // [-1,1]
+	float v = RemapTo01(n); // [0,1]
+	// Sharpen coasts a bit
+	v = Smooth01(v);
+	return Clamp01(v);
+}
+
+float UNoiseWorldGenerator::ComputeMountainMask(float X, float Y) const
+{
+	// Ridged style: 1 - |noise|
+	const float n = Fractal2D(MountainNoise, X, Y, MountainFrequency, 5, 2.0f, 0.5f); // [-1,1]
+	float ridged = 1.0f - FMath::Abs(n);
+	ridged = FMath::Pow(Clamp01(ridged), 2.0f);
+	return ridged; // [0,1]
+}
+
+void UNoiseWorldGenerator::ChooseBiome(float Temp01, float Moist01, bool bIsOcean, bool bIsMountain, int32 ElevationLayers, EBiome& OutBiome) const
+{
+	if (bIsOcean)
+	{
+		OutBiome = EBiome::Ocean;
+		return;
+	}
+	// Beach near sea level
+	if (ElevationLayers - SeaLevelLayers <= BeachDepthLayers && ElevationLayers >= SeaLevelLayers)
+	{
+		OutBiome = EBiome::Beach;
+		return;
+	}
+	if (bIsMountain)
+	{
+		OutBiome = EBiome::Mountain;
+		return;
+	}
+
+	// Cold categories
+	if (Temp01 < 0.2f)
+	{
+		OutBiome = EBiome::Tundra;
+		return;
+	}
+	if (Temp01 < ColdTempThreshold)
+	{
+		OutBiome = EBiome::Taiga;
+		return;
+	}
+
+	// Hot & dry desert
+	if (Temp01 > DesertTempThreshold && Moist01 < DryMoistureThreshold)
+	{
+		OutBiome = EBiome::Desert;
+		return;
+	}
+
+	// Wet → forest
+	if (Moist01 > WetMoistureThreshold)
+	{
+		OutBiome = EBiome::Forest;
+		return;
+	}
+
+	// Default
+	OutBiome = EBiome::Plains;
+}
+
+void UNoiseWorldGenerator::BuildColumn(int32 GroundHeightLayers, int32 SeaLevel, EBiome Biome, bool bIsCliff, bool bIsMountain, TArray<FPiece>& OutPieces) const
+{
+	OutPieces.Reset();
+	const int32 TotalH = GameConstants::Chunk::Height;
+	GroundHeightLayers = FMath::Clamp(GroundHeightLayers, 1, TotalH - 1);
+	SeaLevel = FMath::Clamp(SeaLevel, 0, TotalH - 1);
+
+	// Decide surface materials with slope-aware rules
+	EMaterial TopMat = EMaterial::Grass;
+	EMaterial UnderMat = EMaterial::Dirt;
+	int32 SurfaceThickness = 1;
+	int32 UnderThickness = TopSoilDepthLayers;
+
+	const bool bAboveSnow = GroundHeightLayers >= SeaLevel + SnowLineAboveSeaLayers;
+
+	// Cliff override: expose rock faces regardless of biome (except deep ocean handled below)
+	if (bIsCliff && Biome != EBiome::Ocean)
+	{
+		TopMat = bAboveSnow ? EMaterial::Snow : EMaterial::Stone;
+		UnderMat = EMaterial::Stone;
+		SurfaceThickness = 1;
+		UnderThickness = FMath::Clamp(TopSoilDepthLayers - 1, 1, 8);
+	}
+	else
+	{
+		switch (Biome)
 		{
-			const int Index = UChunkData::GetIndex(X, Y);
-			auto& Column = OutColumns[Index];
-
-			const float WorldX = X + Position.X * GameConstants::Chunk::Size;
-			const float WorldY = Y + Position.Y * GameConstants::Chunk::Size;
-
-			const int TerrainHeight = FMath::Clamp(FMath::RoundToInt(Heights[Index]), 1, GameConstants::Chunk::Height - 1);
-
-			// Get temperature and precipitation for biome determination
-			const float Temperature = GetTemperature(WorldX, WorldY, TerrainHeight);
-			const float Precipitation = GetPrecipitation(WorldX, WorldY);
-			const EBiomeType Biome = GetBiome(Temperature, Precipitation);
-
-			// Build column from bottom up
-			TArray<FPiece> TempPieces;
-			int CurrentHeight = 0;
-
-			while (CurrentHeight < TerrainHeight)
+			case EBiome::Ocean:
 			{
-				// Determine material based on biome system
-				EMaterial Material = GetMaterialForBiome(CurrentHeight, Biome, Temperature, Precipitation, CurrentHeight < SeaLevel);
-
-				// Count consecutive same materials
-				int MaterialHeight = 1;
-				while (CurrentHeight + MaterialHeight < TerrainHeight)
+				TopMat = (SeaLevel - GroundHeightLayers <= BeachDepthLayers + 6) ? EMaterial::Sand : EMaterial::Stone;
+				UnderMat = (TopMat == EMaterial::Sand) ? EMaterial::Sand : EMaterial::Stone;
+				SurfaceThickness = 1;
+				UnderThickness = FMath::Clamp(TopSoilDepthLayers, 1, 12);
+				break;
+			}
+			case EBiome::Beach:
+			{
+				TopMat = EMaterial::Sand;
+				UnderMat = EMaterial::Sand;
+				SurfaceThickness = 1;
+				UnderThickness = TopSoilDepthLayers + 1;
+				break;
+			}
+			case EBiome::Desert:
+			{
+				TopMat = EMaterial::Sand;
+				UnderMat = EMaterial::Sand;
+				SurfaceThickness = 1;
+				UnderThickness = TopSoilDepthLayers + 2;
+				break;
+			}
+			case EBiome::Plains:
+			{
+				TopMat = EMaterial::Grass;
+				UnderMat = EMaterial::Dirt;
+				UnderThickness = TopSoilDepthLayers + SubSoilDepthLayers; // make grasslands thicker
+				break;
+			}
+			case EBiome::Forest:
+			{
+				TopMat = EMaterial::Grass;
+				UnderMat = EMaterial::Dirt;
+				UnderThickness = TopSoilDepthLayers + SubSoilDepthLayers;
+				break;
+			}
+			case EBiome::Taiga:
+			{
+				TopMat = bAboveSnow ? EMaterial::Snow : EMaterial::Grass;
+				UnderMat = EMaterial::Dirt;
+				UnderThickness = TopSoilDepthLayers + (bAboveSnow ? 0 : SubSoilDepthLayers);
+				break;
+			}
+			case EBiome::Tundra:
+			{
+				TopMat = EMaterial::Snow;
+				UnderMat = EMaterial::Dirt;
+				UnderThickness = TopSoilDepthLayers; // thin active layer over permafrost
+				break;
+			}
+			case EBiome::Mountain:
+			{
+				if (bAboveSnow)
 				{
-					EMaterial NextMaterial = GetMaterialForBiome(CurrentHeight + MaterialHeight, Biome, Temperature, Precipitation, (CurrentHeight + MaterialHeight) < SeaLevel);
-					if (NextMaterial != Material)
-					{
-						break;
-					}
-					MaterialHeight++;
-				}
-
-				TempPieces.Emplace(Material, MaterialHeight);
-				CurrentHeight += MaterialHeight;
-			}
-
-			// Add water if terrain is below sea level
-			if (TerrainHeight < SeaLevel)
-			{
-				TempPieces.Emplace(EMaterial::Water, SeaLevel - TerrainHeight);
-				CurrentHeight = SeaLevel;
-			}
-
-			// Add void above terrain
-			if (CurrentHeight < GameConstants::Chunk::Height)
-			{
-				TempPieces.Emplace(EMaterial::Void, GameConstants::Chunk::Height - CurrentHeight);
-			}
-
-			// Optimize pieces by combining adjacent same materials
-			for (const auto& Piece : TempPieces)
-			{
-				if (Column.Pieces.Num() > 0 && Column.Pieces.Last().MaterialId == Piece.MaterialId)
-				{
-					Column.Pieces.Last().Size += Piece.Size;
+					TopMat = EMaterial::Snow;
+					UnderMat = EMaterial::Stone; // firmer base under snow
+					SurfaceThickness = 1;
+					UnderThickness = TopSoilDepthLayers + 1;
 				}
 				else
 				{
-					Column.Pieces.Add(Piece);
+					// Gentle mountain slopes get alpine grass instead of bare stone
+					TopMat = EMaterial::Grass;
+					UnderMat = EMaterial::Dirt;
+					UnderThickness = TopSoilDepthLayers + SubSoilDepthLayers;
 				}
-			}
-		}
-	}
-
-	// Generate instances
-	OutEntities.Empty();
-
-	if (InstanceTypes.Num() == 0 || MaxInstancesPerChunk <= 0)
-	{
-		return; // No instances to generate
-	}
-
-	// Use a deterministic random seed based on chunk position
-	FRandomStream RandomStream(Position.X * 73856093 ^ Position.Y * 19349663 ^ 83492791);
-
-	int32 InstancesGenerated = 0;
-
-	// Try to place instances at random positions
-	for (int32 Attempt = 0; Attempt < MaxInstancesPerChunk * 10 && InstancesGenerated < MaxInstancesPerChunk; ++Attempt)
-	{
-		// Random position within chunk
-		const int32 X = RandomStream.RandRange(1, GameConstants::Chunk::Size - 2);
-		const int32 Y = RandomStream.RandRange(1, GameConstants::Chunk::Size - 2);
-
-		const int32 Index = UChunkData::GetIndex(X, Y);
-		const int32 TerrainHeight = FMath::RoundToInt(Heights[Index]);
-
-		// Skip underwater positions
-		if (TerrainHeight < SeaLevel)
-			continue;
-
-		// Get biome info for this position
-		const float WorldX = X + Position.X * GameConstants::Chunk::Size;
-		const float WorldY = Y + Position.Y * GameConstants::Chunk::Size;
-		const float Temperature = GetTemperature(WorldX, WorldY, TerrainHeight);
-		const float Precipitation = GetPrecipitation(WorldX, WorldY);
-		const EBiomeType Biome = GetBiome(Temperature, Precipitation);
-
-		// Get the surface material at this position
-		EMaterial SurfaceMaterial = GetMaterialForBiome(TerrainHeight, Biome, Temperature, Precipitation, false);
-
-		// Try to find a suitable instance type for this position
-		TArray<UInstanceTypeDataAsset*> ValidInstances;
-
-		for (UInstanceTypeDataAsset* InstanceType : InstanceTypes)
-		{
-			if (!InstanceType)
-				continue;
-
-			// Check if this instance can spawn on this surface
-			if (InstanceType->ValidSurfaces.Contains(SurfaceMaterial))
-			{
-				// Check spawn chance
-				if (RandomStream.FRand() < InstanceType->SpawnChance)
-				{
-					ValidInstances.Add(InstanceType);
-				}
-			}
-		}
-
-		if (ValidInstances.Num() == 0)
-			continue;
-
-		// Select random instance from valid ones
-		UInstanceTypeDataAsset* SelectedInstance = ValidInstances[RandomStream.RandRange(0, ValidInstances.Num() - 1)];
-
-		// Check spacing requirements (ensure instances don't overlap)
-		bool bCanPlace = true;
-		const float RequiredSpacing = SelectedInstance->Radius * GameConstants::Scaling::XYWorldSize;
-		const float RequiredSpacingLocal = SelectedInstance->Radius;
-
-		for (const FEntityRecord& ExistingEntity : OutEntities)
-		{
-			FVector ExistingPos = ExistingEntity.Transform.GetLocation();
-			float DistX = FMath::Abs((X * GameConstants::Scaling::XYWorldSize) - ExistingPos.X);
-			float DistY = FMath::Abs((Y * GameConstants::Scaling::XYWorldSize) - ExistingPos.Y);
-
-			if (DistX < RequiredSpacing && DistY < RequiredSpacing)
-			{
-				bCanPlace = false;
 				break;
 			}
 		}
-
-		if (!bCanPlace)
-			continue;
-
-		// Create entity record for this instance
-		FEntityRecord NewEntity;
-
-		// Random rotation around Z axis
-		float RandomYaw = RandomStream.FRandRange(0.0f, 360.0f);
-
-		// Random scale within defined range
-		float RandomScale = RandomStream.FRandRange(SelectedInstance->MinScale, SelectedInstance->MaxScale);
-
-		// Set transform (local to chunk)
-		FVector LocalPosition(
-			X * GameConstants::Scaling::XYWorldSize,
-			Y * GameConstants::Scaling::XYWorldSize,
-			TerrainHeight * GameConstants::Scaling::ZWorldSize
-		);
-
-		NewEntity.Transform = FTransform(
-			FRotator(0.0f, RandomYaw, 0.0f),
-			LocalPosition,
-			FVector(RandomScale)
-		);
-
-		// Set the instance type
-		NewEntity.InstanceTypeId = SelectedInstance->GetPrimaryAssetId();
-
-		// Instance index will be assigned when added to HISM component
-		NewEntity.InstanceIndex = INDEX_NONE;
-
-		// Add to entities array
-		const auto ArrayIndex = OutEntities.Add(NewEntity);
-		OutEntities[ArrayIndex].ArrayIndex = ArrayIndex;
-		
-		InstancesGenerated++;
 	}
 
-	UE_LOG(LogTemp, Verbose, TEXT("Generated %d instances for chunk %s"), InstancesGenerated, *Position.ToString());
-}
+	// Build from bottom up
+	int32 remainingToGround = GroundHeightLayers;
 
-float UNoiseWorldGenerator::GetTerrainHeight(float WorldX, float WorldY) const
-{
-	// Continental shelf - base terrain shape
-	float ContinentalValue = ContinentalNoise->GetNoise2D(WorldX, WorldY);
-	ContinentalValue += LandBias;
-	ContinentalValue = TerrainCurve(ContinentalValue) * TerrainAmplification;
-
-	// Mountain variation using Worley and Ridge noise
-	float MountainVariation = GetMountainVariation(WorldX, WorldY);
-
-	// Mountain peaks with variation
-	float PeaksValue = PeaksNoise->GetNoise2D(WorldX, WorldY);
-	PeaksValue = FMath::Max(0.0f, PeaksValue - MountainThreshold);
-	if (PeaksValue > 0.0f)
+	// Deep stone base
+	int32 baseStone = FMath::Max(0, remainingToGround - (SurfaceThickness + UnderThickness));
+	if (baseStone > 0)
 	{
-		// Apply mountain variation for more interesting shapes
-		PeaksValue = FMath::Pow(PeaksValue * 2.5f, 2.2f);
-		PeaksValue *= (1.0f + MountainVariation * 0.4f);  // Add variation
-
-		// Reduce spike frequency by smoothing extreme values
-		PeaksValue = FMath::Min(PeaksValue, 2.0f);
+		OutPieces.Emplace(EMaterial::Stone, static_cast<uint16>(baseStone));
+		remainingToGround -= baseStone;
 	}
-
-	// Erosion - more natural valley carving
-	float ErosionValue = ErosionNoise->GetNoise2D(WorldX, WorldY);
-	ErosionValue = FMath::Pow(FMath::Abs(ErosionValue), 1.5f) * FMath::Sign(ErosionValue);
-
-	// Detail noise - reduced to prevent spikes
-	float DetailValue = DetailNoise->GetNoise2D(WorldX, WorldY) * 0.08f;  // Reduced from 0.15f
-
-	// Combine base height components
-	float BaseHeight = ContinentalValue;
-
-	// Add mountains with controlled influence
-	if (PeaksValue > 0.0f)
+	// Under layer
+	int32 under = FMath::Min(UnderThickness, remainingToGround - SurfaceThickness);
+	if (under > 0)
 	{
-		// Smooth blend mountains into terrain
-		float MountainBlend = SmoothStep(0.0f, 0.3f, PeaksValue);
-		BaseHeight = Lerp(BaseHeight, BaseHeight + PeaksValue * 1.5f, MountainBlend);
+		OutPieces.Emplace(UnderMat, static_cast<uint16>(under));
+		remainingToGround -= under;
 	}
-
-	// Apply erosion more naturally
-	float ErosionFactor = FMath::Lerp(1.0f, FMath::Max(0.6f, 1.0f - FMath::Abs(ErosionValue) * 0.3f), ErosionStrength);
-	if (BaseHeight < 0.5f)  // Only erode lower areas
+	// Top surface
+	int32 top = FMath::Min(SurfaceThickness, remainingToGround);
+	if (top > 0)
 	{
-		BaseHeight *= ErosionFactor;
+		OutPieces.Emplace(TopMat, static_cast<uint16>(top));
+		remainingToGround -= top;
 	}
-
-	// Add detail
-	BaseHeight += DetailValue;
-
-	// Smooth height remapping to reduce sharp transitions
-	float Height;
-
-	if (BaseHeight < -0.2f)
+	// Water if below sea level
+	if (GroundHeightLayers < SeaLevel)
 	{
-		// Ocean
-		Height = Remap(BaseHeight, -1.5f, -0.2f, ValleyFloorHeight, SeaLevel);
-	}
-	else if (BaseHeight < 0.1f)
-	{
-		// Coastal transition
-		float t = Remap(BaseHeight, -0.2f, 0.1f, 0.0f, 1.0f);
-		Height = Lerp(SeaLevel, DefaultLandHeight - 10, SmoothStep(0.0f, 1.0f, t));
-	}
-	else if (BaseHeight < 0.5f)
-	{
-		// Plains and hills with smooth transitions
-		float t = Remap(BaseHeight, 0.1f, 0.5f, 0.0f, 1.0f);
-		Height = Lerp(DefaultLandHeight - 10, DefaultLandHeight + 40, t);
-	}
-	else if (BaseHeight < 1.0f)
-	{
-		// Foothills
-		float t = Remap(BaseHeight, 0.5f, 1.0f, 0.0f, 1.0f);
-		Height = Lerp(DefaultLandHeight + 40, DefaultLandHeight + 80, SmoothStep(0.0f, 1.0f, t));
-	}
-	else
-	{
-		// Mountains with controlled height
-		float t = FMath::Min(Remap(BaseHeight, 1.0f, 2.5f, 0.0f, 1.0f), 1.0f);
-		Height = Lerp(DefaultLandHeight + 80, MountainPeakHeight, FMath::Pow(t, 1.5f));
-	}
-
-	// Softer terracing for mountains
-	if (Height > DefaultLandHeight + 60)
-	{
-		float TerraceStrength = 0.15f;  // Reduced from 0.3f
-		float TerraceHeight = 12.0f;
-		float Terrace = FMath::Fmod(Height, TerraceHeight) / TerraceHeight;
-		Terrace = SmoothStep(0.3f, 0.7f, Terrace) * TerraceHeight;
-		Height = FMath::Lerp(Height, FMath::FloorToFloat(Height / TerraceHeight) * TerraceHeight + Terrace, TerraceStrength);
-	}
-
-	return FMath::Clamp(Height, 1.0f, GameConstants::Chunk::Height - 1.0f);
-}
-
-float UNoiseWorldGenerator::GetTemperature(float WorldX, float WorldY, float Height) const
-{
-	// Base temperature from noise
-	float Temperature = TemperatureNoise->GetNoise2D(WorldX, WorldY);
-
-	// Latitude simulation (colder at extremes)
-	float LatitudeFactor = FMath::Sin(WorldY * 0.001f);
-	Temperature += LatitudeFactor * 0.3f;
-
-	// Altitude affects temperature (colder at height)
-	float AltitudeFactor = Remap(Height, SeaLevel, MountainPeakHeight, 0.0f, -0.8f);
-	Temperature += AltitudeFactor;
-
-	// Normalize to 0-1 range (0 = cold, 1 = hot)
-	return FMath::Clamp((Temperature + 1.0f) * 0.5f, 0.0f, 1.0f);
-}
-
-float UNoiseWorldGenerator::GetPrecipitation(float WorldX, float WorldY) const
-{
-	// Base precipitation from noise
-	float Precipitation = PrecipitationNoise->GetNoise2D(WorldX, WorldY);
-
-	// Add some variation
-	float Variation = PrecipitationNoise->GetNoise2D(WorldX * 2.0f, WorldY * 2.0f) * 0.3f;
-	Precipitation += Variation;
-
-	// Normalize to 0-1 range (0 = dry, 1 = wet)
-	return FMath::Clamp((Precipitation + 1.0f) * 0.5f, 0.0f, 1.0f);
-}
-
-EBiomeType UNoiseWorldGenerator::GetBiome(float Temperature, float Precipitation) const
-{
-	// Whittaker biome classification
-	// Temperature: 0 = Cold, 1 = Hot
-	// Precipitation: 0 = Dry, 1 = Wet
-
-	if (Temperature < 0.15f)
-	{
-		// Very cold
-		if (Precipitation < 0.3f)
-			return EBiomeType::Tundra;
-		else
-			return EBiomeType::Ice;
-	}
-	else if (Temperature < 0.35f)
-	{
-		// Cold
-		if (Precipitation < 0.3f)
-			return EBiomeType::Tundra;
-		else if (Precipitation < 0.6f)
-			return EBiomeType::Taiga;
-		else
-			return EBiomeType::Taiga;
-	}
-	else if (Temperature < 0.6f)
-	{
-		// Temperate
-		if (Precipitation < 0.2f)
-			return EBiomeType::Desert;
-		else if (Precipitation < 0.5f)
-			return EBiomeType::Grassland;
-		else if (Precipitation < 0.8f)
-			return EBiomeType::DeciduousForest;
-		else
-			return EBiomeType::TemperateRainforest;
-	}
-	else
-	{
-		// Hot/Tropical
-		if (Precipitation < 0.3f)
-			return EBiomeType::Desert;
-		else if (Precipitation < 0.6f)
-			return EBiomeType::Savanna;
-		else
-			return EBiomeType::TropicalRainforest;
-	}
-}
-
-float UNoiseWorldGenerator::GetMountainVariation(float WorldX, float WorldY) const
-{
-	// Worley noise for cellular mountain patterns
-	float WorleyValue = WorleyNoise->GetNoise2D(WorldX, WorldY);
-	WorleyValue = 1.0f - FMath::Abs(WorleyValue);  // Invert for peaks at cell centers
-
-	// Ridge noise for mountain ridges
-	float RidgeValue = RidgeNoise->GetNoise2D(WorldX, WorldY);
-	RidgeValue = 1.0f - FMath::Abs(RidgeValue);  // Create ridge effect
-
-	// Combine both for varied mountain shapes
-	float Variation = Lerp(WorleyValue, RidgeValue, 0.5f);
-
-	// Add some detail
-	float Detail = RidgeNoise->GetNoise2D(WorldX * 3.0f, WorldY * 3.0f) * 0.2f;
-	Variation += Detail;
-
-	return FMath::Clamp(Variation, -1.0f, 1.0f);
-}
-
-void UNoiseWorldGenerator::SmoothTerrain(TArray<float>& Heights) const
-{
-	// Gaussian blur to smooth terrain and reduce spikes
-	TArray<float> SmoothedHeights = Heights;
-
-	for (int X = 1; X < GameConstants::Chunk::Size - 1; ++X)
-	{
-		for (int Y = 1; Y < GameConstants::Chunk::Size - 1; ++Y)
+		const int32 water = SeaLevel - GroundHeightLayers;
+		if (water > 0)
 		{
-			const int Index = UChunkData::GetIndex(X, Y);
-
-			// 3x3 Gaussian kernel
-			float Sum = 0.0f;
-			float Weight = 0.0f;
-
-			for (int DX = -1; DX <= 1; ++DX)
-			{
-				for (int DY = -1; DY <= 1; ++DY)
-				{
-					const int NIndex = UChunkData::GetIndex(X + DX, Y + DY);
-					float W = (DX == 0 && DY == 0) ? 4.0f : (DX == 0 || DY == 0) ? 2.0f : 1.0f;
-					Sum += Heights[NIndex] * W;
-					Weight += W;
-				}
-			}
-
-			SmoothedHeights[Index] = Sum / Weight;
-
-			// Limit change to prevent over-smoothing
-			float Diff = SmoothedHeights[Index] - Heights[Index];
-			SmoothedHeights[Index] = Heights[Index] + Diff * 0.5f;
+			OutPieces.Emplace(EMaterial::Water, static_cast<uint16>(water));
 		}
 	}
-
-	Heights = SmoothedHeights;
-}
-
-float UNoiseWorldGenerator::Lerp(float A, float B, float T)
-{
-	return A + (B - A) * FMath::Clamp(T, 0.0f, 1.0f);
-}
-
-void UNoiseWorldGenerator::ApplyErosion(TArray<float>& Heights, int32 ChunkX, int32 ChunkY) const
-{
-	// Gentle erosion simulation to preserve mountains while creating valleys
-	const int Iterations = 2;  // Fewer iterations to preserve peaks
-	const float ErosionRate = 0.04f;  // Gentler erosion
-	const float DepositionRate = 0.02f;  // Less deposition
-
-	for (int Iter = 0; Iter < Iterations; ++Iter)
+	// Void to top
+	const int32 filled = FMath::Max(GroundHeightLayers, SeaLevel);
+	const int32 voidH = TotalH - filled;
+	if (voidH > 0)
 	{
-		TArray<float> NewHeights = Heights;
+		OutPieces.Emplace(EMaterial::Void, static_cast<uint16>(voidH));
+	}
+}
 
-		for (int X = 1; X < GameConstants::Chunk::Size - 1; ++X)
+void UNoiseWorldGenerator::GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<FEntityRecord>& OutEntities)
+{
+	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
+	OutEntities.Empty();
+
+	const int32 ChunkSize = GameConstants::Chunk::Size;
+	const int32 SeaLevel = SeaLevelLayers;
+
+	// Deterministic RNG per chunk to keep spawns stable across sessions
+	const int32 SeedMix = Seed ^ (Position.X * 92837111) ^ (Position.Y * 689287499);
+	FRandomStream RNG(SeedMix);
+
+	// Track placed spawns to enforce per-chunk spacing based on asset Radius (in blocks)
+	struct FPlacedSpawn { FVector2D PosBlocks; float RadiusBlocks; };
+	TArray<FPlacedSpawn> PlacedSpawns;
+	PlacedSpawns.Reserve(64);
+
+	for (int32 lx = 0; lx < ChunkSize; ++lx)
+	{
+		for (int32 ly = 0; ly < ChunkSize; ++ly)
 		{
-			for (int Y = 1; Y < GameConstants::Chunk::Size - 1; ++Y)
+			const int32 gx = Position.X * ChunkSize + lx;
+			const int32 gy = Position.Y * ChunkSize + ly;
+
+			// Continents → oceans/land
+			const float landMask = ComputeLandMask((float)gx, (float)gy); // [0,1]
+			const float coast = landMask - 0.5f; // negative = ocean
+			const bool bOcean = coast < 0.0f;
+
+			// Mountains
+			const float mMask = ComputeMountainMask((float)gx, (float)gy); // [0,1]
+
+			// Detail jitter
+			const float jitter = Fractal2D(DetailNoise, (float)gx, (float)gy, DetailFrequency, 3, 2.0f, 0.5f); // [-1,1]
+
+			// Temperature & moisture
+			float temp01 = RemapTo01(Fractal2D(TempNoise, (float)gx, (float)gy, TemperatureFrequency, 4, 2.0f, 0.5f));
+			float moist01 = RemapTo01(Fractal2D(MoistureNoise, (float)gx, (float)gy, MoistureFrequency, 4, 2.0f, 0.5f));
+
+			// Optional very subtle latitudinal gradient by world Y
+			temp01 = Clamp01(temp01 - 0.15f * FMath::Abs(FMath::Sin((float)gy * 0.00005f)));
+
+			int32 groundH = 0;
+			if (bOcean)
 			{
-				const int Index = UChunkData::GetIndex(X, Y);
-				const float CurrentHeight = Heights[Index];
+				const float oceanT = Clamp01(-coast * 2.0f); // 0 at shore, 1 deep ocean
+				const float depth = FMath::Lerp((float)MinOceanDepthLayers, (float)MaxOceanDepthLayers, oceanT);
+				const float depthJitter = MaxDetailJitterLayers * (jitter * 0.5f + 0.5f) - (MaxDetailJitterLayers * 0.5f);
+				groundH = FMath::RoundToInt((float)SeaLevel - depth + depthJitter);
+			}
+			else
+			{
+				const float inland = Clamp01(coast * 2.0f); // 0 at shore, 1 deep inland
+				float base = (float)SeaLevel + (float)BaseLandHeightLayers * inland;
+				float mountainAdd = (float)MountainExtraHeightLayers * FMath::Pow(mMask * inland, 1.2f);
+				float jitterLayers = (float)MaxDetailJitterLayers * jitter;
+				groundH = FMath::RoundToInt(base + mountainAdd + jitterLayers);
+			}
 
-				// Calculate height differences with neighbors
-				float TotalDiff = 0.0f;
-				float MaxDiff = 0.0f;
-				int LowestNeighbor = Index;
+			groundH = FMath::Clamp(groundH, 1, GameConstants::Chunk::Height - 1);
+			const bool bMountain = (!bOcean) && (mMask > 0.6f || groundH > SeaLevel + BaseLandHeightLayers + MountainExtraHeightLayers * 0.25f);
 
-				// Check all 8 neighbors
-				for (int DX = -1; DX <= 1; ++DX)
+			EBiome biome = EBiome::Plains;
+			ChooseBiome(temp01, moist01, bOcean, bMountain, groundH, biome);
+
+			TArray<FPiece> pieces;
+			pieces.Reserve(5);
+
+			// Compute local slope to decide if this column is a cliff (expose stone) or gentle (grass/dirt)
+			auto ComputeGroundH = [&](int32 X, int32 Y) -> int32
+			{
+				const float landM = ComputeLandMask((float)X, (float)Y);
+				const float cst = landM - 0.5f;
+				const bool ocean = cst < 0.0f;
+				const float mM = ComputeMountainMask((float)X, (float)Y);
+				const float j = Fractal2D(DetailNoise, (float)X, (float)Y, DetailFrequency, 3, 2.0f, 0.5f);
+				int32 h = 0;
+				if (ocean)
 				{
-					for (int DY = -1; DY <= 1; ++DY)
+					const float oceanT = Clamp01(-cst * 2.0f);
+					const float depth = FMath::Lerp((float)MinOceanDepthLayers, (float)MaxOceanDepthLayers, oceanT);
+					const float depthJitter = MaxDetailJitterLayers * (j * 0.5f + 0.5f) - (MaxDetailJitterLayers * 0.5f);
+					h = FMath::RoundToInt((float)SeaLevel - depth + depthJitter);
+				}
+				else
+				{
+					const float inland = Clamp01(cst * 2.0f);
+					float base = (float)SeaLevel + (float)BaseLandHeightLayers * inland;
+					float mountainAdd = (float)MountainExtraHeightLayers * FMath::Pow(mM * inland, 1.2f);
+					float jitterLayers = (float)MaxDetailJitterLayers * j;
+					h = FMath::RoundToInt(base + mountainAdd + jitterLayers);
+				}
+				return FMath::Clamp(h, 1, GameConstants::Chunk::Height - 1);
+			};
+
+			const int32 hx_p = ComputeGroundH(gx + 1, gy);
+			const int32 hx_m = ComputeGroundH(gx - 1, gy);
+			const int32 hy_p = ComputeGroundH(gx, gy + 1);
+			const int32 hy_m = ComputeGroundH(gx, gy - 1);
+			const float dHdx = 0.5f * float(hx_p - hx_m);
+			const float dHdy = 0.5f * float(hy_p - hy_m);
+			const float slope = FMath::Sqrt(dHdx * dHdx + dHdy * dHdy);
+			const bool bIsCliff = (!bOcean) && (slope >= (float)CliffSlopeThresholdLayersPerBlock);
+
+			BuildColumn(groundH, SeaLevel, biome, bIsCliff, bMountain, pieces);
+
+			const int32 idx = UChunkData::GetIndex(lx, ly);
+			OutColumns[idx] = FChunkColumn{ MoveTemp(pieces) };
+
+			// Instance spawning per column
+			if (bSpawnInstances && InstanceTypes.Num() > 0)
+			{
+				// Determine surface material (last piece that is not Void/Water)
+				EMaterial SurfaceMat = EMaterial::Void;
+				const TArray<FPiece>& ColPieces = OutColumns[idx].Pieces;
+				for (const FPiece& P : ColPieces)
+				{
+					if (P.MaterialId != EMaterial::Void && P.MaterialId != EMaterial::Water)
 					{
-						if (DX == 0 && DY == 0) continue;
+						SurfaceMat = P.MaterialId;
+					}
+				}
 
-						const int NX = X + DX;
-						const int NY = Y + DY;
-						const int NIndex = UChunkData::GetIndex(NX, NY);
-
-						const float NeighborHeight = Heights[NIndex];
-						const float Diff = CurrentHeight - NeighborHeight;
-
-						if (Diff > 0)
+				// Skip if underwater (ground below sea means first space above ground is Water)
+				const bool bUnderWater = groundH < SeaLevel;
+				if (!bUnderWater)
+				{
+					// Biome multiplier
+					auto GetBiomeMultiplier = [&](EBiome B) -> float
+					{
+						switch (B)
 						{
-							TotalDiff += Diff;
-							if (Diff > MaxDiff)
+							case EBiome::Forest: return ForestSpawnMultiplier;
+							case EBiome::Plains: return PlainsSpawnMultiplier;
+							case EBiome::Taiga: return TaigaSpawnMultiplier;
+							case EBiome::Desert: return DesertSpawnMultiplier;
+							default: return 1.0f;
+						}
+					};
+					const float BiomeMul = GetBiomeMultiplier(biome);
+
+					// Attempt a single spawn per column at most
+					// Shuffle a copy of InstanceTypes deterministically for variability
+					TArray<UInstanceTypeDataAsset*> Types = InstanceTypes;
+					for (int32 i = 0; i < Types.Num(); ++i)
+					{
+						int32 j = RNG.RandRange(i, Types.Num() - 1);
+						Types.Swap(i, j);
+					}
+
+					for (UInstanceTypeDataAsset* Type : Types)
+					{
+						if (!Type) continue;
+						// Surface filter
+						if (Type->ValidSurfaces.Num() > 0 && !Type->ValidSurfaces.Contains(SurfaceMat))
+						{
+							continue;
+						}
+						// Chance
+						const float EffChance = FMath::Clamp(Type->SpawnChance * BiomeMul, 0.0f, 1.0f);
+						if (RNG.FRand() > EffChance)
+						{
+							continue;
+						}
+
+						// Spacing and clearance
+						const float RadiusBlocks = FMath::Max(0.0f, Type->Radius);
+						const float RequiredVoid = (float)FMath::Max(0, Type->Height);
+						// Ensure enough void above ground (ignore if trivially satisfied)
+						const int32 TotalH = GameConstants::Chunk::Height;
+						const int32 VoidAbove = TotalH - groundH;
+						if (VoidAbove < RequiredVoid)
+						{
+							continue;
+						}
+
+						// Enforce distance from prior placed spawns in this chunk
+						const FVector2D Candidate((float)gx + 0.5f, (float)gy + 0.5f);
+						bool bTooClose = false;
+						for (const FPlacedSpawn& PS : PlacedSpawns)
+						{
+							const float Dist = FVector2D::Distance(Candidate, PS.PosBlocks);
+							if (Dist < (RadiusBlocks + PS.RadiusBlocks))
 							{
-								MaxDiff = Diff;
-								LowestNeighbor = NIndex;
+								bTooClose = true;
+								break;
 							}
 						}
-					}
-				}
-
-				// Apply erosion (but preserve mountains)
-				if (TotalDiff > 0)
-				{
-					// Skip erosion for tall mountains to preserve peaks
-					if (CurrentHeight > DefaultLandHeight + 60)
-					{
-						continue;  // Don't erode mountains
-					}
-
-					// Gentle erosion for lower areas
-					float ErosionAmount = FMath::Min(MaxDiff * ErosionRate, CurrentHeight - ValleyFloorHeight);
-
-					// Only apply erosion in low-lying areas
-					if (CurrentHeight < DefaultLandHeight)
-					{
-						NewHeights[Index] -= ErosionAmount;
-
-						// Deposit some material to the lowest neighbor
-						if (LowestNeighbor != Index)
+						if (bTooClose)
 						{
-							NewHeights[LowestNeighbor] += ErosionAmount * DepositionRate;
+							continue;
 						}
+
+						// Passed: create entity record
+						const float XY = GameConstants::Scaling::XYWorldSize;
+						const float ZS = GameConstants::Scaling::ZWorldSize;
+						const float Scale = RNG.FRandRange(Type->MinScale, Type->MaxScale);
+						const float Yaw = RNG.FRandRange(0.0f, 360.0f);
+
+						FEntityRecord Rec;
+						Rec.Transform = FTransform(
+							FRotator(0.0f, Yaw, 0.0f),
+							FVector((lx + 0.5f) * XY, (ly + 0.5f) * XY, (float)groundH * ZS),
+							FVector(Scale)
+						);
+						Rec.InstanceTypeId = Type->GetPrimaryAssetId();
+						OutEntities.Add(MoveTemp(Rec));
+
+						PlacedSpawns.Add({ Candidate, RadiusBlocks * Scale });
+						break; // one spawn max per column
 					}
 				}
 			}
 		}
-
-		Heights = NewHeights;
 	}
-}
-
-EMaterial UNoiseWorldGenerator::GetMaterialForBiome(float Height, EBiomeType Biome, float Temperature, float Precipitation, bool bIsUnderwater) const
-{
-	if (bIsUnderwater)
-	{
-		// Underwater materials
-		if (Height < ValleyFloorHeight + 5)
-		{
-			return EMaterial::Stone;  // Deep ocean floor
-		}
-		else if (Height < SeaLevel - 10)
-		{
-			return EMaterial::Sand;  // Ocean floor
-		}
-		else
-		{
-			return EMaterial::Sand;  // Shallow water
-		}
-	}
-
-	// Beach/coast
-	if (Height < SeaLevel + 3)
-	{
-		return EMaterial::Sand;
-	}
-
-	// Temperature-based snow with gradual spread
-	// Snow appears at different heights based on temperature
-	float SnowLineBase = DefaultLandHeight + 100;  // Base snow line
-	float SnowLine = SnowLineBase - (1.0f - Temperature) * 50.0f;  // Lower snow line in cold areas
-
-	// Gradual snow transition
-	if (Height > SnowLine)
-	{
-		float SnowFactor = Remap(Height, SnowLine, SnowLine + 30, 0.0f, 1.0f);
-		SnowFactor *= (1.0f - Temperature);  // More snow in cold areas
-
-		// Add some noise to the snow line for natural variation
-		float NoiseOffset = DetailNoise->GetNoise2D(Height * 0.1f, Temperature * 100.0f) * 10.0f;
-		SnowFactor = FMath::Clamp(SnowFactor + NoiseOffset * 0.1f, 0.0f, 1.0f);
-
-		if (SnowFactor > 0.7f)
-		{
-			return EMaterial::Snow;
-		}
-		else if (SnowFactor > 0.4f && Height > DefaultLandHeight + 80)
-		{
-			// Transition zone - mix of stone and snow (represented as stone here)
-			return EMaterial::Stone;
-		}
-	}
-
-	// Biome-based materials
-	switch (Biome)
-	{
-	case EBiomeType::Desert:
-		if (Height < DefaultLandHeight + 20)
-			return EMaterial::Sand;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::Savanna:
-		if (Height < DefaultLandHeight + 15)
-			return Precipitation < 0.4f ? EMaterial::Sand : EMaterial::Dirt;
-		else if (Height < DefaultLandHeight + 40)
-			return EMaterial::Dirt;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::TropicalRainforest:
-		if (Height < DefaultLandHeight + 30)
-			return EMaterial::Grass;
-		else if (Height < DefaultLandHeight + 50)
-			return EMaterial::Dirt;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::Grassland:
-		if (Height < DefaultLandHeight + 40)
-			return EMaterial::Grass;
-		else if (Height < DefaultLandHeight + 60)
-			return Precipitation < 0.3f ? EMaterial::Dirt : EMaterial::Grass;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::DeciduousForest:
-		if (Height < DefaultLandHeight + 25)
-			return EMaterial::Grass;
-		else if (Height < DefaultLandHeight + 50)
-			return EMaterial::Dirt;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::TemperateRainforest:
-		if (Height < DefaultLandHeight + 20)
-			return EMaterial::Grass;
-		else if (Height < DefaultLandHeight + 45)
-			return EMaterial::Dirt;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::Taiga:
-		if (Height < DefaultLandHeight + 15)
-			return Temperature < 0.25f ? EMaterial::Snow : EMaterial::Grass;
-		else if (Height < DefaultLandHeight + 40)
-			return EMaterial::Dirt;
-		else
-			return EMaterial::Stone;
-
-	case EBiomeType::Tundra:
-		if (Height < DefaultLandHeight + 10)
-			return Temperature < 0.2f ? EMaterial::Snow : EMaterial::Dirt;
-		else if (Height < DefaultLandHeight + 30)
-			return EMaterial::Stone;
-		else
-			return Temperature < 0.3f ? EMaterial::Snow : EMaterial::Stone;
-
-	case EBiomeType::Ice:
-		return EMaterial::Snow;
-
-	default:
-		return EMaterial::Grass;
-	}
-}
-
-float UNoiseWorldGenerator::Remap(float Value, float OldMin, float OldMax, float NewMin, float NewMax)
-{
-	return NewMin + (Value - OldMin) * (NewMax - NewMin) / (OldMax - OldMin);
-}
-
-float UNoiseWorldGenerator::SmoothStep(float Edge0, float Edge1, float X)
-{
-	float T = FMath::Clamp((X - Edge0) / (Edge1 - Edge0), 0.0f, 1.0f);
-	return T * T * (3.0f - 2.0f * T);
-}
-
-float UNoiseWorldGenerator::TerrainCurve(float Value)
-{
-	// Custom curve to favor land generation with dramatic mountains
-	float Result = Value;
-
-	if (Result > -0.2f)
-	{
-		// Shift most values to positive (land) territory
-		Result = Result + 0.3f;  // Bias toward land
-
-		if (Result > 0.0f)
-		{
-			// Amplify positive values for mountains
-			Result = FMath::Pow(Result, 1.2f);
-
-			// Create VERY dramatic peaks for mountain values
-			if (Result > 0.4f)
-			{
-				Result = 0.4f + FMath::Pow((Result - 0.4f) * 3.0f, 2.5f);
-			}
-		}
-	}
-	else
-	{
-		// Keep some water areas but make them less common
-		Result = -FMath::Pow(-Result, 2.0f) * 0.5f;  // Reduce ocean depth and frequency
-	}
-
-	// Add redistribution to create interesting features
-	if (Result > 0.2f && Result < 0.4f)
-	{
-		// Create plateau effect for default land height
-		Result = FMath::Lerp(Result, 0.3f, 0.7f);
-	}
-
-	return Result;
 }

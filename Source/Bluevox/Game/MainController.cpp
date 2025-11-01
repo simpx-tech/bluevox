@@ -13,6 +13,9 @@
 #include "GameFramework/CharacterMovementComponent.h"
 #include "Kismet/GameplayStatics.h"
 #include "Net/UnrealNetwork.h"
+#include "GameFramework/GameUserSettings.h"
+#include "Misc/ConfigCacheIni.h"
+#include "HAL/IConsoleManager.h"
 
 AMainController::AMainController()
 {
@@ -145,7 +148,276 @@ void AMainController::BeginPlay()
 	
 	Super::BeginPlay();
 
+	// Apply saved graphics settings on the local player only (client side)
+	if (IsLocalController())
+	{
+		Cl_ApplySavedGraphicsSettings();
+	}
+
 	GameManager->OnPlayerJoin.Broadcast(this);
+}
+
+// --- Graphics settings helpers and API ---
+namespace
+{
+	static const TCHAR* const BluevoxGraphicsSection = TEXT("Bluevox.Graphics");
+	static const TCHAR* const KeyPreset = TEXT("ScalabilityPreset");
+	static const TCHAR* const KeyVSM = TEXT("VSMEnabled");
+	static const TCHAR* const KeyLumen = TEXT("LumenEnabled");
+	static const TCHAR* const KeyAA = TEXT("AAMethod");
+	// DLSS keys
+	static const TCHAR* const KeyDLSSEnabled = TEXT("DLSSEnabled");
+	static const TCHAR* const KeyDLSSQuality = TEXT("DLSSQuality");
+	static const TCHAR* const KeyDLSSSharpness = TEXT("DLSSSharpness");
+}
+
+int32 AMainController::PresetToLevel(EGraphicsQualityPreset Preset)
+{
+	switch (Preset)
+	{
+		case EGraphicsQualityPreset::Low: return 0;
+		case EGraphicsQualityPreset::Medium: return 1;
+		case EGraphicsQualityPreset::High: return 2;
+		case EGraphicsQualityPreset::Epic: return 3;
+		case EGraphicsQualityPreset::Cinematic: return 4;
+		default: return 3;
+	}
+}
+
+EGraphicsQualityPreset AMainController::LevelToPreset(const int32 Level)
+{
+	switch (Level)
+	{
+		case 0: return EGraphicsQualityPreset::Low;
+		case 1: return EGraphicsQualityPreset::Medium;
+		case 2: return EGraphicsQualityPreset::High;
+		case 3: return EGraphicsQualityPreset::Epic;
+		case 4: return EGraphicsQualityPreset::Cinematic;
+		default: return EGraphicsQualityPreset::Epic;
+	}
+}
+
+void AMainController::Cl_ApplyGraphicsQualityPreset(const EGraphicsQualityPreset Preset)
+{
+	if (!IsLocalController()) return;
+
+	if (UGameUserSettings* Settings = UGameUserSettings::GetGameUserSettings())
+	{
+		Settings->SetOverallScalabilityLevel(PresetToLevel(Preset));
+		// Apply non-resolution settings immediately in PIE/editor as well
+		Settings->ApplyNonResolutionSettings();
+		Settings->SaveSettings();
+	}
+
+	if (GConfig)
+	{
+		GConfig->SetInt(BluevoxGraphicsSection, KeyPreset, PresetToLevel(Preset), GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+void AMainController::Cl_SetVirtualShadowMapsEnabled(const bool bEnabled)
+{
+	if (!IsLocalController()) return;
+
+	if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.Shadow.Virtual.Enable")))
+	{
+		CVar->Set(bEnabled ? 1 : 0, ECVF_SetByGameSetting);
+	}
+
+	if (GConfig)
+	{
+		GConfig->SetBool(BluevoxGraphicsSection, KeyVSM, bEnabled, GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+void AMainController::Cl_SetLumenEnabled(const bool bEnabled)
+{
+	if (!IsLocalController()) return;
+
+	// 2 = Lumen, 1 = SSGI/ScreenSpace
+	if (IConsoleVariable* GiCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.DynamicGlobalIlluminationMethod")))
+	{
+		GiCVar->Set(bEnabled ? 2 : 1, ECVF_SetByGameSetting);
+	}
+	if (IConsoleVariable* ReflCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.ReflectionMethod")))
+	{
+		ReflCVar->Set(bEnabled ? 2 : 1, ECVF_SetByGameSetting);
+	}
+
+	if (GConfig)
+	{
+		GConfig->SetBool(BluevoxGraphicsSection, KeyLumen, bEnabled, GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+void AMainController::Cl_SetAntialiasingMethod(const EBluevoxAAMethod Method)
+{
+	if (!IsLocalController()) return;
+
+	int32 MethodInt = 2; // default TAA
+	switch (Method)
+	{
+		case EBluevoxAAMethod::AA_None: MethodInt = 0; break;
+		case EBluevoxAAMethod::AA_FXAA: MethodInt = 1; break;
+		case EBluevoxAAMethod::AA_TAA:  MethodInt = 2; break;
+		case EBluevoxAAMethod::AA_MSAA: MethodInt = 3; break;
+		case EBluevoxAAMethod::AA_TSR:  MethodInt = 4; break;
+		default: MethodInt = 2; break;
+	}
+
+	if (IConsoleVariable* CVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.AntiAliasingMethod")))
+	{
+		CVar->Set(MethodInt, ECVF_SetByGameSetting);
+	}
+
+	if (GConfig)
+	{
+		GConfig->SetInt(BluevoxGraphicsSection, KeyAA, MethodInt, GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+void AMainController::Cl_SetDLSSSettings(const bool bEnable, const EBluevoxDLSSQuality QualityMode, const float Sharpness)
+{
+	if (!IsLocalController()) return;
+
+	// Enable/disable DLSS
+	if (IConsoleVariable* EnableCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.NGX.DLSS.Enable")))
+	{
+		EnableCVar->Set(bEnable ? 1 : 0, ECVF_SetByGameSetting);
+	}
+
+	// Map quality to Unreal DLSS quality CVAR values
+	int32 QualityValue = -2; // -2 = Auto (we won't use, but keep as default)
+	switch (QualityMode)
+	{
+		case EBluevoxDLSSQuality::DLSS_UltraPerformance: QualityValue = 4; break;
+		case EBluevoxDLSSQuality::DLSS_Performance:      QualityValue = 3; break;
+		case EBluevoxDLSSQuality::DLSS_Balanced:         QualityValue = 2; break;
+		case EBluevoxDLSSQuality::DLSS_Quality:          QualityValue = 1; break;
+		case EBluevoxDLSSQuality::DLSS_UltraQuality:     QualityValue = 0; break;
+		case EBluevoxDLSSQuality::DLSS_DLAA:             QualityValue = -1; break;
+		case EBluevoxDLSSQuality::DLSS_Off:              QualityValue = 1; break; // default quality when off
+		default: QualityValue = 1; break;
+	}
+
+	if (bEnable)
+	{
+		if (IConsoleVariable* QualityCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.NGX.DLSS.Quality")))
+		{
+			QualityCVar->Set(QualityValue, ECVF_SetByGameSetting);
+		}
+	}
+
+	// Sharpness clamp [0..1]
+	const float ClampedSharpness = FMath::Clamp(Sharpness, 0.0f, 1.0f);
+	if (IConsoleVariable* SharpCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("r.NGX.DLSS.Sharpness")))
+	{
+		SharpCVar->Set(ClampedSharpness, ECVF_SetByGameSetting);
+	}
+
+	// Persist
+	if (GConfig)
+	{
+		GConfig->SetBool(BluevoxGraphicsSection, KeyDLSSEnabled, bEnable, GGameUserSettingsIni);
+		GConfig->SetInt(BluevoxGraphicsSection, KeyDLSSQuality, static_cast<int32>(QualityMode), GGameUserSettingsIni);
+		GConfig->SetFloat(BluevoxGraphicsSection, KeyDLSSSharpness, ClampedSharpness, GGameUserSettingsIni);
+		GConfig->Flush(false, GGameUserSettingsIni);
+	}
+}
+
+EGraphicsQualityPreset AMainController::Cl_GetSavedGraphicsQualityPreset() const
+{
+	int32 Level = 3;
+	if (GConfig)
+	{
+		GConfig->GetInt(BluevoxGraphicsSection, KeyPreset, Level, GGameUserSettingsIni);
+	}
+	return LevelToPreset(Level);
+}
+
+bool AMainController::Cl_GetSavedVSMEnabled() const
+{
+	bool bEnabled = true;
+	if (GConfig)
+	{
+		GConfig->GetBool(BluevoxGraphicsSection, KeyVSM, bEnabled, GGameUserSettingsIni);
+	}
+	return bEnabled;
+}
+
+bool AMainController::Cl_GetSavedLumenEnabled() const
+{
+	bool bEnabled = true;
+	if (GConfig)
+	{
+		GConfig->GetBool(BluevoxGraphicsSection, KeyLumen, bEnabled, GGameUserSettingsIni);
+	}
+	return bEnabled;
+}
+
+EBluevoxAAMethod AMainController::Cl_GetSavedAntialiasingMethod() const
+{
+	int32 MethodInt = 2; // default TAA
+	if (GConfig)
+	{
+		GConfig->GetInt(BluevoxGraphicsSection, KeyAA, MethodInt, GGameUserSettingsIni);
+	}
+	switch (MethodInt)
+	{
+		case 0: return EBluevoxAAMethod::AA_None;
+		case 1: return EBluevoxAAMethod::AA_FXAA;
+		case 2: return EBluevoxAAMethod::AA_TAA;
+		case 3: return EBluevoxAAMethod::AA_MSAA;
+		case 4: return EBluevoxAAMethod::AA_TSR;
+		default: return EBluevoxAAMethod::AA_TAA;
+	}
+}
+
+bool AMainController::Cl_GetSavedDLSSEnabled() const
+{
+	bool bEnabled = false;
+	if (GConfig)
+	{
+		GConfig->GetBool(BluevoxGraphicsSection, KeyDLSSEnabled, bEnabled, GGameUserSettingsIni);
+	}
+	return bEnabled;
+}
+
+EBluevoxDLSSQuality AMainController::Cl_GetSavedDLSSQuality() const
+{
+	int32 Saved = static_cast<int32>(EBluevoxDLSSQuality::DLSS_Quality);
+	if (GConfig)
+	{
+		GConfig->GetInt(BluevoxGraphicsSection, KeyDLSSQuality, Saved, GGameUserSettingsIni);
+	}
+	// Clamp to enum range
+	Saved = FMath::Clamp(Saved, 0, static_cast<int32>(EBluevoxDLSSQuality::DLSS_DLAA));
+	return static_cast<EBluevoxDLSSQuality>(Saved);
+}
+
+float AMainController::Cl_GetSavedDLSSSharpness() const
+{
+	float Sharpness = 0.5f;
+	if (GConfig)
+	{
+		GConfig->GetFloat(BluevoxGraphicsSection, KeyDLSSSharpness, Sharpness, GGameUserSettingsIni);
+	}
+	return FMath::Clamp(Sharpness, 0.0f, 1.0f);
+}
+
+void AMainController::Cl_ApplySavedGraphicsSettings()
+{
+	if (!IsLocalController()) return;
+
+	Cl_ApplyGraphicsQualityPreset(Cl_GetSavedGraphicsQualityPreset());
+	Cl_SetVirtualShadowMapsEnabled(Cl_GetSavedVSMEnabled());
+	Cl_SetLumenEnabled(Cl_GetSavedLumenEnabled());
+	Cl_SetAntialiasingMethod(Cl_GetSavedAntialiasingMethod());
+	Cl_SetDLSSSettings(Cl_GetSavedDLSSEnabled(), Cl_GetSavedDLSSQuality(), Cl_GetSavedDLSSSharpness());
 }
 
 void AMainController::OnRep_PlayerState()

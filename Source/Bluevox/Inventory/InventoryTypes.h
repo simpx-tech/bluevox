@@ -6,6 +6,29 @@
 #include "Net/Serialization/FastArraySerializer.h"
 #include "InventoryTypes.generated.h"
 
+UENUM(BlueprintType)
+enum class EInventoryQuerySort : uint8
+{
+	Name		UMETA(DisplayName = "Name (A→Z)"),
+	MostAmount	UMETA(DisplayName = "Most Amount"),
+	MostRecent	UMETA(DisplayName = "Most Recent"),
+	MostWeight	UMETA(DisplayName = "Most Weight")
+};
+
+USTRUCT(BlueprintType)
+struct BLUEVOX_API FInventoryQueryParams
+{
+	GENERATED_BODY()
+
+	/** Sorting mode */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Query")
+	EInventoryQuerySort SortBy = EInventoryQuerySort::MostRecent;
+
+	/** Optional case-insensitive substring to filter by item display name */
+	UPROPERTY(EditAnywhere, BlueprintReadWrite, Category = "Inventory|Query")
+	FString NameFilter;
+};
+
 class UItemTypeDataAsset;
 struct FInventoryItemArray;
 
@@ -30,13 +53,21 @@ struct BLUEVOX_API FInventoryItem : public FFastArraySerializerItem
 	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
 	float TotalWeight = 0.0f;
 
+	/** Last time this stack was modified by an add/stack operation (UTC). Not persisted to save files yet. */
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	FDateTime LastModifiedAt = FDateTime{};
+
+	/** True only for stacks that have just appeared in inventory and haven't been acknowledged yet. Not persisted. */
+	UPROPERTY(BlueprintReadOnly, Category = "Inventory")
+	bool bIsNew = false;
+
 	FInventoryItem()
-		: Amount(1), TotalWeight(0.0f)
+		: Amount(1), TotalWeight(0.0f), LastModifiedAt(FDateTime::UtcNow()), bIsNew(false)
 	{
 	}
 
 	FInventoryItem(const TSoftObjectPtr<UItemTypeDataAsset>& InItemType, int32 InAmount)
-		: ItemType(InItemType), Amount(InAmount), TotalWeight(0.0f)
+		: ItemType(InItemType), Amount(InAmount), TotalWeight(0.0f), LastModifiedAt(FDateTime::UtcNow()), bIsNew(false)
 	{
 	}
 
@@ -56,6 +87,7 @@ struct BLUEVOX_API FInventoryItem : public FFastArraySerializerItem
 		}
 		Ar << Item.Amount;
 		Ar << Item.TotalWeight;
+		// Note: LastModifiedAt is intentionally NOT serialized to preserve backward compatibility with existing saves.
 		return Ar;
 	}
 

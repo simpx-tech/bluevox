@@ -86,6 +86,7 @@ bool UInventoryComponent::Sv_AddItem(const TSoftObjectPtr<UItemTypeDataAsset>& I
 	{
 		// Stack with existing item
 		ExistingItem->Amount += Amount;
+		ExistingItem->LastModifiedAt = FDateTime::UtcNow();
 		UpdateItemWeight(*ExistingItem);
 		ItemArray.MarkItemDirty(*ExistingItem);
 	}
@@ -93,6 +94,9 @@ bool UInventoryComponent::Sv_AddItem(const TSoftObjectPtr<UItemTypeDataAsset>& I
 	{
 		// Create new stack
 		FInventoryItem NewItem(ItemType, Amount);
+		// Mark as new on first appearance
+		NewItem.bIsNew = true;
+		// NewItem.LastModifiedAt already set in constructor to now
 		UpdateItemWeight(NewItem);
 		ItemArray.Items.Add(NewItem);
 		ItemArray.MarkArrayDirty();
@@ -319,6 +323,17 @@ void UInventoryComponent::BroadcastInventoryChanged()
 	OnInventoryChanged.Broadcast();
 }
 
+bool UInventoryComponent::GetItemAtIndex(int32 Index, FInventoryItem& OutItem) const
+{
+	if (Index >= 0 && Index < ItemArray.Items.Num())
+	{
+		OutItem = ItemArray.Items[Index];
+		return true;
+	}
+	OutItem = FInventoryItem();
+	return false;
+}
+
 FInventoryItem* UInventoryComponent::FindItem(const TSoftObjectPtr<UItemTypeDataAsset>& ItemType)
 {
 	for (FInventoryItem& Item : ItemArray.Items)
@@ -329,6 +344,168 @@ FInventoryItem* UInventoryComponent::FindItem(const TSoftObjectPtr<UItemTypeData
 		}
 	}
 	return nullptr;
+}
+
+TArray<FInventoryItem> UInventoryComponent::Query(const FInventoryQueryParams& Params) const
+{
+	TArray<FInventoryItem> Result = ItemArray.Items; // copy
+
+	// Optional name filter (case-insensitive substring)
+	if (!Params.NameFilter.IsEmpty())
+	{
+		const FString FilterLower = Params.NameFilter.ToLower();
+		TArray<FInventoryItem> Filtered;
+		Filtered.Reserve(Result.Num());
+		for (const FInventoryItem& It : Result)
+		{
+			FString NameStr;
+			if (It.ItemType.IsValid())
+			{
+				if (UItemTypeDataAsset* Asset = It.ItemType.LoadSynchronous())
+				{
+					NameStr = Asset->DisplayName.ToString();
+				}
+			}
+			if (NameStr.IsEmpty())
+			{
+				const FString PathStr = It.ItemType.ToString();
+				NameStr = FSoftObjectPath(PathStr).GetAssetName();
+			}
+			if (NameStr.ToLower().Contains(FilterLower))
+			{
+				Filtered.Add(It);
+			}
+		}
+		Result = MoveTemp(Filtered);
+	}
+
+	// Precompute original index for stable "most recent" sorting (higher index = more recent)
+	TMap<TSoftObjectPtr<UItemTypeDataAsset>, int32> OriginalIndex;
+	OriginalIndex.Reserve(ItemArray.Items.Num());
+	for (int32 i = 0; i < ItemArray.Items.Num(); ++i)
+	{
+		OriginalIndex.Add(ItemArray.Items[i].ItemType, i);
+	}
+
+	// Sorting
+	switch (Params.SortBy)
+	{
+		case EInventoryQuerySort::Name:
+		{
+			Result.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+			{
+				auto GetNameLower = [](const FInventoryItem& It) -> FString
+				{
+					FString NameStr;
+					if (It.ItemType.IsValid())
+					{
+						if (UItemTypeDataAsset* Asset = It.ItemType.LoadSynchronous())
+						{
+							NameStr = Asset->DisplayName.ToString();
+						}
+					}
+					if (NameStr.IsEmpty())
+					{
+						const FString PathStr = It.ItemType.ToString();
+						NameStr = FSoftObjectPath(PathStr).GetAssetName();
+					}
+					return NameStr.ToLower();
+				};
+				const FString NA = GetNameLower(A);
+				const FString NB = GetNameLower(B);
+				return NA < NB;
+			});
+			break;
+		}
+		case EInventoryQuerySort::MostAmount:
+		{
+			Result.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+			{
+				if (A.Amount != B.Amount)
+				{
+					return A.Amount > B.Amount; // descending
+				}
+				// tie-breaker by name path
+				return A.ItemType.ToString() < B.ItemType.ToString();
+			});
+			break;
+		}
+		case EInventoryQuerySort::MostWeight:
+		{
+			Result.Sort([](const FInventoryItem& A, const FInventoryItem& B)
+			{
+				if (!FMath::IsNearlyEqual(A.TotalWeight, B.TotalWeight))
+				{
+					return A.TotalWeight > B.TotalWeight; // descending
+				}
+				return A.Amount > B.Amount; // secondary
+			});
+			break;
+		}
+		case EInventoryQuerySort::MostRecent:
+		{
+			Result.Sort([&](const FInventoryItem& A, const FInventoryItem& B)
+			{
+				// Primary: newer LastModifiedAt first
+				if (A.LastModifiedAt != B.LastModifiedAt)
+				{
+					return A.LastModifiedAt > B.LastModifiedAt;
+				}
+				// Fallback: preserve stable order based on original index (higher index considered more recent)
+				const int32* IdxA = OriginalIndex.Find(A.ItemType);
+				const int32* IdxB = OriginalIndex.Find(B.ItemType);
+				const int32 IA = IdxA ? *IdxA : -1;
+				const int32 IB = IdxB ? *IdxB : -1;
+				return IA > IB;
+			});
+			break;
+		}
+		default:
+			break;
+	}
+
+	return Result;
+}
+
+void UInventoryComponent::Sv_MarkItemSeen(const TSoftObjectPtr<UItemTypeDataAsset>& ItemType)
+{
+	if (!Sv_IsServer())
+	{
+		return;
+	}
+	if (!ItemType.IsValid())
+	{
+		return;
+	}
+	FInventoryItem* ExistingItem = FindItem(ItemType);
+	if (ExistingItem && ExistingItem->bIsNew)
+	{
+		ExistingItem->bIsNew = false;
+		ItemArray.MarkItemDirty(*ExistingItem);
+		BroadcastInventoryChanged();
+	}
+}
+
+void UInventoryComponent::Sv_MarkAllItemsSeen()
+{
+	if (!Sv_IsServer())
+	{
+		return;
+	}
+	bool bAnyChanged = false;
+	for (FInventoryItem& Item : ItemArray.Items)
+	{
+		if (Item.bIsNew)
+		{
+			Item.bIsNew = false;
+			ItemArray.MarkItemDirty(Item);
+			bAnyChanged = true;
+		}
+	}
+	if (bAnyChanged)
+	{
+		BroadcastInventoryChanged();
+	}
 }
 
 bool UInventoryComponent::Sv_IsServer() const

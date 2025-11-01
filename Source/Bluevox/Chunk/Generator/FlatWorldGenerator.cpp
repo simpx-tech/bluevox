@@ -9,7 +9,7 @@
 
 void UFlatWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                         TArray<FChunkColumn>& OutColumns,
-                                        TArray<FEntityRecord>& OutEntities) const
+                                        TArray<FEntityRecord>& OutEntities)
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 	OutEntities.Empty(); // FlatWorldGenerator doesn't generate entities

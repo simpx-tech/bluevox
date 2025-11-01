@@ -150,23 +150,48 @@ public:
 	}
 
 	// ========== Getters ==========
-
+	
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	float GetCurrentWeight() const { return CurrentWeight; }
-
+	
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	float GetMaxWeight() const { return MaxWeight; }
-
+	
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	const TArray<FInventoryItem>& GetItems() const { return ItemArray.Items; }
-
+	
 	UFUNCTION(BlueprintPure, Category = "Inventory")
 	AActor* GetOwner() const { return Owner; }
+
+	/**
+	 * Get the item at the given slot index.
+	 * @param Index Slot index within the internal items array (0-based)
+	 * @param OutItem Filled with a copy of the item if found
+	 * @return true if Index was valid and OutItem was filled; false otherwise (OutItem reset)
+	 */
+	UFUNCTION(BlueprintPure, Category = "Inventory")
+	bool GetItemAtIndex(int32 Index, FInventoryItem& OutItem) const;
+
+	// ========== Query ==========
+	/**
+	 * Query items using sorting and optional name filter.
+	 * Name filter performs case-insensitive substring match on the item DisplayName (falls back to asset path if unloaded).
+	 */
+	UFUNCTION(BlueprintPure, Category = "Inventory|Query")
+	TArray<FInventoryItem> Query(const FInventoryQueryParams& Params) const;
 
 	// ========== Setters ==========
 
 	UFUNCTION(BlueprintCallable, Category = "Inventory")
 	void SetMaxWeight(float NewMaxWeight);
+
+	// ========== New Item Acknowledgement ==========
+	/** Explicitly clear the new flag for a specific item type (SERVER ONLY). */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|New")
+	void Sv_MarkItemSeen(const TSoftObjectPtr<UItemTypeDataAsset>& ItemType);
+	/** Clear the new flag for all items in this inventory (SERVER ONLY). */
+	UFUNCTION(BlueprintCallable, Category = "Inventory|New")
+	void Sv_MarkAllItemsSeen();
 
 	// ========== Events ==========
 

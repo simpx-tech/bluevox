@@ -14,7 +14,7 @@ UWorldGenerator* UWorldGenerator::Init(AGameManager* InGameManager)
 
 void UWorldGenerator::GenerateChunk(const FChunkPosition& Position,
                                     TArray<FChunkColumn>& OutColumns,
-                                    TArray<FEntityRecord>& OutEntities) const
+                                    TArray<FEntityRecord>& OutEntities)
 {
 	OutColumns.SetNum(GameConstants::Chunk::Size * GameConstants::Chunk::Size);
 

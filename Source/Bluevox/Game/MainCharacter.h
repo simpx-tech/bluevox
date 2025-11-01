@@ -7,6 +7,10 @@
 
 #include "MainCharacter.generated.h"
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_TwoParams(FOnHeldQuickSlotChanged, int32, NewSlotIndex, int32, OldSlotIndex);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_ThreeParams(FOnQuickInventorySlotChanged, int32, SlotIndex, int32, NewInventoryIndex, int32, OldInventoryIndex);
+
+class AItemWorldActor;
 class AGameManager;
 class UInputAction;
 class UInventoryComponent;
@@ -17,6 +21,16 @@ class BLUEVOX_API AMainCharacter : public ACharacter
 {
 	GENERATED_BODY()
 
+public:
+	// Delegates: Quick inventory updates
+	/** Broadcast when a quick inventory slot changes mapping (assigned, updated, or cleared). */
+	UPROPERTY(BlueprintAssignable, Category = "Quick Inventory|Events")
+	FOnQuickInventorySlotChanged OnQuickInventorySlotChanged;
+	/** Broadcast when the held quick slot changes (-1 means none). */
+	UPROPERTY(BlueprintAssignable, Category = "Quick Inventory|Events")
+	FOnHeldQuickSlotChanged OnHeldQuickSlotChanged;
+
+private:
 	UPROPERTY()
 	AGameManager* GameManager = nullptr;
 
@@ -32,6 +46,20 @@ public:
 	// Called every frame
 	virtual void Tick(float DeltaTime) override;
 
+private:
+	// Previous state caches for client-side diffing
+	UPROPERTY(Transient)
+	TArray<int32> PrevQuickInventorySlots;
+	UPROPERTY(Transient)
+	int32 PrevHeldSlot = -1;
+
+ // Replication notification handlers
+	UFUNCTION()
+	void OnRep_QuickInventorySlots();
+	UFUNCTION()
+	void OnRep_CurrentlyHeldSlot();
+
+public:
 	// Called to bind functionality to input
 	virtual void SetupPlayerInputComponent(class UInputComponent* PlayerInputComponent) override;
 
@@ -52,21 +80,24 @@ public:
 	UInventoryComponent* InventoryComponent = nullptr;
 
 	// ========== Quick Inventory ==========
-
+	
+	/** Number of quick slots available. */
+	static constexpr int32 QuickSlotCount = 12;
+	
 	/**
-	 * Quick inventory slots (8 slots) containing indices to items in the main inventory
+	 * Quick inventory slots (12 slots) containing indices to items in the main inventory
 	 * -1 means the slot is empty (no item assigned)
 	 */
-	UPROPERTY(EditAnywhere, BlueprintReadOnly, Replicated, Category = "Quick Inventory")
-	TArray<int32> QuickInventorySlots;
-
+ UPROPERTY(EditAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_QuickInventorySlots, Category = "Quick Inventory")
+ TArray<int32> QuickInventorySlots;
+	
 	/**
-	 * Index of the currently held quick slot (0-7), or -1 if no item is held
+	 * Index of the currently held quick slot (0-11), or -1 if no item is held
 	 * Replicated so other players can see what item this player is holding
 	 */
-	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Replicated, Category = "Quick Inventory")
-	int32 CurrentlyHeldSlot = -1;
-
+ UPROPERTY(VisibleAnywhere, BlueprintReadOnly, ReplicatedUsing=OnRep_CurrentlyHeldSlot, Category = "Quick Inventory")
+ int32 CurrentlyHeldSlot = -1;
+	
 	UFUNCTION()
 	void HandleMoveAction(const FInputActionValue& Value);
 
@@ -91,7 +122,7 @@ public:
 	UFUNCTION(Server, Reliable)
 	void RSv_PickupItem(AItemWorldActor* ItemActor);
 
-	// Quick slot input handlers (called when player presses 1-8)
+	// Quick slot input handlers (called when player presses 1-12)
 	UFUNCTION()
 	void HandleQuickSlot1Action();
 
@@ -104,53 +135,41 @@ public:
 	UFUNCTION()
 	void HandleQuickSlot4Action();
 
-	UFUNCTION()
-	void HandleQuickSlot5Action();
-
-	UFUNCTION()
-	void HandleQuickSlot6Action();
-
-	UFUNCTION()
-	void HandleQuickSlot7Action();
-
-	UFUNCTION()
-	void HandleQuickSlot8Action();
-
 	// ========== Quick Inventory Methods ==========
-
+	
 	/**
-	 * Handle quick slot input (1-8)
+	 * Handle quick slot input (1-12)
 	 * Toggles between holding and not holding the item in that slot
 	 * Client-side call that sends RPC to server
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Quick Inventory")
 	void Cl_HandleQuickSlotInput(int32 SlotIndex);
-
+	
 	/**
 	 * Server RPC to select or deselect a quick inventory slot
-	 * @param SlotIndex The slot to select (0-7), or -1 to deselect
+	 * @param SlotIndex The slot to select (0-11), or -1 to deselect
 	 */
 	UFUNCTION(Server, Reliable, BlueprintCallable, Category = "Quick Inventory")
 	void RSv_SetHeldQuickSlot(int32 SlotIndex);
-
+	
 	/**
 	 * Assign an inventory item index to a quick slot
-	 * @param QuickSlotIndex The quick slot (0-7) to assign to
+	 * @param QuickSlotIndex The quick slot (0-11) to assign to
 	 * @param InventoryItemIndex The index in the main inventory array, or -1 to clear
 	 */
 	UFUNCTION(BlueprintCallable, Category = "Quick Inventory")
 	void Sv_SetQuickSlot(int32 QuickSlotIndex, int32 InventoryItemIndex);
-
+	
 	/**
 	 * Get the item type currently held in hand (if any)
 	 * @return The item type data asset, or nullptr if no item is held
 	 */
 	UFUNCTION(BlueprintPure, Category = "Quick Inventory")
 	class UItemTypeDataAsset* GetCurrentlyHeldItem() const;
-
+	
 	/**
 	 * Get the item type in a specific quick slot
-	 * @param SlotIndex The quick slot (0-7) to check
+	 * @param SlotIndex The quick slot (0-11) to check
 	 * @return The item type data asset, or nullptr if slot is empty
 	 */
 	UFUNCTION(BlueprintPure, Category = "Quick Inventory")

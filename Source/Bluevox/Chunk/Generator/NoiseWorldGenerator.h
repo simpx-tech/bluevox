@@ -1,115 +1,161 @@
-﻿// Fill out your copyright notice in the Description page of Project Settings.
-
-#pragma once
+﻿#pragma once
 
 #include "CoreMinimal.h"
 #include "WorldGenerator.h"
+#include "Bluevox/Chunk/Data/Piece.h"
 #include "NoiseWorldGenerator.generated.h"
 
 class UFastNoiseWrapper;
+class UInstanceTypeDataAsset;
 
-// Whittaker biome classification
 UENUM()
-enum class EBiomeType : uint8
+enum class EBiome : uint8
 {
-	Desert,
-	Savanna,
-	TropicalRainforest,
-	Grassland,
-	DeciduousForest,
-	TemperateRainforest,
-	Taiga,
-	Tundra,
-	Ice
+    Ocean,
+    Beach,
+    Plains,
+    Forest,
+    Desert,
+    Taiga,
+    Tundra,
+    Mountain
 };
 
-/**
- * 
- */
 UCLASS(EditInlineNew, DefaultToInstanced)
 class BLUEVOX_API UNoiseWorldGenerator : public UWorldGenerator
 {
 	GENERATED_BODY()
 
+public:
 	UNoiseWorldGenerator();
 
-	// Multiple noise layers for terrain generation
-	UPROPERTY()
-	UFastNoiseWrapper* ContinentalNoise; // Large scale continent shapes
+	virtual void PostLoad() override;
 
-	UPROPERTY()
-	UFastNoiseWrapper* ErosionNoise; // Erosion simulation
+	// ---------- Tunables ----------
+	// Seeds
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	bool bFixedSeed = false;
+	
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	int32 Seed = 1337;
 
-	UPROPERTY()
-	UFastNoiseWrapper* PeaksNoise; // Mountain peaks
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	int32 ContinentSeed = 0;
 
-	UPROPERTY()
-	UFastNoiseWrapper* DetailNoise; // Small scale details
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	int32 MountainSeed = 1;
 
-	UPROPERTY()
-	UFastNoiseWrapper* TemperatureNoise; // Temperature distribution
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	int32 DetailSeed = 2;
 
-	UPROPERTY()
-	UFastNoiseWrapper* PrecipitationNoise; // Precipitation/moisture distribution
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	int32 TemperatureSeed = 3;
 
-	UPROPERTY()
-	UFastNoiseWrapper* WorleyNoise; // Worley noise for mountain variation
+	UPROPERTY(EditAnywhere, Category = "Noise|Seeds")
+	int32 MoistureSeed = 4;
 
-	UPROPERTY()
-	UFastNoiseWrapper* RidgeNoise; // Ridge noise for mountain features
+	// Frequencies (applied to world XY block indices)
+	UPROPERTY(EditAnywhere, Category = "Noise|Frequency")
+	float ContinentFrequency = 0.002f; // very low frequency → big continents
 
-	// Terrain configuration
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "30", ClampMax = "100"))
-	int32 SeaLevel = 60;  // Lower sea level for more land (15 meters)
+	UPROPERTY(EditAnywhere, Category = "Noise|Frequency")
+	float MountainFrequency = 0.008f;  // medium frequency → mountain bands
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "200", ClampMax = "250"))
-	int32 MountainPeakHeight = 245;  // Mountains can reach 245 blocks (61.25 meters)
+	UPROPERTY(EditAnywhere, Category = "Noise|Frequency")
+	float DetailFrequency = 0.03f;     // high-frequency → small features
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "10", ClampMax = "50"))
-	int32 ValleyFloorHeight = 20;  // Valleys go down to 20 blocks (5 meters)
+	UPROPERTY(EditAnywhere, Category = "Noise|Frequency")
+	float TemperatureFrequency = 0.0015f;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "80", ClampMax = "140"))
-	int32 DefaultLandHeight = 110;  // Default land height above sea level
+	UPROPERTY(EditAnywhere, Category = "Noise|Frequency")
+	float MoistureFrequency = 0.0020f;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "0.001", ClampMax = "0.01"))
-	float TerrainScale = 0.0015f;  // Larger features for more dramatic terrain
+	// Elevation parameters (in layers)
+	UPROPERTY(EditAnywhere, Category = "Terrain|Heights")
+	int32 SeaLevelLayers = 256;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "0.2", ClampMax = "0.7"))
-	float MountainThreshold = 0.35f;  // Much lower threshold for frequent mountains
+	UPROPERTY(EditAnywhere, Category = "Terrain|Heights")
+	int32 MaxOceanDepthLayers = 160;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "0.1", ClampMax = "0.6"))
-	float ErosionStrength = 0.25f;  // Moderate erosion to preserve mountains
+	UPROPERTY(EditAnywhere, Category = "Terrain|Heights")
+	int32 MinOceanDepthLayers = 8;
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "0.5", ClampMax = "3.0"))
-	float TerrainAmplification = 1.8f;  // Higher amplification for dramatic features
+	UPROPERTY(EditAnywhere, Category = "Terrain|Heights")
+	int32 BaseLandHeightLayers = 160; // typical hills above sea
 
-	UPROPERTY(EditAnywhere, Category = "Terrain", meta = (ClampMin = "-0.5", ClampMax = "0.5"))
-	float LandBias = 0.3f;  // Positive bias to favor land over water
+	UPROPERTY(EditAnywhere, Category = "Terrain|Heights")
+	int32 MountainExtraHeightLayers = 320; // extra on top when in mountain regions
 
-	// Instance generation
+	UPROPERTY(EditAnywhere, Category = "Terrain|Heights")
+	int32 MaxDetailJitterLayers = 8; // micro variation from detail noise
+
+	UPROPERTY(EditAnywhere, Category = "Terrain|Surface")
+	int32 BeachDepthLayers = 4;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain|Surface")
+	int32 TopSoilDepthLayers = 4; // thickness of grass/sand/snow cap
+
+	// Additional dirt layers placed under topsoil in gentle slopes (not cliffs/mountains)
+	UPROPERTY(EditAnywhere, Category = "Terrain|Surface")
+	int32 SubSoilDepthLayers = 6;
+
+	UPROPERTY(EditAnywhere, Category = "Terrain|Surface")
+	int32 SnowLineAboveSeaLayers = 520; // approximate altitude when snow starts
+
+	// Slope threshold (layers per block) above which we expose stone as a cliff face
+	UPROPERTY(EditAnywhere, Category = "Terrain|Surface")
+	int32 CliffSlopeThresholdLayersPerBlock = 8;
+
+	// Instance spawning controls
+	UPROPERTY(EditAnywhere, Category = "Instances|Spawn")
+	bool bSpawnInstances = true;
+
+	UPROPERTY(EditAnywhere, Category = "Instances|Spawn")
+	float ForestSpawnMultiplier = 1.5f;
+	UPROPERTY(EditAnywhere, Category = "Instances|Spawn")
+	float PlainsSpawnMultiplier = 0.6f;
+	UPROPERTY(EditAnywhere, Category = "Instances|Spawn")
+	float TaigaSpawnMultiplier = 0.8f;
+	UPROPERTY(EditAnywhere, Category = "Instances|Spawn")
+	float DesertSpawnMultiplier = 0.2f;
+
+	// Biome thresholds
+	UPROPERTY(EditAnywhere, Category = "Biome")
+	float DesertTempThreshold = 0.7f;
+	UPROPERTY(EditAnywhere, Category = "Biome")
+	float ColdTempThreshold = 0.3f;
+	UPROPERTY(EditAnywhere, Category = "Biome")
+	float DryMoistureThreshold = 0.35f;
+	UPROPERTY(EditAnywhere, Category = "Biome")
+	float WetMoistureThreshold = 0.6f;
+
+	// Optional instance types that biomes can use (not required)
 	UPROPERTY(EditAnywhere, Category = "Instances")
-	TArray<class UInstanceTypeDataAsset*> InstanceTypes;
+	TArray<UInstanceTypeDataAsset*> InstanceTypes;
 
-	UPROPERTY(EditAnywhere, Category = "Instances", meta = (ClampMin = "1", ClampMax = "100"))
-	int32 MaxInstancesPerChunk = 20;  // Maximum instances to spawn per chunk
+protected:
+	// Cached noise wrappers
+	UPROPERTY()
+	UFastNoiseWrapper* ContinentNoise = nullptr;
+	UPROPERTY()
+	UFastNoiseWrapper* MountainNoise = nullptr;
+	UPROPERTY()
+	UFastNoiseWrapper* DetailNoise = nullptr;
+	UPROPERTY()
+	UFastNoiseWrapper* TempNoise = nullptr;
+	UPROPERTY()
+	UFastNoiseWrapper* MoistureNoise = nullptr;
+
+	// Helpers
+	static inline float RemapTo01(float v) { return 0.5f * (v + 1.0f); }
+	static inline float Clamp01(float v) { return FMath::Clamp(v, 0.0f, 1.0f); }
+
+	float Fractal2D(const UFastNoiseWrapper* Noise, float X, float Y, float BaseFreq, int32 Octaves, float Lacunarity, float Gain) const;
+	float ComputeLandMask(float X, float Y) const;
+	float ComputeMountainMask(float X, float Y) const;
+	void ChooseBiome(float Temp01, float Moist01, bool bIsOcean, bool bIsMountain, int32 ElevationLayers, EBiome& OutBiome) const;
+	void BuildColumn(int32 GroundHeightLayers, int32 SeaLevel, EBiome Biome, bool bIsCliff, bool bIsMountain, TArray<struct FPiece>& OutPieces) const;
 
 public:
-	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) const override;
-
-private:
-	// Terrain generation helpers
-	float GetTerrainHeight(float WorldX, float WorldY) const;
-	float GetTemperature(float WorldX, float WorldY, float Height) const;
-	float GetPrecipitation(float WorldX, float WorldY) const;
-	EBiomeType GetBiome(float Temperature, float Precipitation) const;
-	void ApplyErosion(TArray<float>& Heights, int32 ChunkX, int32 ChunkY) const;
-	void SmoothTerrain(TArray<float>& Heights) const;
-	EMaterial GetMaterialForBiome(float Height, EBiomeType Biome, float Temperature, float Precipitation, bool bIsUnderwater) const;
-	float GetMountainVariation(float WorldX, float WorldY) const;
-
-	// Utility functions for terrain shaping
-	static float Remap(float Value, float OldMin, float OldMax, float NewMin, float NewMax);
-	static float SmoothStep(float Edge0, float Edge1, float X);
-	static float TerrainCurve(float Value);
-	static float Lerp(float A, float B, float T);
+	virtual void GenerateChunk(const FChunkPosition& Position, TArray<FChunkColumn>& OutColumns, TArray<struct FEntityRecord>& OutEntities) override;
 };
